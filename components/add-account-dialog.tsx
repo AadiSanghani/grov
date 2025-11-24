@@ -202,7 +202,7 @@ export function AddAccountDialog({ open, onOpenChange, onSave }: AddAccountDialo
               </Button>
               <Button
                 onClick={handleSave}
-                className="px-6 bg-orange-600 hover:bg-orange-700 text-white"
+                className="px-6 bg-primary text-primary-foreground hover:bg-primary/90"
               >
                 Save
               </Button>

@@ -164,8 +164,8 @@ export default function Accounts() {
                 <YAxis />
                 <Tooltip />
                 <Legend />
-                <Line type="monotone" dataKey="pv" stroke="#8884d8" strokeWidth={3} activeDot={{ r: 8 }} />
-                <Line type="monotone" dataKey="uv" stroke="#82ca9d" strokeWidth={3} />
+                <Line type="monotone" dataKey="pv" stroke="#22577A" strokeWidth={3} activeDot={{ r: 8 }} />
+                <Line type="monotone" dataKey="uv" stroke="#38A3A5" strokeWidth={3} />
                 </LineChart>
             </ResponsiveContainer>
             </div>
