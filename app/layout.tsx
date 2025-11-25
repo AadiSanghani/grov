@@ -4,7 +4,6 @@ import type { Metadata } from "next"
 import {
   ClerkProvider,
   SignedIn,
-  UserButton,
 } from "@clerk/nextjs"
 import "./globals.css"
 
@@ -31,11 +30,6 @@ export default function RootLayout({
         </head>
         <body>
           <SignedIn>
-            <header className="border-b">
-              <div className="container mx-auto flex h-16 items-center justify-end px-4">
-                <UserButton />
-              </div>
-            </header>
             <SidebarProvider>
               <AppSidebar />
               <main className="flex-1 w-full overflow-auto">

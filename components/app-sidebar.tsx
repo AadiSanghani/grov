@@ -6,6 +6,7 @@ import { Sidebar,
     SidebarGroup, 
     SidebarGroupContent, 
     SidebarHeader,
+    SidebarFooter,
     SidebarMenu, 
     SidebarMenuButton, 
     SidebarMenuItem, 
@@ -15,6 +16,7 @@ import { ChartArea, CreditCard, Home, LayoutDashboard, PanelLeft } from "lucide-
 import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
+import { UserButton, useUser } from "@clerk/nextjs"
 
 const items = [
     {
@@ -42,6 +44,15 @@ const items = [
   export function AppSidebar() {
     const { toggleSidebar, open } = useSidebar()
     const [isHovered, setIsHovered] = React.useState(false)
+    const { user } = useUser()
+    const userButtonRef = React.useRef<HTMLDivElement>(null)
+
+    const handleFooterClick = () => {
+      const button = userButtonRef.current?.querySelector('button');
+      if (button) {
+        button.click();
+      }
+    }
 
     return (
       <Sidebar collapsible="icon">
@@ -133,6 +144,42 @@ const items = [
             </SidebarGroupContent>
           </SidebarGroup>
         </SidebarContent>
+        <SidebarFooter className="p-0 border-t">
+          {open ? (
+            <div 
+              className="flex items-center gap-2.5 p-3 hover:bg-accent cursor-pointer transition-colors relative"
+              onClick={handleFooterClick}
+            >
+              <div ref={userButtonRef} className="pointer-events-none">
+                <UserButton 
+                  appearance={{
+                    elements: {
+                      avatarBox: "w-8 h-8"
+                    }
+                  }}
+                />
+              </div>
+              <div className="flex flex-col flex-1 min-w-0">
+                <span className="text-sm font-medium truncate">
+                  {user?.fullName || user?.firstName || "My Account"}
+                </span>
+                <span className="text-xs text-muted-foreground truncate">
+                  {user?.primaryEmailAddress?.emailAddress}
+                </span>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center justify-center p-3">
+              <UserButton 
+                appearance={{
+                  elements: {
+                    avatarBox: "w-7 h-7"
+                  }
+                }}
+              />
+            </div>
+          )}
+        </SidebarFooter>
       </Sidebar>
     )
   }
