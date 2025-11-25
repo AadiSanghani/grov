@@ -1,12 +1,9 @@
-import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar"
+import { SidebarProvider } from "@/components/ui/sidebar"
 import { AppSidebar } from "@/components/app-sidebar"
 import type { Metadata } from "next"
 import {
   ClerkProvider,
-  SignInButton,
-  SignUpButton,
   SignedIn,
-  SignedOut,
   UserButton,
 } from "@clerk/nextjs"
 import "./globals.css"
@@ -33,25 +30,19 @@ export default function RootLayout({
           />
         </head>
         <body>
-          <header className="border-b">
-            <div className="container mx-auto flex h-16 items-center justify-between px-4">
-              <SignedOut>
-                <div className="flex gap-4">
-                  <SignInButton />
-                  <SignUpButton />
-                </div>
-              </SignedOut>
-              <SignedIn>
+          <SignedIn>
+            <header className="border-b">
+              <div className="container mx-auto flex h-16 items-center justify-end px-4">
                 <UserButton />
-              </SignedIn>
-            </div>
-          </header>
-          <SidebarProvider>
-            <AppSidebar />
-            <main className="flex-1 w-full overflow-auto">
-              {children}
-            </main>
-          </SidebarProvider>
+              </div>
+            </header>
+            <SidebarProvider>
+              <AppSidebar />
+              <main className="flex-1 w-full overflow-auto">
+                {children}
+              </main>
+            </SidebarProvider>
+          </SignedIn>
         </body>
       </html>
     </ClerkProvider>
