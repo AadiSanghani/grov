@@ -112,7 +112,7 @@ export function AddAccountDialog({ open, onOpenChange, setAccounts }: AddAccount
         id: account.id?.toString() || '',
         type: account.account_type,
         name: account.account_name,
-        subtype: formData.subtype, // Note: subtype isn't stored in DB, using form value
+        subtype: account.account_subtype || '',
         balance: parseFloat(account.account_balance) || 0,
         icon: accountIcons[account.account_type] || DollarSign,
         lastUpdated: 'Just now',

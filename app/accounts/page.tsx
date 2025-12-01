@@ -76,12 +76,11 @@ export default function Accounts() {
     const fetchAccounts = async () => {
       const accountsData = await getAccounts();
       
-      // Transform database format to UI format
       const transformedAccounts: Account[] = (accountsData || []).map((account) => ({
         id: account.id?.toString() || '',
         type: account.account_type,
         name: account.account_name,
-        subtype: '', // Subtype isn't stored in DB
+        subtype: account.account_subtype || '',
         balance: parseFloat(account.account_balance) || 0,
         icon: accountIcons[account.account_type] || accountIcons['Cash'],
         lastUpdated: 'Just now',

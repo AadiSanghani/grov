@@ -8,6 +8,7 @@ export interface Account {
   account_name: string
   account_type: string
   account_balance: string
+  account_subtype: string
   user_id?: string
 }
 
@@ -46,6 +47,7 @@ export async function createAccount(data: {
     account_name: data.name,
     account_type: data.type,
     account_balance: data.balance.toString(),
+    account_subtype: data.subtype,
     user_id: userId,
   }
   
