@@ -1,10 +1,12 @@
 "use client"
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { Button } from '@/components/ui/button';
 import { AddAccountDialog } from '@/components/add-account-dialog';
 import { ChevronDown, ChevronRight } from 'lucide-react';
+import { accountIcons } from '@/lib/constants';
+import { getAccounts } from '@/lib/accounts';
 
 interface Account {
   id: string;
@@ -69,6 +71,26 @@ export default function Accounts() {
   const [isAddAccountOpen, setIsAddAccountOpen] = useState(false);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    const fetchAccounts = async () => {
+      const accountsData = await getAccounts();
+      
+      // Transform database format to UI format
+      const transformedAccounts: Account[] = (accountsData || []).map((account) => ({
+        id: account.id?.toString() || '',
+        type: account.account_type,
+        name: account.account_name,
+        subtype: '', // Subtype isn't stored in DB
+        balance: parseFloat(account.account_balance) || 0,
+        icon: accountIcons[account.account_type] || accountIcons['Cash'],
+        lastUpdated: 'Just now',
+      }));
+      
+      setAccounts(transformedAccounts);
+    };
+    fetchAccounts();
+  }, []);
 
   const toggleGroup = (groupName: string) => {
     const newCollapsed = new Set(collapsedGroups);
@@ -157,7 +179,6 @@ export default function Accounts() {
                     Object.entries(groupedAccounts).map(([groupName, groupAccounts]) => {
                         const isCollapsed = collapsedGroups.has(groupName);
                         const total = getGroupTotal(groupName);
-                        const IconComponent = groupAccounts[0].icon;
                         
                         return (
                             <Card key={groupName} className="w-full">
@@ -178,26 +199,29 @@ export default function Accounts() {
 
                                 {!isCollapsed && (
                                     <div className="border-t">
-                                        {groupAccounts.map((account) => (
+                                        {groupAccounts.map((account) => {
+                                            const IconComponent = account.icon;
+                                            return (
                                             <div
                                                 key={account.id}
                                                 className="flex items-center justify-between p-4 hover:bg-accent/50 transition-colors border-b last:border-b-0"
                                             >
                                                 <div className="flex items-center gap-4 flex-1">
                                                     <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
-                                                        <account.icon className="h-5 w-5" />
+                                                        <IconComponent className="h-5 w-5" />
                                                     </div>
                                                     <div className="flex-1">
                                                         <div className="font-medium">{account.name}</div>
                                                         <div className="text-sm text-muted-foreground">{account.subtype}</div>
                                                     </div>
                                                 </div>
-                                                <div className="text-right">
+                                                    <div className="text-right">
                                                     <div className="font-semibold">{formatCurrency(account.balance)}</div>
                                                     <div className="text-sm text-muted-foreground">{account.lastUpdated}</div>
                                                 </div>
                                             </div>
-                                        ))}
+                                            );
+                                        })}
                                     </div>
                                 )}
                             </Card>
