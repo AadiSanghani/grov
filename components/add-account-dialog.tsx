@@ -104,7 +104,6 @@ export function AddAccountDialog({ open, onOpenChange, setAccounts }: AddAccount
         balance: balanceValue,
       });
       
-      // Fetch updated accounts and transform to UI format
       const accountsData = await getAccounts();
       
       // Transform database format to UI format
