@@ -6,6 +6,18 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DollarSign, TrendingUp, Home, Car, Award, ArrowUp, CreditCard, Building2, FileText, ArrowDown, ArrowLeft } from 'lucide-react';
+import { createAccount, getAccounts } from '@/lib/accounts';
+import { accountIcons } from '@/lib/constants';
+
+interface Account {
+  id: string;
+  type: string;
+  name: string;
+  subtype: string;
+  balance: number;
+  icon: any;
+  lastUpdated: string;
+}
 
 interface AccountFormData {
   name: string;
@@ -17,6 +29,7 @@ interface AddAccountDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSave?: (data: { type: string; formData: AccountFormData }) => void;
+  setAccounts: React.Dispatch<React.SetStateAction<Account[]>>;
 }
 
 const accountTypes = {
@@ -49,7 +62,7 @@ const accountSubtypes: { [key: string]: string[] } = {
   'Other Liabilities': ['Other'],
 };
 
-export function AddAccountDialog({ open, onOpenChange, onSave }: AddAccountDialogProps) {
+export function AddAccountDialog({ open, onOpenChange, setAccounts }: AddAccountDialogProps) {
   const [selectedAccountType, setSelectedAccountType] = useState<string | null>(null);
   const [formData, setFormData] = useState<AccountFormData>({
     name: '',
@@ -81,10 +94,33 @@ export function AddAccountDialog({ open, onOpenChange, onSave }: AddAccountDialo
     });
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (selectedAccountType) {
-      onSave?.({ type: selectedAccountType, formData });
+      const balanceValue = parseFloat(formData.balance.replace(/[^0-9.-]+/g, '')) || 0;
+      await createAccount({
+        type: selectedAccountType,
+        name: formData.name,
+        subtype: formData.subtype,
+        balance: balanceValue,
+      });
+      
+      // Fetch updated accounts and transform to UI format
+      const accountsData = await getAccounts();
+      
+      // Transform database format to UI format
+      const transformedAccounts: Account[] = (accountsData || []).map((account) => ({
+        id: account.id?.toString() || '',
+        type: account.account_type,
+        name: account.account_name,
+        subtype: formData.subtype, // Note: subtype isn't stored in DB, using form value
+        balance: parseFloat(account.account_balance) || 0,
+        icon: accountIcons[account.account_type] || DollarSign,
+        lastUpdated: 'Just now',
+      }));
+      
+      setAccounts(transformedAccounts);
     }
+    
     handleCancel();
   };
 

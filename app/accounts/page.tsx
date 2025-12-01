@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { Button } from '@/components/ui/button';
 import { AddAccountDialog } from '@/components/add-account-dialog';
-import { DollarSign, TrendingUp, Home, Car, Award, ArrowUp, CreditCard, Building2, FileText, ArrowDown, ChevronDown, ChevronRight } from 'lucide-react';
+import { ChevronDown, ChevronRight } from 'lucide-react';
 
 interface Account {
   id: string;
@@ -19,19 +19,6 @@ interface Account {
 interface GroupedAccounts {
   [key: string]: Account[];
 }
-
-const accountIcons: { [key: string]: any } = {
-  'Cash': DollarSign,
-  'Investments': TrendingUp,
-  'Real Estate': Home,
-  'Vehicles': Car,
-  'Valuables': Award,
-  'Other Assets': ArrowUp,
-  'Credit Card': CreditCard,
-  'Mortgage': Building2,
-  'Loans': FileText,
-  'Other Liabilities': ArrowDown,
-};
 
 const data = [
   {
@@ -82,22 +69,6 @@ export default function Accounts() {
   const [isAddAccountOpen, setIsAddAccountOpen] = useState(false);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
-
-  const handleSaveAccount = (data: { type: string; formData: { name: string; subtype: string; balance: string } }) => {
-    const balanceValue = parseFloat(data.formData.balance.replace(/[^0-9.-]+/g, '')) || 0;
-    
-    const newAccount: Account = {
-      id: Date.now().toString(),
-      type: data.type,
-      name: data.formData.name,
-      subtype: data.formData.subtype,
-      balance: balanceValue,
-      icon: accountIcons[data.type],
-      lastUpdated: 'Just now',
-    };
-    
-    setAccounts([...accounts, newAccount]);
-  };
 
   const toggleGroup = (groupName: string) => {
     const newCollapsed = new Set(collapsedGroups);
@@ -176,7 +147,7 @@ export default function Accounts() {
         <AddAccountDialog 
           open={isAddAccountOpen} 
           onOpenChange={setIsAddAccountOpen}
-          onSave={handleSaveAccount}
+          setAccounts={setAccounts}
         />
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
