@@ -37,7 +37,6 @@ const accountTypes = {
     { name: 'Cash', icon: DollarSign },
     { name: 'Investments', icon: TrendingUp },
     { name: 'Real Estate', icon: Home },
-    { name: 'Vehicles', icon: Car },
     { name: 'Valuables', icon: Award },
     { name: 'Other Assets', icon: ArrowUp },
   ],
@@ -45,6 +44,7 @@ const accountTypes = {
     { name: 'Credit Card', icon: CreditCard },
     { name: 'Mortgage', icon: Building2 },
     { name: 'Loans', icon: FileText },
+    { name: 'Vehicles', icon: Car },
     { name: 'Other Liabilities', icon: ArrowDown },
   ],
 };

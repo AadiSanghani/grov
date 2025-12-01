@@ -5,8 +5,9 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsi
 import { Button } from '@/components/ui/button';
 import { AddAccountDialog } from '@/components/add-account-dialog';
 import { ChevronDown, ChevronRight } from 'lucide-react';
-import { accountIcons } from '@/lib/constants';
+import { accountIcons, CATEGORY_COLORS } from '@/lib/constants';
 import { getAccounts } from '@/lib/accounts';
+
 
 interface Account {
   id: string;
@@ -21,6 +22,9 @@ interface Account {
 interface GroupedAccounts {
   [key: string]: Account[];
 }
+
+const ASSET_TYPES = ['Cash', 'Investments', 'Real Estate', 'Valuables', 'Other Assets'];
+const LIABILITY_TYPES = ['Credit Card', 'Mortgage', 'Loans', 'Vehicles','Other Liabilities' ];
 
 const data = [
   {
@@ -112,6 +116,10 @@ export default function Accounts() {
   const getGroupTotal = (groupName: string) => {
     return groupedAccounts[groupName]?.reduce((sum, acc) => sum + acc.balance, 0) || 0;
   };
+
+  const totalLiabilities = accounts
+    .filter(a => LIABILITY_TYPES.includes(a.type))
+    .reduce((sum, a) => sum + a.balance, 0);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -235,14 +243,97 @@ export default function Accounts() {
                 )}
             </div>
 
-            {/* Summary Card - Takes 1 column */}
+            {/* Summary Card */}
             <div className="lg:col-span-1">
                 <Card className="w-full">
                     <CardHeader>
                         <CardTitle>Summary</CardTitle>
                     </CardHeader>
-                    <CardContent>
-                        {/* Summary content will go here */}
+                    <CardContent className="space-y-6">
+                        {/* Assets Section */}
+                        <div>
+                            <div className="flex items-center justify-between mb-2">
+                                <span className="font-semibold">Assets</span>
+                                <span className="font-semibold">{formatCurrency(accounts.filter(a => ASSET_TYPES.includes(a.type)).reduce((sum, a) => sum + a.balance, 0))}</span>
+                            </div>
+                            <div className="h-2 w-full bg-muted rounded-full overflow-hidden flex mb-4">
+                                {ASSET_TYPES.map((type) => {
+                                    const amount = groupedAccounts[type]?.reduce((sum, acc) => sum + acc.balance, 0) || 0;
+                                    const total = accounts.filter(a => ASSET_TYPES.includes(a.type)).reduce((sum, a) => sum + a.balance, 0);
+                                    const percent = total > 0 ? (amount / total) * 100 : 0;
+                                    if (amount === 0) return null;
+                                    
+                                    return (
+                                        <div 
+                                            key={type}
+                                            style={{ width: `${percent}%`, backgroundColor: CATEGORY_COLORS[type] }}
+                                            className="h-full"
+                                        />
+                                    );
+                                })}
+                            </div>
+                            <div className="space-y-2">
+                                {ASSET_TYPES.map((type) => {
+                                    const amount = groupedAccounts[type]?.reduce((sum, acc) => sum + acc.balance, 0) || 0;
+                                    if (amount === 0) return null;
+                                    
+                                    return (
+                                        <div key={type} className="flex items-center justify-between text-sm">
+                                            <div className="flex items-center gap-2">
+                                                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: CATEGORY_COLORS[type] }} />
+                                                <span>{type}</span>
+                                            </div>
+                                            <span>{formatCurrency(amount)}</span>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
+                        {totalLiabilities > 0 && (
+                            <>
+                                <div className="h-px bg-border" />
+
+                                {/* Liabilities Section */}
+                                <div>
+                                    <div className="flex items-center justify-between mb-2">
+                                        <span className="font-semibold">Liabilities</span>
+                                        <span className="font-semibold">{formatCurrency(totalLiabilities)}</span>
+                                    </div>
+                                    <div className="h-2 w-full bg-muted rounded-full overflow-hidden flex mb-4">
+                                        {LIABILITY_TYPES.map((type) => {
+                                            const amount = groupedAccounts[type]?.reduce((sum, acc) => sum + acc.balance, 0) || 0;
+                                            const percent = totalLiabilities > 0 ? (amount / totalLiabilities) * 100 : 0;
+                                            if (amount === 0) return null;
+                                            
+                                            return (
+                                                <div 
+                                                    key={type}
+                                                    style={{ width: `${percent}%`, backgroundColor: CATEGORY_COLORS[type] }}
+                                                    className="h-full"
+                                                />
+                                            );
+                                        })}
+                                    </div>
+                                    <div className="space-y-2">
+                                        {LIABILITY_TYPES.map((type) => {
+                                            const amount = groupedAccounts[type]?.reduce((sum, acc) => sum + acc.balance, 0) || 0;
+                                            if (amount === 0) return null;
+                                            
+                                            return (
+                                                <div key={type} className="flex items-center justify-between text-sm">
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: CATEGORY_COLORS[type] }} />
+                                                        <span>{type}</span>
+                                                    </div>
+                                                    <span>{formatCurrency(amount)}</span>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            </>
+                        )}
                     </CardContent>
                 </Card>
             </div>
