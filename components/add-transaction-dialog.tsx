@@ -1,0 +1,415 @@
+"use client"
+
+import * as React from "react"
+import { useState, useEffect } from "react"
+import { Button } from "@/components/ui/button"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Calendar } from "@/components/ui/calendar"
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command"
+import { cn } from "@/lib/utils"
+import { CalendarIcon, Check, ChevronsUpDown, MinusCircle, PlusCircle } from "lucide-react"
+import { format } from "date-fns"
+import { TRANSACTION_CATEGORIES } from "@/lib/constants"
+import { getAccounts, type Account } from "@/lib/accounts"
+
+interface AddTransactionDialogProps {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+}
+
+export function AddTransactionDialog({
+  open,
+  onOpenChange,
+}: AddTransactionDialogProps) {
+  const [transactionType, setTransactionType] = useState<"debit" | "credit">("debit")
+  const [amount, setAmount] = useState("")
+  const [merchant, setMerchant] = useState("")
+  const [merchantOpen, setMerchantOpen] = useState(false)
+  const [date, setDate] = useState<Date>(new Date())
+  const [accountId, setAccountId] = useState("")
+  const [accountOpen, setAccountOpen] = useState(false)
+  const [category, setCategory] = useState("")
+  const [categoryOpen, setCategoryOpen] = useState(false)
+  const [notes, setNotes] = useState("")
+  const [accounts, setAccounts] = useState<Account[]>([])
+  const [loading, setLoading] = useState(true)
+
+  // Popular merchants for autocomplete
+  const popularMerchants = [
+    "Amazon",
+    "Walmart",
+    "Target",
+    "Starbucks",
+    "McDonald's",
+    "Costco",
+    "Apple",
+    "Netflix",
+    "Spotify",
+    "Uber",
+  ]
+
+  useEffect(() => {
+    if (open) {
+      loadAccounts()
+    }
+  }, [open])
+
+  const loadAccounts = async () => {
+    try {
+      setLoading(true)
+      const data = await getAccounts()
+      setAccounts(data || [])
+    } catch (error) {
+      console.error("Failed to load accounts:", error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    
+    // Validate amount is a number
+    const numAmount = parseFloat(amount)
+    if (isNaN(numAmount) || numAmount <= 0) {
+      alert("Please enter a valid amount")
+      return
+    }
+
+    // Here you would typically call an API to create the transaction
+    console.log({
+      transactionType,
+      amount: numAmount,
+      merchant,
+      date,
+      accountId,
+      category,
+      notes,
+    })
+
+    // Reset form
+    setTransactionType("debit")
+    setAmount("")
+    setMerchant("")
+    setDate(new Date())
+    setAccountId("")
+    setCategory("")
+    setNotes("")
+    
+    // Close dialog
+    onOpenChange(false)
+  }
+
+  const filteredMerchants = popularMerchants.filter((m) =>
+    m.toLowerCase().includes(merchant.toLowerCase())
+  )
+
+  const selectedCategory = TRANSACTION_CATEGORIES.flatMap((group) => group.items).find(
+    (item) => item.value === category
+  )
+
+  const selectedAccount = accounts.find(
+    (account) => account.id?.toString() === accountId
+  )
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-[600px] max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Add transaction</DialogTitle>
+        </DialogHeader>
+
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Transaction Type Toggle */}
+          <div className="flex gap-4">
+            <Button
+              type="button"
+              variant={transactionType === "debit" ? "default" : "outline"}
+              className="flex-1"
+              onClick={() => setTransactionType("debit")}
+            >
+              <MinusCircle className="w-4 h-4 mr-2" />
+              DEBIT
+            </Button>
+            <Button
+              type="button"
+              variant={transactionType === "credit" ? "default" : "outline"}
+              className="flex-1"
+              onClick={() => setTransactionType("credit")}
+            >
+              <PlusCircle className="w-4 h-4 mr-2" />
+              CREDIT
+            </Button>
+          </div>
+
+          {/* Amount */}
+          <div className="space-y-2">
+            <Label htmlFor="amount">Amount</Label>
+            <Input
+              id="amount"
+              type="text"
+              placeholder="$0.00"
+              value={amount}
+              onChange={(e) => {
+                const value = e.target.value.replace(/[^0-9.]/g, "")
+                setAmount(value)
+              }}
+              className="text-lg"
+            />
+          </div>
+
+          {/* Merchant */}
+          <div className="space-y-2">
+            <Label htmlFor="merchant">Merchant</Label>
+            <Popover open={merchantOpen} onOpenChange={setMerchantOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={merchantOpen}
+                  className="w-full justify-between"
+                >
+                  {merchant || "Search merchants..."}
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-(--radix-popover-trigger-width) p-0" align="start">
+                <Command>
+                  <CommandInput
+                    placeholder="Search merchants..."
+                    value={merchant}
+                    onValueChange={setMerchant}
+                  />
+                  <CommandList>
+                    <CommandEmpty>
+                      {merchant && (
+                        <div className="p-2">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            className="w-full"
+                            onClick={() => {
+                              setMerchantOpen(false)
+                            }}
+                          >
+                            Use "{merchant}"
+                          </Button>
+                        </div>
+                      )}
+                    </CommandEmpty>
+                    <CommandGroup>
+                      {filteredMerchants.map((m) => (
+                        <CommandItem
+                          key={m}
+                          value={m}
+                          onSelect={(currentValue) => {
+                            setMerchant(currentValue)
+                            setMerchantOpen(false)
+                          }}
+                        >
+                          <Check
+                            className={cn(
+                              "mr-2 h-4 w-4",
+                              merchant === m ? "opacity-100" : "opacity-0"
+                            )}
+                          />
+                          {m}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+          </div>
+
+          {/* Date */}
+          <div className="space-y-2">
+            <Label>Date</Label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className={cn(
+                    "w-full justify-start text-left font-normal",
+                    !date && "text-muted-foreground"
+                  )}
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {date ? format(date, "MMMM dd, yyyy") : <span>Pick a date</span>}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={date}
+                  onSelect={(newDate) => newDate && setDate(newDate)}
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
+          </div>
+
+          {/* Account */}
+          <div className="space-y-2">
+            <Label htmlFor="account">Account</Label>
+            <Popover open={accountOpen} onOpenChange={setAccountOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={accountOpen}
+                  className="w-full justify-between"
+                  disabled={loading}
+                >
+                  {loading ? (
+                    "Loading accounts..."
+                  ) : selectedAccount ? (
+                    selectedAccount.account_name
+                  ) : (
+                    "Select account..."
+                  )}
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-(--radix-popover-trigger-width) p-0" align="start">
+                <Command>
+                  <CommandInput placeholder="Search accounts..." />
+                  <CommandList>
+                    <CommandEmpty>
+                      {accounts.length === 0 ? "No accounts found." : "No account found."}
+                    </CommandEmpty>
+                    <CommandGroup>
+                      {accounts.map((account) => (
+                        <CommandItem
+                          key={account.id}
+                          value={account.account_name}
+                          onSelect={() => {
+                            setAccountId(account.id?.toString() || "")
+                            setAccountOpen(false)
+                          }}
+                        >
+                          <Check
+                            className={cn(
+                              "mr-2 h-4 w-4",
+                              accountId === account.id?.toString() ? "opacity-100" : "opacity-0"
+                            )}
+                          />
+                          {account.account_name}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+          </div>
+
+          {/* Category */}
+          <div className="space-y-2">
+            <Label htmlFor="category">Category</Label>
+            <Popover open={categoryOpen} onOpenChange={setCategoryOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={categoryOpen}
+                  className="w-full justify-between"
+                >
+                  {selectedCategory ? (
+                    <>
+                      <span className="mr-2">{selectedCategory.emoji}</span>
+                      {selectedCategory.label}
+                    </>
+                  ) : (
+                    "Search categories..."
+                  )}
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-(--radix-popover-trigger-width) p-0" side="right" align="start">
+                <Command>
+                  <CommandInput placeholder="Search categories..." />
+                  <CommandList>
+                    <CommandEmpty>No category found.</CommandEmpty>
+                    {TRANSACTION_CATEGORIES.map((group) => (
+                      <CommandGroup key={group.group} heading={group.group}>
+                        {group.items.map((item) => (
+                          <CommandItem
+                            key={item.value}
+                            value={item.value}
+                            onSelect={(currentValue) => {
+                              setCategory(currentValue)
+                              setCategoryOpen(false)
+                            }}
+                          >
+                            <Check
+                              className={cn(
+                                "mr-2 h-4 w-4",
+                                category === item.value ? "opacity-100" : "opacity-0"
+                              )}
+                            />
+                            <span className="mr-2">{item.emoji}</span>
+                            {item.label}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    ))}
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+          </div>
+
+          {/* Notes */}
+          <div className="space-y-2">
+            <Label htmlFor="notes">Notes</Label>
+            <Input
+              id="notes"
+              placeholder="Add a note..."
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+            />
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex gap-3 justify-end">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              className="bg-[#FF6B4A] hover:bg-[#FF6B4A]/90 text-white"
+            >
+              Add transaction
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
