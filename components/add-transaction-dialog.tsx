@@ -346,10 +346,10 @@ export function AddTransactionDialog({
                   <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-(--radix-popover-trigger-width) p-0" side="right" align="start">
+              <PopoverContent className="w-(--radix-popover-trigger-width) p-0 max-h-[800px]" side="right" align="start">
                 <Command>
                   <CommandInput placeholder="Search categories..." />
-                  <CommandList>
+                  <CommandList className="max-h-[750px]">
                     <CommandEmpty>No category found.</CommandEmpty>
                     {TRANSACTION_CATEGORIES.map((group) => (
                       <CommandGroup key={group.group} heading={group.group}>
