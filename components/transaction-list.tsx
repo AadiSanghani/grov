@@ -91,12 +91,6 @@ export function TransactionList({ transactions, onTransactionClick }: Transactio
                       <p className="font-medium truncate">{transaction.merchant}</p>
                     </div>
 
-                    {/* Account - placeholder for now */}
-                    <div className="flex items-center gap-2 min-w-[150px]">
-                      <span className="text-sm">💰</span>
-                      <span className="text-sm text-muted-foreground">Account</span>
-                    </div>
-
                     {/* Category */}
                     {categoryInfo && (
                       <div className="flex items-center gap-2 min-w-[150px]">
