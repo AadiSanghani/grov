@@ -144,7 +144,12 @@ export function AddTransactionDialog({
             <Button
               type="button"
               variant={transactionType === "debit" ? "default" : "outline"}
-              className="flex-1"
+              className={cn(
+                "flex-1",
+                transactionType === "debit" 
+                  ? "bg-primary text-primary-foreground hover:bg-primary/80 hover:text-primary-foreground" 
+                  : "hover:bg-muted hover:text-foreground"
+              )}
               onClick={() => setTransactionType("debit")}
             >
               <MinusCircle className="w-4 h-4 mr-2" />
@@ -153,7 +158,12 @@ export function AddTransactionDialog({
             <Button
               type="button"
               variant={transactionType === "credit" ? "default" : "outline"}
-              className="flex-1"
+              className={cn(
+                "flex-1",
+                transactionType === "credit" 
+                  ? "bg-primary text-primary-foreground hover:bg-primary/80 hover:text-primary-foreground" 
+                  : "hover:bg-muted hover:text-foreground"
+              )}
               onClick={() => setTransactionType("credit")}
             >
               <PlusCircle className="w-4 h-4 mr-2" />
