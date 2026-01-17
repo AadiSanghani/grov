@@ -141,7 +141,7 @@ export function AddTransactionDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[600px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-[600px] max-h-[90vh] overflow-y-auto shadow-2xl">
         <DialogHeader>
           <DialogTitle>Add transaction</DialogTitle>
         </DialogHeader>
@@ -232,7 +232,7 @@ export function AddTransactionDialog({
                   variant="outline"
                   role="combobox"
                   aria-expanded={merchantOpen}
-                  className="w-full justify-between"
+                  className="w-full justify-between font-normal"
                 >
                   {merchant || "Search merchants..."}
                   <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
@@ -294,7 +294,7 @@ export function AddTransactionDialog({
                     !date && "text-muted-foreground"
                   )}
                 >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  <CalendarIcon className="mr-0.5 h-4 w-4" />
                   {date ? format(date, "MMMM dd, yyyy") : <span>Pick a date</span>}
                 </Button>
               </PopoverTrigger>
@@ -322,7 +322,7 @@ export function AddTransactionDialog({
                   variant="outline"
                   role="combobox"
                   aria-expanded={accountOpen}
-                  className="w-full justify-between"
+                  className="w-full justify-between font-normal"
                   disabled={loading}
                 >
                   {loading ? (
@@ -377,7 +377,7 @@ export function AddTransactionDialog({
                   variant="outline"
                   role="combobox"
                   aria-expanded={categoryOpen}
-                  className="w-full justify-between"
+                  className="w-full justify-between font-normal"
                 >
                   {selectedCategory ? (
                     <div className="flex items-center">
@@ -437,13 +437,6 @@ export function AddTransactionDialog({
 
           {/* Action Buttons */}
           <div className="flex gap-3 justify-end">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-            >
-              Cancel
-            </Button>
             <Button
               type="submit"
               className="bg-[#FF6B4A] hover:bg-[#FF6B4A]/90 text-white"
