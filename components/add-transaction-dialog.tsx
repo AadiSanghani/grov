@@ -308,7 +308,6 @@ export function AddTransactionDialog({
                       setDateOpen(false)
                     }
                   }}
-                  initialFocus
                 />
               </PopoverContent>
             </Popover>
@@ -381,10 +380,10 @@ export function AddTransactionDialog({
                   className="w-full justify-between"
                 >
                   {selectedCategory ? (
-                    <>
+                    <div className="flex items-center">
                       <span className="mr-2">{selectedCategory.emoji}</span>
-                      {selectedCategory.label}
-                    </>
+                      <span>{selectedCategory.label}</span>
+                    </div>
                   ) : (
                     "Search categories..."
                   )}
