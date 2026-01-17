@@ -30,15 +30,18 @@ import { CalendarIcon, Check, ChevronsUpDown, MinusCircle, PlusCircle } from "lu
 import { format } from "date-fns"
 import { TRANSACTION_CATEGORIES } from "@/lib/constants"
 import { getAccounts, type Account } from "@/lib/accounts"
+import { createTransaction } from "@/lib/transactions"
 
 interface AddTransactionDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
+  onTransactionCreated?: () => void
 }
 
 export function AddTransactionDialog({
   open,
   onOpenChange,
+  onTransactionCreated,
 }: AddTransactionDialogProps) {
   const [transactionType, setTransactionType] = useState<"debit" | "credit">("debit")
   const [amount, setAmount] = useState("")
@@ -97,29 +100,38 @@ export function AddTransactionDialog({
       return
     }
 
-    // Here you would typically call an API to create the transaction
-    console.log({
-      transactionType,
-      amount: numAmount,
-      merchant,
-      date,
-      accountId,
-      category,
-      notes,
-    })
+    try {
+      await createTransaction({
+        transaction_type: transactionType,
+        amount: numAmount,
+        merchant,
+        date,
+        account_id: accountId,
+        category,
+        notes,
+      })
 
-    // Reset form
-    setTransactionType("debit")
-    setAmount("")
-    setDisplayAmount("$")
-    setMerchant("")
-    setDate(new Date())
-    setAccountId("")
-    setCategory("")
-    setNotes("")
-    
-    // Close dialog
-    onOpenChange(false)
+      // Notify parent to refresh transaction list
+      if (onTransactionCreated) {
+        onTransactionCreated()
+      }
+
+      // Reset form
+      setTransactionType("debit")
+      setAmount("")
+      setDisplayAmount("$")
+      setMerchant("")
+      setDate(new Date())
+      setAccountId("")
+      setCategory("")
+      setNotes("")
+      
+      // Close dialog
+      onOpenChange(false)
+    } catch (error) {
+      console.error("Failed to create transaction:", error)
+      alert("Failed to create transaction. Please try again.")
+    }
   }
 
   const filteredMerchants = popularMerchants.filter((m) =>
