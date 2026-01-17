@@ -151,7 +151,7 @@ export default function Transactions() {
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 flex-1 min-h-0">
           {/* Transactions Section */}
           <div className="lg:col-span-4 flex flex-col">
-            <div className="bg-background rounded-xl shadow-md hover:shadow-xl border overflow-hidden flex flex-col h-full transition-shadow duration-200">
+            <div className="bg-background rounded-xl hover:shadow-xl border overflow-hidden flex flex-col h-full transition-shadow duration-200">
               <div className="px-6 py-4 border-b shrink-0">
                 <h2 className="text-xl font-semibold">Transactions</h2>
               </div>
@@ -167,7 +167,7 @@ export default function Transactions() {
           {/* Right Column with Filter & Summary - Sticky */}
           <div className="space-y-4 flex flex-col sticky top-6 self-start h-[calc(100vh-3rem)]">
             {/* Filter & Sort Section */}
-            <div className="bg-background rounded-xl shadow-md hover:shadow-xl border overflow-hidden flex flex-col shrink-0 transition-shadow duration-200">
+            <div className="bg-background rounded-xl hover:shadow-xl border overflow-hidden flex flex-col shrink-0 transition-shadow duration-200">
               <div className="px-4 py-3 border-b shrink-0">
                 <h2 className="text-lg font-semibold">Filter & sort</h2>
               </div>
@@ -181,7 +181,7 @@ export default function Transactions() {
             </div>
 
             {/* Summary Section - Takes remaining height */}
-            <div className="bg-background rounded-xl shadow-md hover:shadow-xl border overflow-hidden flex flex-col flex-1 min-h-0 transition-shadow duration-200">
+            <div className="bg-background rounded-xl hover:shadow-xl border overflow-hidden flex flex-col flex-1 min-h-0 transition-shadow duration-200">
               <div className="px-4 py-3 border-b shrink-0">
                 <h2 className="text-lg font-semibold">Summary</h2>
               </div>
