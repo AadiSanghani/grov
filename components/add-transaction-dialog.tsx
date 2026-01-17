@@ -42,6 +42,7 @@ export function AddTransactionDialog({
 }: AddTransactionDialogProps) {
   const [transactionType, setTransactionType] = useState<"debit" | "credit">("debit")
   const [amount, setAmount] = useState("")
+  const [displayAmount, setDisplayAmount] = useState("$")
   const [merchant, setMerchant] = useState("")
   const [merchantOpen, setMerchantOpen] = useState(false)
   const [date, setDate] = useState<Date>(new Date())
@@ -109,6 +110,7 @@ export function AddTransactionDialog({
     // Reset form
     setTransactionType("debit")
     setAmount("")
+    setDisplayAmount("$")
     setMerchant("")
     setDate(new Date())
     setAccountId("")
@@ -178,10 +180,38 @@ export function AddTransactionDialog({
               id="amount"
               type="text"
               placeholder="$0.00"
-              value={amount}
+              value={displayAmount}
               onChange={(e) => {
-                const value = e.target.value.replace(/[^0-9.]/g, "")
+                let value = e.target.value.replace(/[^0-9.]/g, "")
+                
+                // Handle empty input
+                if (value === "") {
+                  setAmount("")
+                  setDisplayAmount("$")
+                  return
+                }
+                
+                // Prevent multiple decimal points
+                const parts = value.split(".")
+                if (parts.length > 2) {
+                  value = parts[0] + "." + parts.slice(1).join("")
+                }
+                
+                // Limit to 2 decimal places
+                if (parts.length === 2 && parts[1].length > 2) {
+                  value = parts[0] + "." + parts[1].slice(0, 2)
+                }
+                
                 setAmount(value)
+                
+                // Format with commas
+                const [integerPart, decimalPart] = value.split(".")
+                const formattedInteger = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, ",")
+                const formatted = decimalPart !== undefined 
+                  ? `$${formattedInteger}.${decimalPart}` 
+                  : `$${formattedInteger}`
+                
+                setDisplayAmount(formatted)
               }}
               className="text-lg"
             />
