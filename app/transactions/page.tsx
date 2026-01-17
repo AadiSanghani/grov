@@ -133,22 +133,11 @@ export default function Transactions() {
   }
 
   return (
-    <div className="flex h-screen">
-      {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0">
+    <div className="h-screen bg-muted/30 p-6 flex flex-col">
+      <div className="max-w-[1800px] mx-auto w-full flex flex-col flex-1 space-y-4">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b">
-          <div className="flex items-center gap-4">
-            <h1 className="text-2xl font-bold">Transactions</h1>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-sm text-muted-foreground hover:text-foreground"
-              disabled
-            >
-              Customize rules
-            </Button>
-          </div>
+        <div className="flex items-center justify-between shrink-0">
+          <h1 className="text-3xl font-bold">Transactions</h1>
           <Button 
             className="bg-[#FF6B4A] hover:bg-[#FF6B4A]/90 text-white"
             onClick={() => setIsAddTransactionOpen(true)}
@@ -158,58 +147,49 @@ export default function Transactions() {
           </Button>
         </div>
 
-        {/* Filter Bar - Top of list area */}
-        <div className="px-6 py-3 border-b bg-muted/30">
-          <div className="flex items-center justify-between">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-sm"
-              disabled
-            >
-              All transactions
-            </Button>
-            <div className="flex items-center gap-4">
-              <Button
-                variant="ghost"
-                size="sm"
-                disabled
-              >
-                Edit multiple
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-              >
-                Filter & sort
-              </Button>
+        {/* Three Section Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 flex-1 min-h-0">
+          {/* Transactions Section */}
+          <div className="lg:col-span-4 flex flex-col">
+            <div className="bg-background rounded-xl shadow-md hover:shadow-xl border overflow-hidden flex flex-col h-full transition-shadow duration-200">
+              <div className="px-6 py-4 border-b shrink-0">
+                <h2 className="text-xl font-semibold">Transactions</h2>
+              </div>
+              <div className="flex-1 overflow-y-auto p-6">
+                <TransactionList 
+                  transactions={filteredTransactions}
+                  onTransactionClick={handleTransactionClick}
+                />
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* Transaction List */}
-        <div className="flex-1 overflow-y-auto p-6">
-          <TransactionList 
-            transactions={filteredTransactions}
-            onTransactionClick={handleTransactionClick}
-          />
-        </div>
-      </div>
+          {/* Right Column with Filter & Summary - Sticky */}
+          <div className="space-y-4 flex flex-col sticky top-6 self-start h-[calc(100vh-3rem)]">
+            {/* Filter & Sort Section */}
+            <div className="bg-background rounded-xl shadow-md hover:shadow-xl border overflow-hidden flex flex-col shrink-0 transition-shadow duration-200">
+              <div className="px-4 py-3 border-b shrink-0">
+                <h2 className="text-lg font-semibold">Filter & sort</h2>
+              </div>
+              <div className="overflow-y-auto">
+                <TransactionFiltersPanel
+                  filters={filters}
+                  onFiltersChange={setFilters}
+                  accounts={accounts}
+                />
+              </div>
+            </div>
 
-      {/* Right Sidebar */}
-      <div className="w-[400px] flex flex-col border-l">
-        {/* Filters */}
-        <div className="flex-1 overflow-y-auto">
-          <TransactionFiltersPanel
-            filters={filters}
-            onFiltersChange={setFilters}
-            accounts={accounts}
-          />
-        </div>
-
-        {/* Summary */}
-        <div className="border-t">
-          <TransactionSummary transactions={filteredTransactions} />
+            {/* Summary Section - Takes remaining height */}
+            <div className="bg-background rounded-xl shadow-md hover:shadow-xl border overflow-hidden flex flex-col flex-1 min-h-0 transition-shadow duration-200">
+              <div className="px-4 py-3 border-b shrink-0">
+                <h2 className="text-lg font-semibold">Summary</h2>
+              </div>
+              <div className="overflow-y-auto">
+                <TransactionSummary transactions={filteredTransactions} />
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 

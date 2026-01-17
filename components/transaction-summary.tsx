@@ -73,38 +73,34 @@ export function TransactionSummary({ transactions }: TransactionSummaryProps) {
   }
 
   return (
-    <div className="space-y-4 p-6 bg-background border-l">
-      <h2 className="text-lg font-semibold">Summary</h2>
-
-      <Separator />
-
+    <div className="p-4">
       <div className="space-y-4">
         {/* Total transactions */}
         <div className="flex justify-between items-center">
-          <span className="text-sm text-muted-foreground">Total transactions</span>
-          <span className="font-semibold">{summary.totalTransactions}</span>
+          <span className="text-base text-muted-foreground">Total transactions</span>
+          <span className="font-semibold text-base">{summary.totalTransactions}</span>
         </div>
 
         {/* Largest transaction */}
         <div className="flex justify-between items-center">
-          <span className="text-sm text-muted-foreground">Largest transaction</span>
-          <span className="font-semibold text-green-600">
+          <span className="text-base text-muted-foreground">Largest transaction</span>
+          <span className="font-semibold text-base text-green-600">
             {formatCurrency(summary.largestIncome)}
           </span>
         </div>
 
         {/* Largest expense */}
         <div className="flex justify-between items-center">
-          <span className="text-sm text-muted-foreground">Largest expense</span>
-          <span className="font-semibold">
+          <span className="text-base text-muted-foreground">Largest expense</span>
+          <span className="font-semibold text-base">
             {formatCurrency(summary.largestExpense)}
           </span>
         </div>
 
         {/* Average transaction */}
         <div className="flex justify-between items-center">
-          <span className="text-sm text-muted-foreground">Average transaction</span>
-          <span className="font-semibold text-green-600">
+          <span className="text-base text-muted-foreground">Average transaction</span>
+          <span className="font-semibold text-base text-green-600">
             +{formatCurrency(summary.averageTransaction)}
           </span>
         </div>
@@ -113,16 +109,16 @@ export function TransactionSummary({ transactions }: TransactionSummaryProps) {
 
         {/* Total income */}
         <div className="flex justify-between items-center">
-          <span className="text-sm text-muted-foreground">Total income</span>
-          <span className="font-semibold text-green-600">
+          <span className="text-base text-muted-foreground">Total income</span>
+          <span className="font-semibold text-base text-green-600">
             +{formatCurrency(summary.totalIncome)}
           </span>
         </div>
 
         {/* Total spending */}
         <div className="flex justify-between items-center">
-          <span className="text-sm text-muted-foreground">Total spending</span>
-          <span className="font-semibold">
+          <span className="text-base text-muted-foreground">Total spending</span>
+          <span className="font-semibold text-base">
             {formatCurrency(summary.totalSpending)}
           </span>
         </div>
@@ -131,7 +127,7 @@ export function TransactionSummary({ transactions }: TransactionSummaryProps) {
 
         {/* First transaction */}
         <div className="flex justify-between items-center">
-          <span className="text-sm text-muted-foreground">First transaction</span>
+          <span className="text-base text-muted-foreground">First transaction</span>
           <span className="font-medium text-sm">
             {formatDate(summary.firstTransactionDate)}
           </span>
@@ -139,7 +135,7 @@ export function TransactionSummary({ transactions }: TransactionSummaryProps) {
 
         {/* Last transaction */}
         <div className="flex justify-between items-center">
-          <span className="text-sm text-muted-foreground">Last transaction</span>
+          <span className="text-base text-muted-foreground">Last transaction</span>
           <span className="font-medium text-sm">
             {formatDate(summary.lastTransactionDate)}
           </span>
