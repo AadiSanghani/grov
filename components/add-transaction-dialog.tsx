@@ -125,6 +125,11 @@ export function AddTransactionDialog({
     m.toLowerCase().includes(merchant.toLowerCase())
   )
 
+  // Check if the current merchant is custom (not in the popular list)
+  const isCustomMerchant = merchant && !popularMerchants.some(m => 
+    m.toLowerCase() === merchant.toLowerCase()
+  )
+
   const selectedCategory = TRANSACTION_CATEGORIES.flatMap((group) => group.items).find(
     (item) => item.value === category
   )
@@ -240,22 +245,16 @@ export function AddTransactionDialog({
                     onValueChange={setMerchant}
                   />
                   <CommandList>
-                    <CommandEmpty>
-                      {merchant && (
-                        <div className="p-2">
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            className="w-full"
-                            onClick={() => {
-                              setMerchantOpen(false)
-                            }}
-                          >
-                            Use "{merchant}"
-                          </Button>
-                        </div>
-                      )}
-                    </CommandEmpty>
+                    {isCustomMerchant && (
+                      <CommandItem
+                        onSelect={() => {
+                          setMerchantOpen(false)
+                        }}
+                      >
+                        Use "{merchant}"
+                      </CommandItem>
+                    )}
+                    <CommandEmpty>No merchant found.</CommandEmpty>
                     <CommandGroup>
                       {filteredMerchants.map((m) => (
                         <CommandItem
