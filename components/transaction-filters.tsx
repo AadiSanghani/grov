@@ -3,6 +3,7 @@
 import { TransactionFilters } from "@/lib/types"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Button } from "@/components/ui/button"
 import {
   Select,
   SelectContent,
@@ -10,8 +11,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
+import { Calendar } from "@/components/ui/calendar"
 import { Separator } from "@/components/ui/separator"
 import { Account } from "@/lib/accounts"
+import { CalendarIcon } from "lucide-react"
+import { cn } from "@/lib/utils"
 
 interface TransactionFiltersProps {
   filters: TransactionFilters
@@ -48,6 +57,14 @@ export function TransactionFiltersPanel({ filters, onFiltersChange, accounts }: 
     })
   }
 
+  const formatDate = (date: Date | undefined) => {
+    if (!date) return ""
+    const day = String(date.getDate()).padStart(2, '0')
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const year = String(date.getFullYear()).slice(-2)
+    return `${day}/${month}/${year}`
+  }
+
   return (
     <div className="space-y-3 p-4">
       {/* Search - Full Width */}
@@ -67,30 +84,61 @@ export function TransactionFiltersPanel({ filters, onFiltersChange, accounts }: 
       <div className="space-y-1.5">
         <Label className="text-sm">Date range</Label>
         <div className="grid grid-cols-2 gap-2">
-          <Input
-            type="date"
-            placeholder="Start date"
-            value={filters.dateStart ? format(filters.dateStart, "yyyy-MM-dd") : ""}
-            onChange={(e) => {
-              onFiltersChange({
-                ...filters,
-                dateStart: e.target.value ? new Date(e.target.value) : undefined,
-              })
-            }}
-            className="h-9 text-sm"
-          />
-          <Input
-            type="date"
-            placeholder="End date"
-            value={filters.dateEnd ? format(filters.dateEnd, "yyyy-MM-dd") : ""}
-            onChange={(e) => {
-              onFiltersChange({
-                ...filters,
-                dateEnd: e.target.value ? new Date(e.target.value) : undefined,
-              })
-            }}
-            className="h-9 text-sm"
-          />
+          {/* Start Date */}
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                className={cn(
+                  "h-9 justify-start text-left font-normal text-sm",
+                  !filters.dateStart && "text-muted-foreground"
+                )}
+              >
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {filters.dateStart ? formatDate(filters.dateStart) : "Start"}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar
+                mode="single"
+                selected={filters.dateStart}
+                onSelect={(date) => {
+                  onFiltersChange({
+                    ...filters,
+                    dateStart: date,
+                  })
+                }}
+              />
+            </PopoverContent>
+          </Popover>
+
+          {/* End Date */}
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                className={cn(
+                  "h-9 justify-start text-left font-normal text-sm",
+                  !filters.dateEnd && "text-muted-foreground"
+                )}
+              >
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {filters.dateEnd ? formatDate(filters.dateEnd) : "End"}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar
+                mode="single"
+                selected={filters.dateEnd}
+                onSelect={(date) => {
+                  onFiltersChange({
+                    ...filters,
+                    dateEnd: date,
+                  })
+                }}
+              />
+            </PopoverContent>
+          </Popover>
         </div>
       </div>
 
@@ -161,17 +209,4 @@ export function TransactionFiltersPanel({ filters, onFiltersChange, accounts }: 
       </div>
     </div>
   )
-}
-
-// Helper function
-function format(date: Date, formatStr: string): string {
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  
-  if (formatStr === "yyyy-MM-dd") {
-    return `${year}-${month}-${day}`
-  }
-  
-  return date.toLocaleDateString()
 }
