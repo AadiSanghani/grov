@@ -46,6 +46,7 @@ export function AddTransactionDialog({
   const [merchant, setMerchant] = useState("")
   const [merchantOpen, setMerchantOpen] = useState(false)
   const [date, setDate] = useState<Date>(new Date())
+  const [dateOpen, setDateOpen] = useState(false)
   const [accountId, setAccountId] = useState("")
   const [accountOpen, setAccountOpen] = useState(false)
   const [category, setCategory] = useState("")
@@ -284,7 +285,7 @@ export function AddTransactionDialog({
           {/* Date */}
           <div className="space-y-2">
             <Label>Date</Label>
-            <Popover>
+            <Popover open={dateOpen} onOpenChange={setDateOpen}>
               <PopoverTrigger asChild>
                 <Button
                   variant="outline"
@@ -301,7 +302,12 @@ export function AddTransactionDialog({
                 <Calendar
                   mode="single"
                   selected={date}
-                  onSelect={(newDate) => newDate && setDate(newDate)}
+                  onSelect={(newDate) => {
+                    if (newDate) {
+                      setDate(newDate)
+                      setDateOpen(false)
+                    }
+                  }}
                   initialFocus
                 />
               </PopoverContent>
