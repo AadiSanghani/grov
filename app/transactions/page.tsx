@@ -9,8 +9,8 @@ import { TransactionList } from "@/components/transaction-list"
 import { TransactionFiltersPanel } from "@/components/transaction-filters"
 import { TransactionSummary } from "@/components/transaction-summary"
 import { Transaction, TransactionFilters } from "@/lib/types"
-import { mockTransactions } from "@/lib/mock-transactions"
 import { getAccounts, type Account } from "@/lib/accounts"
+import { getTransactions } from "@/lib/transactions"
 
 export default function Transactions() {
   const [isAddTransactionOpen, setIsAddTransactionOpen] = useState(false)
@@ -37,10 +37,8 @@ export default function Transactions() {
     try {
       setLoading(true)
       
-      // For now, use mock data
-      // TODO: Replace with actual server action once database is set up
-      // const data = await getTransactions()
-      setTransactions(mockTransactions)
+      const transactionsData = await getTransactions()
+      setTransactions(transactionsData || [])
       
       // Load accounts for filter
       const accountsData = await getAccounts()

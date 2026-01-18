@@ -83,7 +83,7 @@ export function TransactionSummary({ transactions }: TransactionSummaryProps) {
 
         {/* Largest transaction */}
         <div className="flex justify-between items-center">
-          <span className="text-base text-muted-foreground">Largest transaction</span>
+          <span className="text-base text-muted-foreground">Largest Income</span>
           <span className="font-semibold text-base text-green-600">
             {formatCurrency(summary.largestIncome)}
           </span>
@@ -91,7 +91,7 @@ export function TransactionSummary({ transactions }: TransactionSummaryProps) {
 
         {/* Largest expense */}
         <div className="flex justify-between items-center">
-          <span className="text-base text-muted-foreground">Largest expense</span>
+          <span className="text-base text-muted-foreground">Largest Expense</span>
           <span className="font-semibold text-base">
             {formatCurrency(summary.largestExpense)}
           </span>
@@ -99,7 +99,7 @@ export function TransactionSummary({ transactions }: TransactionSummaryProps) {
 
         {/* Average transaction */}
         <div className="flex justify-between items-center">
-          <span className="text-base text-muted-foreground">Average transaction</span>
+          <span className="text-base text-muted-foreground">Average Transaction</span>
           <span className="font-semibold text-base text-green-600">
             +{formatCurrency(summary.averageTransaction)}
           </span>
@@ -109,7 +109,7 @@ export function TransactionSummary({ transactions }: TransactionSummaryProps) {
 
         {/* Total income */}
         <div className="flex justify-between items-center">
-          <span className="text-base text-muted-foreground">Total income</span>
+          <span className="text-base text-muted-foreground">Total Income</span>
           <span className="font-semibold text-base text-green-600">
             +{formatCurrency(summary.totalIncome)}
           </span>
@@ -117,7 +117,7 @@ export function TransactionSummary({ transactions }: TransactionSummaryProps) {
 
         {/* Total spending */}
         <div className="flex justify-between items-center">
-          <span className="text-base text-muted-foreground">Total spending</span>
+          <span className="text-base text-muted-foreground">Total Spending</span>
           <span className="font-semibold text-base">
             {formatCurrency(summary.totalSpending)}
           </span>
@@ -127,7 +127,7 @@ export function TransactionSummary({ transactions }: TransactionSummaryProps) {
 
         {/* First transaction */}
         <div className="flex justify-between items-center">
-          <span className="text-base text-muted-foreground">First transaction</span>
+          <span className="text-base text-muted-foreground">First Transaction</span>
           <span className="font-medium text-sm">
             {formatDate(summary.firstTransactionDate)}
           </span>
@@ -135,7 +135,7 @@ export function TransactionSummary({ transactions }: TransactionSummaryProps) {
 
         {/* Last transaction */}
         <div className="flex justify-between items-center">
-          <span className="text-base text-muted-foreground">Last transaction</span>
+          <span className="text-base text-muted-foreground">Last Transaction</span>
           <span className="font-medium text-sm">
             {formatDate(summary.lastTransactionDate)}
           </span>
