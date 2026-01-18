@@ -50,7 +50,7 @@ export function AddTransactionDialog({
   const [merchantOpen, setMerchantOpen] = useState(false)
   const [date, setDate] = useState<Date>(new Date())
   const [dateOpen, setDateOpen] = useState(false)
-  const [accountId, setAccountId] = useState("")
+  const [accountTypeId, setAccountTypeId] = useState("")
   const [accountOpen, setAccountOpen] = useState(false)
   const [category, setCategory] = useState("")
   const [categoryOpen, setCategoryOpen] = useState(false)
@@ -106,7 +106,7 @@ export function AddTransactionDialog({
         amount: numAmount,
         merchant,
         date,
-        account_id: accountId,
+        account_type_id: accountTypeId,
         category,
         notes,
       })
@@ -122,7 +122,7 @@ export function AddTransactionDialog({
       setDisplayAmount("$")
       setMerchant("")
       setDate(new Date())
-      setAccountId("")
+      setAccountTypeId("")
       setCategory("")
       setNotes("")
       
@@ -148,7 +148,7 @@ export function AddTransactionDialog({
   )
 
   const selectedAccount = accounts.find(
-    (account) => account.id?.toString() === accountId
+    (account) => account.id?.toString() === accountTypeId
   )
 
   return (
@@ -360,14 +360,14 @@ export function AddTransactionDialog({
                           key={account.id}
                           value={account.account_name}
                           onSelect={() => {
-                            setAccountId(account.id?.toString() || "")
+                            setAccountTypeId(account.id?.toString() || "")
                             setAccountOpen(false)
                           }}
                         >
                           <Check
                             className={cn(
                               "mr-2 h-4 w-4",
-                              accountId === account.id?.toString() ? "opacity-100" : "opacity-0"
+                              accountTypeId === account.id?.toString() ? "opacity-100" : "opacity-0"
                             )}
                           />
                           {account.account_name}

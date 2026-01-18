@@ -25,10 +25,10 @@ import { cn } from "@/lib/utils"
 interface TransactionFiltersProps {
   filters: TransactionFilters
   onFiltersChange: (filters: TransactionFilters) => void
-  accounts: Account[]
+  accountTypes: Account[]
 }
 
-export function TransactionFiltersPanel({ filters, onFiltersChange, accounts }: TransactionFiltersProps) {
+export function TransactionFiltersPanel({ filters, onFiltersChange, accountTypes }: TransactionFiltersProps) {
   const handleSortChange = (value: string) => {
     onFiltersChange({
       ...filters,
@@ -46,7 +46,7 @@ export function TransactionFiltersPanel({ filters, onFiltersChange, accounts }: 
   const handleAccountChange = (value: string) => {
     onFiltersChange({
       ...filters,
-      accounts: value === "all" ? [] : [value],
+      account_types: value === "all" ? [] : [value],
     })
   }
 
@@ -165,7 +165,7 @@ export function TransactionFiltersPanel({ filters, onFiltersChange, accounts }: 
         <div className="space-y-1.5">
           <Label className="text-sm">Accounts</Label>
           <Select 
-            value={filters.accounts.length > 0 ? filters.accounts[0] : "all"}
+            value={filters.account_types.length > 0 ? filters.account_types[0] : "all"}
             onValueChange={handleAccountChange}
           >
             <SelectTrigger className="h-9">
@@ -173,7 +173,7 @@ export function TransactionFiltersPanel({ filters, onFiltersChange, accounts }: 
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All accounts</SelectItem>
-              {accounts.map((account) => (
+              {accountTypes.map((account) => (
                 <SelectItem key={account.id} value={account.id?.toString() || ""}>
                   {account.account_name}
                 </SelectItem>

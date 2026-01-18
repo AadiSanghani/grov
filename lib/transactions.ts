@@ -34,7 +34,7 @@ export async function createTransaction(data: {
   amount: number
   merchant: string
   date: Date
-  account_id: string
+  account_type_id: string
   category: string
   notes?: string
 }) {
@@ -51,7 +51,7 @@ export async function createTransaction(data: {
     amount: data.amount,
     merchant: data.merchant,
     date: data.date.toISOString().split('T')[0], // Convert to YYYY-MM-DD format
-    account_id: data.account_id,
+    account_type_id: data.account_type_id,
     category: data.category,
     notes: data.notes || null,
   }
@@ -84,7 +84,7 @@ export async function updateTransaction(id: string, data: Partial<Transaction>) 
   if (data.amount !== undefined) updateData.amount = data.amount
   if (data.merchant) updateData.merchant = data.merchant
   if (data.date) updateData.date = data.date.toISOString().split('T')[0]
-  if (data.account_id) updateData.account_id = data.account_id
+  if (data.account_type_id) updateData.account_type_id = data.account_type_id
   if (data.category) updateData.category = data.category
   if (data.notes !== undefined) updateData.notes = data.notes
   

@@ -53,7 +53,7 @@ export function EditTransactionDialog({
   const [merchantOpen, setMerchantOpen] = useState(false)
   const [date, setDate] = useState<Date>(new Date())
   const [dateOpen, setDateOpen] = useState(false)
-  const [accountId, setAccountId] = useState("")
+  const [accountTypeId, setAccountTypeId] = useState("")
   const [accountOpen, setAccountOpen] = useState(false)
   const [category, setCategory] = useState("")
   const [categoryOpen, setCategoryOpen] = useState(false)
@@ -86,7 +86,7 @@ export function EditTransactionDialog({
       setDisplayAmount(`$${transaction.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`)
       setMerchant(transaction.merchant)
       setDate(transaction.date)
-      setAccountId(transaction.account_id)
+      setAccountTypeId(transaction.account_type_id)
       setCategory(transaction.category)
       setNotes(transaction.notes || "")
     }
@@ -122,7 +122,7 @@ export function EditTransactionDialog({
         amount: numAmount,
         merchant,
         date,
-        account_id: accountId,
+        account_type_id: accountTypeId,
         category,
         notes,
       })
@@ -173,7 +173,7 @@ export function EditTransactionDialog({
   )
 
   const selectedAccount = accounts.find(
-    (account) => account.id?.toString() === accountId
+    (account) => account.id?.toString() === accountTypeId
   )
 
   if (!transaction) return null
@@ -388,14 +388,14 @@ export function EditTransactionDialog({
                             key={account.id}
                             value={account.account_name}
                             onSelect={() => {
-                              setAccountId(account.id?.toString() || "")
+                              setAccountTypeId(account.id?.toString() || "")
                               setAccountOpen(false)
                             }}
                           >
                             <Check
                               className={cn(
                                 "mr-2 h-4 w-4",
-                                accountId === account.id?.toString() ? "opacity-100" : "opacity-0"
+                                accountTypeId === account.id?.toString() ? "opacity-100" : "opacity-0"
                               )}
                             />
                             {account.account_name}

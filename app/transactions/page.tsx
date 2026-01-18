@@ -23,7 +23,7 @@ export default function Transactions() {
     sortBy: "date",
     sortOrder: "desc",
     search: "",
-    accounts: [],
+    account_types: [],
     categories: [],
     tags: [],
   })
@@ -67,8 +67,8 @@ export default function Transactions() {
     }
 
     // Account filter
-    if (filters.accounts.length > 0) {
-      filtered = filtered.filter(t => filters.accounts.includes(t.account_id))
+    if (filters.account_types.length > 0) {
+      filtered = filtered.filter(t => filters.account_types.includes(t.account_type_id))
     }
 
     // Category filter
@@ -175,7 +175,7 @@ export default function Transactions() {
                 <TransactionFiltersPanel
                   filters={filters}
                   onFiltersChange={setFilters}
-                  accounts={accounts}
+                  accountTypes={accounts}
                 />
               </div>
             </div>

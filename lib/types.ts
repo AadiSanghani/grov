@@ -5,7 +5,7 @@ export interface Transaction {
   amount: number
   merchant: string
   date: Date
-  account_id: string
+  account_type_id: string
   category: string
   notes?: string
   created_at?: Date
@@ -16,7 +16,7 @@ export interface TransactionFilters {
   sortBy: "date" | "amount" | "merchant"
   sortOrder: "asc" | "desc"
   search: string
-  accounts: string[]
+  account_types: string[]
   categories: string[]
   amountMin?: number
   amountMax?: number
