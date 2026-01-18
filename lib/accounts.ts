@@ -21,7 +21,7 @@ export async function getAccounts() {
   }
   
   const { data, error } = await supabase
-    .from('accounts')
+    .from('account_types')
     .select('*')
     .eq('user_id', userId)
     
@@ -52,7 +52,7 @@ export async function createAccount(data: {
   }
   
   const { data: result, error } = await supabase
-    .from('accounts')
+    .from('account_types')
     .insert(accountData)
     .select()
     .single()
