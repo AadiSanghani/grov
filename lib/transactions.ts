@@ -21,9 +21,10 @@ export async function getTransactions() {
     
   if (error) throw error
   
-  // Convert date strings to Date objects
+  // Convert date strings to Date objects and ensure account_type_id is a string
   return data?.map(transaction => ({
     ...transaction,
+    account_type_id: transaction.account_type_id.toString(),
     date: new Date(transaction.date),
     created_at: transaction.created_at ? new Date(transaction.created_at) : undefined,
     updated_at: transaction.updated_at ? new Date(transaction.updated_at) : undefined,

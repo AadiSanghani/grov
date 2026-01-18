@@ -28,16 +28,18 @@ import {
 import { cn, formatCategoriesForUI } from "@/lib/utils"
 import { CalendarIcon, Check, ChevronsUpDown, MinusCircle, PlusCircle, Trash2 } from "lucide-react"
 import { format } from "date-fns"
-import { getAccounts, type Account } from "@/lib/accounts"
+import { type Account } from "@/lib/accounts"
 import { Transaction } from "@/lib/types"
 import { updateTransaction, deleteTransaction } from "@/lib/transactions"
-import { getCategories, type Category, type CategoryGroup } from "@/lib/categories"
+import { type Category, type CategoryGroup } from "@/lib/categories"
 
 interface EditTransactionDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   transaction: Transaction | null
   onTransactionUpdated: () => void
+  accounts: Account[]
+  categories: Category[]
 }
 
 export function EditTransactionDialog({
@@ -45,6 +47,8 @@ export function EditTransactionDialog({
   onOpenChange,
   transaction,
   onTransactionUpdated,
+  accounts,
+  categories,
 }: EditTransactionDialogProps) {
   const [transactionType, setTransactionType] = useState<"debit" | "credit">("debit")
   const [amount, setAmount] = useState("")
@@ -58,10 +62,7 @@ export function EditTransactionDialog({
   const [category, setCategory] = useState("")
   const [categoryOpen, setCategoryOpen] = useState(false)
   const [notes, setNotes] = useState("")
-  const [accounts, setAccounts] = useState<Account[]>([])
-  const [categories, setCategories] = useState<Category[]>([])
   const [formattedCategories, setFormattedCategories] = useState<CategoryGroup[]>([])
-  const [loading, setLoading] = useState(true)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
 
@@ -79,37 +80,26 @@ export function EditTransactionDialog({
     "Uber",
   ]
 
+  // Format categories when they change
+  useEffect(() => {
+    if (categories.length > 0) {
+      setFormattedCategories(formatCategoriesForUI(categories))
+    }
+  }, [categories])
+
+  // Pre-populate form when dialog opens with a transaction
   useEffect(() => {
     if (open && transaction) {
-      loadData()
-      // Pre-populate form with transaction data
       setTransactionType(transaction.transaction_type)
       setAmount(transaction.amount.toString())
       setDisplayAmount(`$${transaction.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`)
       setMerchant(transaction.merchant)
       setDate(transaction.date)
-      setAccountTypeId(transaction.account_type_id)
+      setAccountTypeId(transaction.account_type_id.toString())
       setCategory(transaction.category)
       setNotes(transaction.notes || "")
     }
   }, [open, transaction])
-
-  const loadData = async () => {
-    try {
-      setLoading(true)
-      const [accountsData, categoriesData] = await Promise.all([
-        getAccounts(),
-        getCategories()
-      ])
-      setAccounts(accountsData || [])
-      setCategories(categoriesData || [])
-      setFormattedCategories(formatCategoriesForUI(categoriesData || []))
-    } catch (error) {
-      console.error("Failed to load data:", error)
-    } finally {
-      setLoading(false)
-    }
-  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -370,11 +360,8 @@ export function EditTransactionDialog({
                     role="combobox"
                     aria-expanded={accountOpen}
                     className="w-full justify-between font-normal"
-                    disabled={loading}
                   >
-                    {loading ? (
-                      "Loading accounts..."
-                    ) : selectedAccount ? (
+                    {selectedAccount ? (
                       selectedAccount.account_name
                     ) : (
                       "Select account..."

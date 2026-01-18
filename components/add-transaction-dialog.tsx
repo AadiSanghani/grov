@@ -28,20 +28,24 @@ import {
 import { cn, formatCategoriesForUI } from "@/lib/utils"
 import { CalendarIcon, Check, ChevronsUpDown, MinusCircle, PlusCircle } from "lucide-react"
 import { format } from "date-fns"
-import { getAccounts, type Account } from "@/lib/accounts"
+import { type Account } from "@/lib/accounts"
 import { createTransaction } from "@/lib/transactions"
-import { getCategories, type Category, type CategoryGroup } from "@/lib/categories"
+import { type Category, type CategoryGroup } from "@/lib/categories"
 
 interface AddTransactionDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   onTransactionCreated?: () => void
+  accounts: Account[]
+  categories: Category[]
 }
 
 export function AddTransactionDialog({
   open,
   onOpenChange,
   onTransactionCreated,
+  accounts,
+  categories,
 }: AddTransactionDialogProps) {
   const [transactionType, setTransactionType] = useState<"debit" | "credit">("debit")
   const [amount, setAmount] = useState("")
@@ -55,10 +59,7 @@ export function AddTransactionDialog({
   const [category, setCategory] = useState("")
   const [categoryOpen, setCategoryOpen] = useState(false)
   const [notes, setNotes] = useState("")
-  const [accounts, setAccounts] = useState<Account[]>([])
-  const [categories, setCategories] = useState<Category[]>([])
   const [formattedCategories, setFormattedCategories] = useState<CategoryGroup[]>([])
-  const [loading, setLoading] = useState(true)
 
   // Popular merchants for autocomplete
   const popularMerchants = [
@@ -74,30 +75,12 @@ export function AddTransactionDialog({
     "Uber",
   ]
 
+  // Format categories when they change
   useEffect(() => {
-    if (open) {
-      loadData()
+    if (categories.length > 0) {
+      setFormattedCategories(formatCategoriesForUI(categories))
     }
-  }, [open])
-
-  const loadData = async () => {
-    try {
-      setLoading(true)
-      const [accountsData, categoriesData] = await Promise.all([
-        getAccounts(),
-        getCategories()
-      ])
-      console.log('Loaded categories:', categoriesData)
-      console.log('Formatted categories:', formatCategoriesForUI(categoriesData || []))
-      setAccounts(accountsData || [])
-      setCategories(categoriesData || [])
-      setFormattedCategories(formatCategoriesForUI(categoriesData || []))
-    } catch (error) {
-      console.error("Failed to load data:", error)
-    } finally {
-      setLoading(false)
-    }
-  }
+  }, [categories])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -340,19 +323,16 @@ export function AddTransactionDialog({
             <Popover open={accountOpen} onOpenChange={setAccountOpen}>
               <PopoverTrigger asChild>
                 <Button
-                  variant="outline"
-                  role="combobox"
-                  aria-expanded={accountOpen}
-                  className="w-full justify-between font-normal"
-                  disabled={loading}
-                >
-                  {loading ? (
-                    "Loading accounts..."
-                  ) : selectedAccount ? (
-                    selectedAccount.account_name
-                  ) : (
-                    "Select account..."
-                  )}
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={accountOpen}
+                    className="w-full justify-between font-normal"
+                  >
+                    {selectedAccount ? (
+                      selectedAccount.account_name
+                    ) : (
+                      "Select account..."
+                    )}
                   <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                 </Button>
               </PopoverTrigger>

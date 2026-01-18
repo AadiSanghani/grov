@@ -203,6 +203,8 @@ export default function Transactions() {
         open={isAddTransactionOpen}
         onOpenChange={setIsAddTransactionOpen}
         onTransactionCreated={handleTransactionUpdated}
+        accounts={accounts}
+        categories={categories}
       />
 
       <EditTransactionDialog
@@ -210,6 +212,8 @@ export default function Transactions() {
         onOpenChange={setIsEditTransactionOpen}
         transaction={selectedTransaction}
         onTransactionUpdated={handleTransactionUpdated}
+        accounts={accounts}
+        categories={categories}
       />
     </div>
   )
