@@ -64,3 +64,62 @@ export async function createAccount(data: {
   
   return result
 }
+
+export async function updateAccountBalance(accountId: string | number, newBalance: number) {
+  const supabase = createServerSupabaseClient()
+  const { userId } = await auth()
+  
+  if (!userId) {
+    throw new Error('User not authenticated')
+  }
+  
+  // Convert to number if it's a string
+  const numericAccountId = typeof accountId === 'string' ? parseInt(accountId, 10) : accountId
+  
+  console.log('Updating account balance:', { accountId, numericAccountId, newBalance, userId })
+  
+  const { data, error } = await supabase
+    .from('account_types')
+    .update({ account_balance: newBalance.toString() })
+    .eq('id', numericAccountId)
+    .eq('user_id', userId)
+    .select()
+    .single()
+    
+  if (error) {
+    console.error('Supabase error updating balance:', error)
+    throw error
+  }
+  
+  console.log('Balance updated successfully:', data)
+  return data
+}
+
+export async function getAccountById(accountId: string | number) {
+  const supabase = createServerSupabaseClient()
+  const { userId } = await auth()
+  
+  if (!userId) {
+    throw new Error('User not authenticated')
+  }
+  
+  // Convert to number if it's a string
+  const numericAccountId = typeof accountId === 'string' ? parseInt(accountId, 10) : accountId
+  
+  console.log('Getting account by ID:', { accountId, numericAccountId, userId })
+  
+  const { data, error } = await supabase
+    .from('account_types')
+    .select('*')
+    .eq('id', numericAccountId)
+    .eq('user_id', userId)
+    .single()
+    
+  if (error) {
+    console.error('Supabase error getting account:', error)
+    throw error
+  }
+  
+  console.log('Account retrieved:', data)
+  return data
+}

@@ -40,6 +40,5 @@ export async function getCategories() {
     throw error
   }
   
-  console.log('Categories from database:', data)
   return data
 }

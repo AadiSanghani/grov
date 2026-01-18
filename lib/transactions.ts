@@ -3,6 +3,7 @@
 import { createServerSupabaseClient } from '@/ssr/client'
 import { auth } from '@clerk/nextjs/server'
 import { Transaction } from './types'
+import { getAccountById, updateAccountBalance } from './accounts'
 
 export async function getTransactions() {
   const supabase = createServerSupabaseClient()
@@ -67,6 +68,28 @@ export async function createTransaction(data: {
     throw error
   }
   
+  // Update account balance
+  try {
+    console.log('Transaction created, updating account balance for account:', data.account_type_id)
+    const account = await getAccountById(data.account_type_id)
+    const currentBalance = parseFloat(account.account_balance)
+    
+    console.log('Current account balance:', currentBalance)
+    
+    // Debit decreases balance, credit increases balance
+    const newBalance = data.transaction_type === 'debit' 
+      ? currentBalance - data.amount 
+      : currentBalance + data.amount
+    
+    console.log('New balance to set:', newBalance)
+    
+    await updateAccountBalance(data.account_type_id, newBalance)
+    console.log('Account balance updated successfully')
+  } catch (balanceError) {
+    console.error('Failed to update account balance:', balanceError)
+    // Note: Transaction is already created, so we just log the error
+  }
+  
   return result
 }
 
@@ -76,6 +99,19 @@ export async function updateTransaction(id: string, data: Partial<Transaction>) 
   
   if (!userId) {
     throw new Error('User not authenticated')
+  }
+  
+  // Get the old transaction to reverse its effect on the account balance
+  const { data: oldTransaction, error: fetchError } = await supabase
+    .from('transactions')
+    .select('*')
+    .eq('id', id)
+    .eq('user_id', userId)
+    .single()
+    
+  if (fetchError) {
+    console.error('Supabase error:', fetchError)
+    throw fetchError
   }
   
   const updateData: any = {}
@@ -103,6 +139,54 @@ export async function updateTransaction(id: string, data: Partial<Transaction>) 
     throw error
   }
   
+  // Update account balances
+  try {
+    const oldAccountId = oldTransaction.account_type_id
+    const newAccountId = data.account_type_id || oldAccountId
+    const oldAmount = oldTransaction.amount
+    const newAmount = data.amount !== undefined ? data.amount : oldAmount
+    const oldType = oldTransaction.transaction_type
+    const newType = data.transaction_type || oldType
+    
+    // If account changed, we need to reverse the effect on the old account
+    if (oldAccountId !== newAccountId) {
+      // Reverse old transaction on old account
+      const oldAccount = await getAccountById(oldAccountId)
+      const oldAccountBalance = parseFloat(oldAccount.account_balance)
+      const reversedBalance = oldType === 'debit'
+        ? oldAccountBalance + oldAmount  // Reverse debit by adding back
+        : oldAccountBalance - oldAmount  // Reverse credit by subtracting
+      await updateAccountBalance(oldAccountId, reversedBalance)
+      
+      // Apply new transaction to new account
+      const newAccount = await getAccountById(newAccountId)
+      const newAccountBalance = parseFloat(newAccount.account_balance)
+      const updatedBalance = newType === 'debit'
+        ? newAccountBalance - newAmount
+        : newAccountBalance + newAmount
+      await updateAccountBalance(newAccountId, updatedBalance)
+    } else {
+      // Same account, just update the difference
+      const account = await getAccountById(oldAccountId)
+      const currentBalance = parseFloat(account.account_balance)
+      
+      // Reverse old transaction effect
+      const reversedBalance = oldType === 'debit'
+        ? currentBalance + oldAmount
+        : currentBalance - oldAmount
+      
+      // Apply new transaction effect
+      const newBalance = newType === 'debit'
+        ? reversedBalance - newAmount
+        : reversedBalance + newAmount
+      
+      await updateAccountBalance(oldAccountId, newBalance)
+    }
+  } catch (balanceError) {
+    console.error('Failed to update account balance:', balanceError)
+    // Note: Transaction is already updated, so we just log the error
+  }
+  
   return result
 }
 
@@ -114,6 +198,19 @@ export async function deleteTransaction(id: string) {
     throw new Error('User not authenticated')
   }
   
+  // Get the transaction to reverse its effect on the account balance
+  const { data: transaction, error: fetchError } = await supabase
+    .from('transactions')
+    .select('*')
+    .eq('id', id)
+    .eq('user_id', userId)
+    .single()
+    
+  if (fetchError) {
+    console.error('Supabase error:', fetchError)
+    throw fetchError
+  }
+  
   const { error } = await supabase
     .from('transactions')
     .delete()
@@ -123,6 +220,22 @@ export async function deleteTransaction(id: string) {
   if (error) {
     console.error('Supabase error:', error)
     throw error
+  }
+  
+  // Reverse the transaction's effect on the account balance
+  try {
+    const account = await getAccountById(transaction.account_type_id)
+    const currentBalance = parseFloat(account.account_balance)
+    
+    // Reverse the transaction effect
+    const newBalance = transaction.transaction_type === 'debit'
+      ? currentBalance + transaction.amount  // Reverse debit by adding back
+      : currentBalance - transaction.amount  // Reverse credit by subtracting
+    
+    await updateAccountBalance(transaction.account_type_id, newBalance)
+  } catch (balanceError) {
+    console.error('Failed to update account balance:', balanceError)
+    // Note: Transaction is already deleted, so we just log the error
   }
   
   return { success: true }
