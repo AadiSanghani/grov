@@ -19,6 +19,7 @@ import {
 import { Calendar } from "@/components/ui/calendar"
 import { Separator } from "@/components/ui/separator"
 import { Account } from "@/lib/accounts"
+import { Category } from "@/lib/categories"
 import { CalendarIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -26,9 +27,10 @@ interface TransactionFiltersProps {
   filters: TransactionFilters
   onFiltersChange: (filters: TransactionFilters) => void
   accountTypes: Account[]
+  categories: Category[]
 }
 
-export function TransactionFiltersPanel({ filters, onFiltersChange, accountTypes }: TransactionFiltersProps) {
+export function TransactionFiltersPanel({ filters, onFiltersChange, accountTypes, categories }: TransactionFiltersProps) {
   const handleSortChange = (value: string) => {
     onFiltersChange({
       ...filters,
@@ -194,15 +196,11 @@ export function TransactionFiltersPanel({ filters, onFiltersChange, accountTypes
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All categories</SelectItem>
-              <SelectItem value="paychecks">💵 Paychecks</SelectItem>
-              <SelectItem value="groceries">🛒 Groceries</SelectItem>
-              <SelectItem value="restaurants">🍽️ Restaurants</SelectItem>
-              <SelectItem value="gas">⛽ Gas</SelectItem>
-              <SelectItem value="mortgage">🏠 Mortgage</SelectItem>
-              <SelectItem value="phone">📱 Phone</SelectItem>
-              <SelectItem value="internet-cable">🌐 Internet & Cable</SelectItem>
-              <SelectItem value="coffee-shops">☕ Coffee Shops</SelectItem>
-              <SelectItem value="auto-payment">🚗 Auto Payment</SelectItem>
+              {categories.map((category) => (
+                <SelectItem key={category.id} value={category.id?.toString() || ""}>
+                  {category.emoji} {category.name}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>

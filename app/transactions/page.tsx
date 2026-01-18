@@ -180,6 +180,7 @@ export default function Transactions() {
                   filters={filters}
                   onFiltersChange={setFilters}
                   accountTypes={accounts}
+                  categories={categories}
                 />
               </div>
             </div>
