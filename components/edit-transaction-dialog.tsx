@@ -25,13 +25,13 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command"
-import { cn } from "@/lib/utils"
+import { cn, formatCategoriesForUI } from "@/lib/utils"
 import { CalendarIcon, Check, ChevronsUpDown, MinusCircle, PlusCircle, Trash2 } from "lucide-react"
 import { format } from "date-fns"
-import { TRANSACTION_CATEGORIES } from "@/lib/constants"
 import { getAccounts, type Account } from "@/lib/accounts"
 import { Transaction } from "@/lib/types"
 import { updateTransaction, deleteTransaction } from "@/lib/transactions"
+import { getCategories, type Category, type CategoryGroup } from "@/lib/categories"
 
 interface EditTransactionDialogProps {
   open: boolean
@@ -59,6 +59,8 @@ export function EditTransactionDialog({
   const [categoryOpen, setCategoryOpen] = useState(false)
   const [notes, setNotes] = useState("")
   const [accounts, setAccounts] = useState<Account[]>([])
+  const [categories, setCategories] = useState<Category[]>([])
+  const [formattedCategories, setFormattedCategories] = useState<CategoryGroup[]>([])
   const [loading, setLoading] = useState(true)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
@@ -79,7 +81,7 @@ export function EditTransactionDialog({
 
   useEffect(() => {
     if (open && transaction) {
-      loadAccounts()
+      loadData()
       // Pre-populate form with transaction data
       setTransactionType(transaction.transaction_type)
       setAmount(transaction.amount.toString())
@@ -92,13 +94,18 @@ export function EditTransactionDialog({
     }
   }, [open, transaction])
 
-  const loadAccounts = async () => {
+  const loadData = async () => {
     try {
       setLoading(true)
-      const data = await getAccounts()
-      setAccounts(data || [])
+      const [accountsData, categoriesData] = await Promise.all([
+        getAccounts(),
+        getCategories()
+      ])
+      setAccounts(accountsData || [])
+      setCategories(categoriesData || [])
+      setFormattedCategories(formatCategoriesForUI(categoriesData || []))
     } catch (error) {
-      console.error("Failed to load accounts:", error)
+      console.error("Failed to load data:", error)
     } finally {
       setLoading(false)
     }
@@ -168,7 +175,7 @@ export function EditTransactionDialog({
     m.toLowerCase() === merchant.toLowerCase()
   )
 
-  const selectedCategory = TRANSACTION_CATEGORIES.flatMap((group) => group.items).find(
+  const selectedCategory = formattedCategories.flatMap((group) => group.items).find(
     (item) => item.value === category
   )
 
@@ -435,7 +442,7 @@ export function EditTransactionDialog({
                     <CommandInput placeholder="Search categories..." />
                     <CommandList className="max-h-[750px]">
                       <CommandEmpty>No category found.</CommandEmpty>
-                      {TRANSACTION_CATEGORIES.map((group) => (
+                      {formattedCategories.map((group) => (
                         <CommandGroup key={group.group} heading={group.group}>
                           {group.items.map((item) => (
                             <CommandItem

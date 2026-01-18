@@ -3,11 +3,12 @@
 import { Transaction } from "@/lib/types"
 import { format } from "date-fns"
 import { ChevronRight } from "lucide-react"
-import { cn } from "@/lib/utils"
-import { TRANSACTION_CATEGORIES } from "@/lib/constants"
+import { cn, findCategoryByValue } from "@/lib/utils"
+import { Category } from "@/lib/categories"
 
 interface TransactionListProps {
   transactions: Transaction[]
+  categories: Category[]
   onTransactionClick: (transaction: Transaction) => void
 }
 
@@ -18,7 +19,7 @@ interface GroupedTransactions {
   }
 }
 
-export function TransactionList({ transactions, onTransactionClick }: TransactionListProps) {
+export function TransactionList({ transactions, categories, onTransactionClick }: TransactionListProps) {
   // Group transactions by date
   const groupedTransactions: GroupedTransactions = transactions.reduce((acc, transaction) => {
     const dateKey = format(transaction.date, "MMMM dd, yyyy")
@@ -40,15 +41,6 @@ export function TransactionList({ transactions, onTransactionClick }: Transactio
     
     return acc
   }, {} as GroupedTransactions)
-
-  // Get category info
-  const getCategoryInfo = (categoryValue: string) => {
-    for (const group of TRANSACTION_CATEGORIES) {
-      const item = group.items.find(i => i.value === categoryValue)
-      if (item) return item
-    }
-    return null
-  }
 
   if (transactions.length === 0) {
     return (
@@ -77,7 +69,7 @@ export function TransactionList({ transactions, onTransactionClick }: Transactio
           {/* Transaction Rows */}
           <div className="space-y-1">
             {transactions.map((transaction) => {
-              const categoryInfo = getCategoryInfo(transaction.category)
+              const categoryInfo = findCategoryByValue(categories, transaction.category)
               
               return (
                 <button

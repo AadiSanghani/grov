@@ -11,6 +11,7 @@ import { TransactionSummary } from "@/components/transaction-summary"
 import { Transaction, TransactionFilters } from "@/lib/types"
 import { getAccounts, type Account } from "@/lib/accounts"
 import { getTransactions } from "@/lib/transactions"
+import { getCategories, type Category } from "@/lib/categories"
 
 export default function Transactions() {
   const [isAddTransactionOpen, setIsAddTransactionOpen] = useState(false)
@@ -18,6 +19,7 @@ export default function Transactions() {
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null)
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [accounts, setAccounts] = useState<Account[]>([])
+  const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
   const [filters, setFilters] = useState<TransactionFilters>({
     sortBy: "date",
@@ -37,12 +39,15 @@ export default function Transactions() {
     try {
       setLoading(true)
       
-      const transactionsData = await getTransactions()
-      setTransactions(transactionsData || [])
+      const [transactionsData, accountsData, categoriesData] = await Promise.all([
+        getTransactions(),
+        getAccounts(),
+        getCategories()
+      ])
       
-      // Load accounts for filter
-      const accountsData = await getAccounts()
+      setTransactions(transactionsData || [])
       setAccounts(accountsData || [])
+      setCategories(categoriesData || [])
     } catch (error) {
       console.error("Failed to load data:", error)
     } finally {
@@ -156,6 +161,7 @@ export default function Transactions() {
               <div className="flex-1 overflow-y-auto p-6">
                 <TransactionList 
                   transactions={filteredTransactions}
+                  categories={categories}
                   onTransactionClick={handleTransactionClick}
                 />
               </div>
