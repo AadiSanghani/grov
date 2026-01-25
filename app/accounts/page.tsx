@@ -7,6 +7,13 @@ import { AddAccountDialog } from '@/components/add-account-dialog';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { accountIcons, CATEGORY_COLORS } from '@/lib/constants';
 import { getAccounts } from '@/lib/accounts';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 
 interface Account {
@@ -75,6 +82,7 @@ export default function Accounts() {
   const [isAddAccountOpen, setIsAddAccountOpen] = useState(false);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+  const [netWorthTimeline, setNetWorthTimeline] = useState<string>("last-30-days");
 
   useEffect(() => {
     const fetchAccounts = async () => {
@@ -144,8 +152,24 @@ export default function Accounts() {
     {/* Net Worth Chart */}
     <Card className="w-full mb-6">
         <CardHeader>
-            <CardTitle>Net Worth</CardTitle>
-            <CardDescription>Your net worth over time.</CardDescription>
+            <div className="flex items-center justify-between">
+                <div>
+                    <CardTitle>Net Worth</CardTitle>
+                    <CardDescription>Your net worth over time.</CardDescription>
+                </div>
+                <Select value={netWorthTimeline} onValueChange={setNetWorthTimeline}>
+                    <SelectTrigger className="w-[180px]">
+                        <SelectValue placeholder="Select timeline" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="last-30-days">Last 30 Days</SelectItem>
+                        <SelectItem value="month-to-date">Month to Date</SelectItem>
+                        <SelectItem value="last-6-months">Last 6 Months</SelectItem>
+                        <SelectItem value="year-to-date">Year to Date</SelectItem>
+                        <SelectItem value="all-time">All Time</SelectItem>
+                    </SelectContent>
+                </Select>
+            </div>
         </CardHeader>
         <CardContent className="pt-6">
             <div className="w-full h-[300px]">
