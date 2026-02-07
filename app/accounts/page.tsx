@@ -2,7 +2,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Button } from '@/components/ui/button';
 import { AddAccountDialog } from '@/components/add-account-dialog';
 import { ChevronDown, ChevronRight } from 'lucide-react';
@@ -138,15 +138,13 @@ export default function Accounts() {
     fetchNetWorthHistory();
   }, [netWorthTimeline]);
 
-  // Format chart data
+  // Format chart data for net worth line only
   const chartData = useMemo(() => {
     return netWorthData.map(point => ({
-      name: netWorthTimeline === 'all-time' 
-        ? format(new Date(point.date + '-01'), 'MMM yyyy')
-        : format(new Date(point.date), 'MMM dd'),
+      name: netWorthTimeline === 'all-time'
+        ? format(new Date(point.date + '-01'), 'MMM-dd-yyyy')
+        : format(new Date(point.date), 'MMM-dd-yyyy'),
       'Net Worth': point.net_worth,
-      'Assets': point.total_assets,
-      'Liabilities': point.total_liabilities,
     }));
   }, [netWorthData, netWorthTimeline]);
 
@@ -195,6 +193,9 @@ export default function Accounts() {
     }).format(amount);
   };
 
+  // Dynamic area color: red when net worth is negative, blue when positive
+  const netWorthChartColor = currentNetWorth < 0 ? '#ef4444' : '#3b82f6';
+
   return (
     <div className="w-full p-6">
         <div className="flex items-center justify-between mb-6">
@@ -212,7 +213,7 @@ export default function Accounts() {
         <CardHeader>
             <div className="flex items-center justify-between">
                 <div>
-                    <CardTitle>Net Worth</CardTitle>
+                    <CardTitle>Net Worth Over Time</CardTitle>
                     <CardDescription>
                       Current: {formatCurrency(currentNetWorth)}
                     </CardDescription>
@@ -232,29 +233,30 @@ export default function Accounts() {
               </div>
             ) : (
             <ResponsiveContainer width="100%" height="100%">
-                <LineChart
+                <AreaChart
                 data={chartData}
                 margin={{
-                    top: 5,
-                    right: 30,
-                    left: 20,
-                    bottom: 5,
+                    top: 24,
+                    right: 24,
+                    left: 24,
+                    bottom: 8,
                 }}
                 >
                 <CartesianGrid strokeDasharray="2 2" horizontal={true} vertical={false} />
-                <XAxis dataKey="name" />
-                <YAxis 
-                  tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
+                <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+                <YAxis
+                  tickFormatter={(value) => {
+                    if (value < 0) return `($${Math.abs(value).toLocaleString('en-US', { maximumFractionDigits: 0 })})`;
+                    return `$${value.toLocaleString('en-US', { maximumFractionDigits: 0 })}`;
+                  }}
+                  tick={{ fontSize: 12 }}
                 />
-                <Tooltip 
+                <Tooltip
                   formatter={(value: number) => formatCurrency(value)}
                   labelStyle={{ color: 'var(--foreground)' }}
                 />
-                <Legend />
-                <Line type="monotone" dataKey="Net Worth" stroke="#22577A" strokeWidth={3} activeDot={{ r: 8 }} dot={false} />
-                <Line type="monotone" dataKey="Assets" stroke="#38A3A5" strokeWidth={2} dot={false} />
-                <Line type="monotone" dataKey="Liabilities" stroke="#ef4444" strokeWidth={2} dot={false} />
-                </LineChart>
+                <Area type="monotone" dataKey="Net Worth" stroke={netWorthChartColor} fill={netWorthChartColor} fillOpacity={0.3} strokeWidth={2} />
+                </AreaChart>
             </ResponsiveContainer>
             )}
             </div>
