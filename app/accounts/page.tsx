@@ -82,9 +82,9 @@ function getDateRange(timeline: string): { startDate: string; endDate: string; g
     case 'month-to-date':
       return { startDate: format(startOfMonth(today), 'yyyy-MM-dd'), endDate, granularity: 'daily' };
     case 'last-6-months':
-      return { startDate: format(subMonths(today, 6), 'yyyy-MM-dd'), endDate, granularity: 'daily' };
+      return { startDate: format(subMonths(today, 6), 'yyyy-MM-dd'), endDate, granularity: 'monthly' };
     case 'year-to-date':
-      return { startDate: format(startOfYear(today), 'yyyy-MM-dd'), endDate, granularity: 'daily' };
+      return { startDate: format(startOfYear(today), 'yyyy-MM-dd'), endDate, granularity: 'monthly' };
     case 'all-time':
       return { startDate: '2020-01-01', endDate, granularity: 'monthly' };
     default:
@@ -138,15 +138,17 @@ export default function Accounts() {
     fetchNetWorthHistory();
   }, [netWorthTimeline]);
 
-  // Format chart data for net worth line only
+  const isMonthOnlyTimeline = ['last-6-months', 'year-to-date', 'all-time'].includes(netWorthTimeline);
+
   const chartData = useMemo(() => {
-    return netWorthData.map(point => ({
-      name: netWorthTimeline === 'all-time'
-        ? format(new Date(point.date + '-01'), 'MMM-dd-yyyy')
-        : format(new Date(point.date), 'MMM-dd-yyyy'),
-      'Net Worth': point.net_worth,
-    }));
-  }, [netWorthData, netWorthTimeline]);
+    return netWorthData.map(point => {
+      const dateStr = point.date.length === 7 ? point.date + '-01' : point.date;
+      const name = isMonthOnlyTimeline
+        ? format(new Date(dateStr), 'MMM yyyy')
+        : format(new Date(dateStr), 'MMM dd');
+      return { name, 'Net Worth': point.net_worth };
+    });
+  }, [netWorthData, isMonthOnlyTimeline]);
 
   // Calculate current net worth from accounts
   const currentNetWorth = useMemo(() => {
