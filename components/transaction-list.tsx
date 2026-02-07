@@ -33,8 +33,8 @@ export function TransactionList({ transactions, categories, onTransactionClick }
     
     acc[dateKey].transactions.push(transaction)
     
-    // Calculate daily total (credits positive, debits negative)
-    const amount = transaction.transaction_type === "credit" 
+    // Calculate daily total (incoming positive, outgoing negative)
+    const amount = transaction.transaction_type === "incoming" 
       ? transaction.amount 
       : -transaction.amount
     acc[dateKey].total += amount
@@ -96,11 +96,11 @@ export function TransactionList({ transactions, categories, onTransactionClick }
                   <div className="flex items-center gap-2">
                     <span className={cn(
                       "font-semibold",
-                      transaction.transaction_type === "credit" 
+                      transaction.transaction_type === "incoming" 
                         ? "text-green-600" 
                         : "text-foreground"
                     )}>
-                      {transaction.transaction_type === "credit" ? "+" : ""}
+                      {transaction.transaction_type === "incoming" ? "+" : ""}
                       ${transaction.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </span>
                     <ChevronRight className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />

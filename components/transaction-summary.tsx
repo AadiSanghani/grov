@@ -33,7 +33,7 @@ export function TransactionSummary({ transactions }: TransactionSummaryProps) {
     transactions.forEach((transaction) => {
       dates.push(transaction.date)
       
-      if (transaction.transaction_type === "credit") {
+      if (transaction.transaction_type === "incoming") {
         totalIncome += transaction.amount
         if (transaction.amount > largestIncome) {
           largestIncome = transaction.amount

@@ -56,3 +56,41 @@ export function findCategoryByValue(
   
   return null
 }
+
+// Account type classification
+const ASSET_TYPES = ['Cash', 'Investments', 'Real Estate', 'Valuables', 'Other Assets']
+const LIABILITY_TYPES = ['Credit Card', 'Mortgage', 'Loans', 'Vehicles', 'Other Liabilities']
+
+/**
+ * Determine if an account type is an asset or liability
+ */
+export function getCategoryFromAccountType(accountType: string): 'asset' | 'liability' {
+  if (ASSET_TYPES.includes(accountType)) return 'asset'
+  if (LIABILITY_TYPES.includes(accountType)) return 'liability'
+  // Default to asset if unknown
+  return 'asset'
+}
+
+/**
+ * Calculate balance delta based on transaction type and account category.
+ * 
+ * Convention:
+ * - Outgoing = money leaving (you spent/used money)
+ * - Incoming = money coming in (you received money)
+ * 
+ * For Assets: outgoing = -amount, incoming = +amount
+ * For Liabilities: outgoing = +amount (debt increases), incoming = -amount (debt decreases)
+ */
+export function calculateBalanceDelta(
+  transactionType: 'outgoing' | 'incoming',
+  amount: number,
+  accountCategory: 'asset' | 'liability'
+): number {
+  if (accountCategory === 'asset') {
+    // Assets: outgoing decreases, incoming increases
+    return transactionType === 'incoming' ? amount : -amount
+  } else {
+    // Liabilities: outgoing increases (more debt), incoming decreases (paying off)
+    return transactionType === 'outgoing' ? amount : -amount
+  }
+}

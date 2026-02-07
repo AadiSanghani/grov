@@ -2,6 +2,7 @@
 
 import { createServerSupabaseClient } from '@/ssr/client'
 import { auth } from '@clerk/nextjs/server'
+import { getCategoryFromAccountType } from './utils'
 
 export interface Account {
   id?: number
@@ -9,6 +10,7 @@ export interface Account {
   account_type: string
   account_balance: string
   account_subtype: string
+  category: 'asset' | 'liability'
   user_id?: string
 }
 
@@ -42,12 +44,16 @@ export async function createAccount(data: {
     throw new Error('User not authenticated')
   }
   
+  // Determine category based on account type
+  const category = getCategoryFromAccountType(data.type)
+  
   // Map the incoming data to match database schema
   const accountData: Omit<Account, 'id'> = {
     account_name: data.name,
     account_type: data.type,
     account_balance: data.balance.toString(),
     account_subtype: data.subtype,
+    category,
     user_id: userId,
   }
   
@@ -61,6 +67,17 @@ export async function createAccount(data: {
     console.error('Supabase error:', error)
     throw error
   }
+  
+  // Create initial entry in account_daily_balances for this account
+  const today = new Date().toISOString().split('T')[0]
+  await supabase
+    .from('account_daily_balances')
+    .upsert({
+      user_id: userId,
+      account_id: result.id,
+      date: today,
+      balance_amount: data.balance
+    }, { onConflict: 'account_id,date' })
   
   return result
 }

@@ -50,7 +50,7 @@ export function EditTransactionDialog({
   accounts,
   categories,
 }: EditTransactionDialogProps) {
-  const [transactionType, setTransactionType] = useState<"debit" | "credit">("debit")
+  const [transactionType, setTransactionType] = useState<"outgoing" | "incoming">("outgoing")
   const [amount, setAmount] = useState("")
   const [displayAmount, setDisplayAmount] = useState("$")
   const [merchant, setMerchant] = useState("")
@@ -188,31 +188,31 @@ export function EditTransactionDialog({
             <div className="flex gap-4">
               <Button
                 type="button"
-                variant={transactionType === "debit" ? "default" : "outline"}
+                variant={transactionType === "outgoing" ? "default" : "outline"}
                 className={cn(
                   "flex-1",
-                  transactionType === "debit" 
+                  transactionType === "outgoing" 
                     ? "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground" 
                     : "hover:bg-muted hover:text-foreground"
                 )}
-                onClick={() => setTransactionType("debit")}
+                onClick={() => setTransactionType("outgoing")}
               >
                 <MinusCircle className="w-4 h-4 mr-0.5" />
-                DEBIT
+                OUTGOING
               </Button>
               <Button
                 type="button"
-                variant={transactionType === "credit" ? "default" : "outline"}
+                variant={transactionType === "incoming" ? "default" : "outline"}
                 className={cn(
                   "flex-1",
-                  transactionType === "credit" 
+                  transactionType === "incoming" 
                     ? "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground" 
                     : "hover:bg-muted hover:text-foreground"
                 )}
-                onClick={() => setTransactionType("credit")}
+                onClick={() => setTransactionType("incoming")}
               >
                 <PlusCircle className="w-4 h-4 mr-0.5" />
-                CREDIT
+                INCOMING
               </Button>
             </div>
 

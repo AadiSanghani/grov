@@ -1,7 +1,7 @@
 export interface Transaction {
   id?: string
   user_id?: string
-  transaction_type: "debit" | "credit"
+  transaction_type: "outgoing" | "incoming"
   amount: number
   merchant: string
   date: Date
@@ -10,6 +10,23 @@ export interface Transaction {
   notes?: string
   created_at?: Date
   updated_at?: Date
+}
+
+export interface DailyBalance {
+  id?: number
+  user_id?: string
+  account_id: number
+  date: string  // YYYY-MM-DD
+  balance_amount: number
+  created_at?: Date
+  updated_at?: Date
+}
+
+export interface NetWorthDataPoint {
+  date: string
+  total_assets: number
+  total_liabilities: number
+  net_worth: number
 }
 
 export interface TransactionFilters {

@@ -1,5 +1,6 @@
 "use client"
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import dynamic from 'next/dynamic';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { Button } from '@/components/ui/button';
@@ -7,13 +8,46 @@ import { AddAccountDialog } from '@/components/add-account-dialog';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { accountIcons, CATEGORY_COLORS } from '@/lib/constants';
 import { getAccounts } from '@/lib/accounts';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { getNetWorthHistory } from '@/lib/balances';
+import { NetWorthDataPoint } from '@/lib/types';
+import { format, subDays, subMonths, startOfMonth, startOfYear } from 'date-fns';
+
+// Timeline select options
+const TIMELINE_OPTIONS = [
+  { value: "last-30-days", label: "Last 30 Days" },
+  { value: "month-to-date", label: "Month to Date" },
+  { value: "last-6-months", label: "Last 6 Months" },
+  { value: "year-to-date", label: "Year to Date" },
+  { value: "all-time", label: "All Time" },
+];
+
+// Client-only Timeline Select to avoid hydration mismatch with Radix UI's generated IDs
+function TimelineSelectInner({ value, onValueChange }: { value: string; onValueChange: (value: string) => void }) {
+  const { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } = require("@/components/ui/select");
+  
+  return (
+    <Select value={value} onValueChange={onValueChange}>
+      <SelectTrigger className="w-[180px]">
+        <SelectValue placeholder="Select timeline" />
+      </SelectTrigger>
+      <SelectContent>
+        {TIMELINE_OPTIONS.map((option) => (
+          <SelectItem key={option.value} value={option.value}>
+            {option.label}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
+
+// Dynamically import the entire Select component to avoid SSR hydration issues
+const TimelineSelect = dynamic(() => Promise.resolve(TimelineSelectInner), {
+  ssr: false,
+  loading: () => (
+    <div className="w-[180px] h-12 rounded-lg border border-input bg-background animate-pulse" />
+  ),
+});
 
 
 interface Account {
@@ -33,57 +67,40 @@ interface GroupedAccounts {
 const ASSET_TYPES = ['Cash', 'Investments', 'Real Estate', 'Valuables', 'Other Assets'];
 const LIABILITY_TYPES = ['Credit Card', 'Mortgage', 'Loans', 'Vehicles','Other Liabilities' ];
 
-const data = [
-  {
-    name: 'Page A',
-    uv: 4000,
-    pv: 2400,
-    amt: 2400,
-  },
-  {
-    name: 'Page B',
-    uv: 3000,
-    pv: 1398,
-    amt: 2210,
-  },
-  {
-    name: 'Page C',
-    uv: 2000,
-    pv: 9800,
-    amt: 2290,
-  },
-  {
-    name: 'Page D',
-    uv: 2780,
-    pv: 3908,
-    amt: 2000,
-  },
-  {
-    name: 'Page E',
-    uv: 1890,
-    pv: 4800,
-    amt: 2181,
-  },
-  {
-    name: 'Page F',
-    uv: 2390,
-    pv: 3800,
-    amt: 2500,
-  },
-  {
-    name: 'Page G',
-    uv: 3490,
-    pv: 4300,
-    amt: 2100,
-  },
-];
+// Helper to get date range based on timeline selection
+function getDateRange(timeline: string): { startDate: string; endDate: string; granularity: 'daily' | 'monthly' } {
+  const today = new Date();
+  // Add 1 day to end date to account for UTC vs local timezone differences
+  // This ensures we capture records created in UTC that might appear as "tomorrow" locally
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const endDate = format(tomorrow, 'yyyy-MM-dd');
+  
+  switch (timeline) {
+    case 'last-30-days':
+      return { startDate: format(subDays(today, 30), 'yyyy-MM-dd'), endDate, granularity: 'daily' };
+    case 'month-to-date':
+      return { startDate: format(startOfMonth(today), 'yyyy-MM-dd'), endDate, granularity: 'daily' };
+    case 'last-6-months':
+      return { startDate: format(subMonths(today, 6), 'yyyy-MM-dd'), endDate, granularity: 'daily' };
+    case 'year-to-date':
+      return { startDate: format(startOfYear(today), 'yyyy-MM-dd'), endDate, granularity: 'daily' };
+    case 'all-time':
+      return { startDate: '2020-01-01', endDate, granularity: 'monthly' };
+    default:
+      return { startDate: format(subDays(today, 30), 'yyyy-MM-dd'), endDate, granularity: 'daily' };
+  }
+}
 
 export default function Accounts() {
   const [isAddAccountOpen, setIsAddAccountOpen] = useState(false);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   const [netWorthTimeline, setNetWorthTimeline] = useState<string>("last-30-days");
+  const [netWorthData, setNetWorthData] = useState<NetWorthDataPoint[]>([]);
+  const [loadingNetWorth, setLoadingNetWorth] = useState(true);
 
+  // Fetch accounts on mount
   useEffect(() => {
     const fetchAccounts = async () => {
       const accountsData = await getAccounts();
@@ -102,6 +119,47 @@ export default function Accounts() {
     };
     fetchAccounts();
   }, []);
+
+  // Fetch net worth history when timeline changes
+  useEffect(() => {
+    const fetchNetWorthHistory = async () => {
+      setLoadingNetWorth(true);
+      try {
+        const { startDate, endDate, granularity } = getDateRange(netWorthTimeline);
+        const data = await getNetWorthHistory(startDate, endDate, granularity);
+        setNetWorthData(data);
+      } catch (error) {
+        console.error('Failed to fetch net worth history:', error);
+        setNetWorthData([]);
+      } finally {
+        setLoadingNetWorth(false);
+      }
+    };
+    fetchNetWorthHistory();
+  }, [netWorthTimeline]);
+
+  // Format chart data
+  const chartData = useMemo(() => {
+    return netWorthData.map(point => ({
+      name: netWorthTimeline === 'all-time' 
+        ? format(new Date(point.date + '-01'), 'MMM yyyy')
+        : format(new Date(point.date), 'MMM dd'),
+      'Net Worth': point.net_worth,
+      'Assets': point.total_assets,
+      'Liabilities': point.total_liabilities,
+    }));
+  }, [netWorthData, netWorthTimeline]);
+
+  // Calculate current net worth from accounts
+  const currentNetWorth = useMemo(() => {
+    const totalAssets = accounts
+      .filter(a => ASSET_TYPES.includes(a.type))
+      .reduce((sum, a) => sum + a.balance, 0);
+    const totalLiabilities = accounts
+      .filter(a => LIABILITY_TYPES.includes(a.type))
+      .reduce((sum, a) => sum + a.balance, 0);
+    return totalAssets - totalLiabilities;
+  }, [accounts]);
 
   const toggleGroup = (groupName: string) => {
     const newCollapsed = new Set(collapsedGroups);
@@ -155,27 +213,27 @@ export default function Accounts() {
             <div className="flex items-center justify-between">
                 <div>
                     <CardTitle>Net Worth</CardTitle>
-                    <CardDescription>Your net worth over time.</CardDescription>
+                    <CardDescription>
+                      Current: {formatCurrency(currentNetWorth)}
+                    </CardDescription>
                 </div>
-                <Select value={netWorthTimeline} onValueChange={setNetWorthTimeline}>
-                    <SelectTrigger className="w-[180px]">
-                        <SelectValue placeholder="Select timeline" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="last-30-days">Last 30 Days</SelectItem>
-                        <SelectItem value="month-to-date">Month to Date</SelectItem>
-                        <SelectItem value="last-6-months">Last 6 Months</SelectItem>
-                        <SelectItem value="year-to-date">Year to Date</SelectItem>
-                        <SelectItem value="all-time">All Time</SelectItem>
-                    </SelectContent>
-                </Select>
+                <TimelineSelect value={netWorthTimeline} onValueChange={setNetWorthTimeline} />
             </div>
         </CardHeader>
         <CardContent className="pt-6">
             <div className="w-full h-[300px]">
+            {loadingNetWorth ? (
+              <div className="flex items-center justify-center h-full">
+                <p className="text-muted-foreground">Loading net worth history...</p>
+              </div>
+            ) : chartData.length === 0 ? (
+              <div className="flex items-center justify-center h-full">
+                <p className="text-muted-foreground">No historical data available. Add transactions to see your net worth history.</p>
+              </div>
+            ) : (
             <ResponsiveContainer width="100%" height="100%">
                 <LineChart
-                data={data}
+                data={chartData}
                 margin={{
                     top: 5,
                     right: 30,
@@ -185,13 +243,20 @@ export default function Accounts() {
                 >
                 <CartesianGrid strokeDasharray="2 2" horizontal={true} vertical={false} />
                 <XAxis dataKey="name" />
-                <YAxis />
-                <Tooltip />
+                <YAxis 
+                  tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
+                />
+                <Tooltip 
+                  formatter={(value: number) => formatCurrency(value)}
+                  labelStyle={{ color: 'var(--foreground)' }}
+                />
                 <Legend />
-                <Line type="monotone" dataKey="pv" stroke="#22577A" strokeWidth={3} activeDot={{ r: 8 }} />
-                <Line type="monotone" dataKey="uv" stroke="#38A3A5" strokeWidth={3} />
+                <Line type="monotone" dataKey="Net Worth" stroke="#22577A" strokeWidth={3} activeDot={{ r: 8 }} dot={false} />
+                <Line type="monotone" dataKey="Assets" stroke="#38A3A5" strokeWidth={2} dot={false} />
+                <Line type="monotone" dataKey="Liabilities" stroke="#ef4444" strokeWidth={2} dot={false} />
                 </LineChart>
             </ResponsiveContainer>
+            )}
             </div>
         </CardContent>
     </Card>
