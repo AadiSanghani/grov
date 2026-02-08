@@ -444,7 +444,10 @@ export default function SpendingPage() {
                       />
                       <span className="text-sm shrink-0">{item.emoji}</span>
                       <div className="flex-1 min-w-0">
-                        <p className="font-medium text-sm truncate">
+                        <p className="font-semibold text-sm">
+                          {formatCurrency(item.amount)}
+                        </p>
+                        <p className="text-xs text-muted-foreground truncate mt-0.5">
                           {item.name}
                         </p>
                         <div className="h-1.5 rounded-full bg-muted mt-1 overflow-hidden">
@@ -457,9 +460,6 @@ export default function SpendingPage() {
                           />
                         </div>
                       </div>
-                      <span className="text-sm font-medium shrink-0">
-                        {formatCurrency(item.amount)}
-                      </span>
                       <span className="text-xs text-muted-foreground shrink-0 w-10 text-right">
                         {pct.toFixed(0)}%
                       </span>
