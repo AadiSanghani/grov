@@ -113,13 +113,12 @@ export default function Transactions() {
       filtered = filtered.filter(t => t.date <= filters.dateEnd!)
     }
 
-    // Sort
     filtered.sort((a, b) => {
       let comparison = 0
       
       switch (filters.sortBy) {
         case "date":
-          comparison = b.date.getTime() - a.date.getTime() // Default: newest first
+          comparison = b.date.getTime() - a.date.getTime()
           break
         case "amount":
           comparison = b.amount - a.amount
@@ -129,7 +128,13 @@ export default function Transactions() {
           break
       }
       
-      return filters.sortOrder === "asc" ? -comparison : comparison
+      if (comparison !== 0) {
+        return filters.sortOrder === "asc" ? -comparison : comparison
+      }
+
+      const aTime = a.created_at?.getTime() ?? Number.MAX_SAFE_INTEGER
+      const bTime = b.created_at?.getTime() ?? Number.MAX_SAFE_INTEGER
+      return bTime - aTime
     })
 
     return filtered
