@@ -22,7 +22,6 @@ interface Account {
 interface AccountFormData {
   name: string;
   subtype: string;
-  balance: string;
 }
 
 interface AddAccountDialogProps {
@@ -67,17 +66,21 @@ export function AddAccountDialog({ open, onOpenChange, setAccounts }: AddAccount
   const [formData, setFormData] = useState<AccountFormData>({
     name: '',
     subtype: '',
-    balance: '$0.00',
   });
+  const [balance, setBalance] = useState('');
+  const [displayBalance, setDisplayBalance] = useState('$');
+  const [errors, setErrors] = useState<{ name?: string; subtype?: string; balance?: string }>({});
 
   const handleAccountTypeSelect = (typeName: string) => {
     setSelectedAccountType(typeName);
     const subtypes = accountSubtypes[typeName] || [];
     setFormData({
-      name: `My ${typeName} Account`,
+      name: '',
       subtype: subtypes[0] || '',
-      balance: '$0.00',
     });
+    setBalance('');
+    setDisplayBalance('$');
+    setErrors({});
   };
 
   const handleBack = () => {
@@ -90,49 +93,60 @@ export function AddAccountDialog({ open, onOpenChange, setAccounts }: AddAccount
     setFormData({
       name: '',
       subtype: '',
-      balance: '$0.00',
     });
+    setBalance('');
+    setDisplayBalance('$');
+    setErrors({});
   };
 
   const handleSave = async () => {
-    if (selectedAccountType) {
-      const balanceValue = parseFloat(formData.balance.replace(/[^0-9.-]+/g, '')) || 0;
-      await createAccount({
-        type: selectedAccountType,
-        name: formData.name,
-        subtype: formData.subtype,
-        balance: balanceValue,
-      });
-      
-      const accountsData = await getAccounts();
-      
-      // Transform database format to UI format
-      const transformedAccounts: Account[] = (accountsData || []).map((account) => ({
-        id: account.id?.toString() || '',
-        type: account.account_type,
-        name: account.account_name,
-        subtype: account.account_subtype || '',
-        balance: parseFloat(account.account_balance) || 0,
-        icon: accountIcons[account.account_type] || DollarSign,
-        lastUpdated: 'Just now',
-      }));
-      
-      setAccounts(transformedAccounts);
+    if (!selectedAccountType) return;
+
+    const balanceValue = parseFloat(balance);
+    const newErrors: { name?: string; subtype?: string; balance?: string } = {};
+    if (!formData.name.trim()) newErrors.name = 'Name is required';
+    if (!formData.subtype) newErrors.subtype = 'Type is required';
+    if (balance === '' || isNaN(balanceValue)) newErrors.balance = 'Balance is required';
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      return;
     }
-    
+
+    setErrors({});
+    await createAccount({
+      type: selectedAccountType,
+      name: formData.name.trim(),
+      subtype: formData.subtype,
+      balance: balanceValue,
+    });
+
+    const accountsData = await getAccounts();
+
+    const transformedAccounts: Account[] = (accountsData || []).map((account) => ({
+      id: account.id?.toString() || '',
+      type: account.account_type,
+      name: account.account_name,
+      subtype: account.account_subtype || '',
+      balance: parseFloat(account.account_balance) || 0,
+      icon: accountIcons[account.account_type] || DollarSign,
+      lastUpdated: 'Just now',
+    }));
+
+    setAccounts(transformedAccounts);
     handleCancel();
   };
 
   return (
     <Dialog open={open} onOpenChange={handleCancel}>
-      <DialogContent className="max-w-md max-h-[80vh] overflow-hidden flex flex-col">
+      <DialogContent className="max-w-[600px] max-h-[90vh] overflow-y-auto shadow-2xl">
         {!selectedAccountType ? (
           <>
             <DialogHeader>
               <DialogTitle className="text-xl">Add Account</DialogTitle>
             </DialogHeader>
 
-            <div className="overflow-y-auto flex-1 -mx-6 px-6">
+            <div className="-mx-6 px-6">
               {/* Asset Section */}
               <div className="mb-6">
                 <h3 className="text-muted-foreground text-sm font-medium mb-3">Asset</h3>
@@ -140,10 +154,10 @@ export function AddAccountDialog({ open, onOpenChange, setAccounts }: AddAccount
                   {accountTypes.asset.map((type) => (
                     <button
                       key={type.name}
-                      className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-accent transition-colors text-left"
+                      className="group w-full flex items-center gap-3 p-3 rounded-lg hover:bg-accent hover:text-white transition-colors text-left"
                       onClick={() => handleAccountTypeSelect(type.name)}
                     >
-                      <type.icon className="h-5 w-5 text-foreground" />
+                      <type.icon className="h-5 w-5 text-foreground group-hover:text-white" />
                       <span className="text-base">{type.name}</span>
                     </button>
                   ))}
@@ -157,10 +171,10 @@ export function AddAccountDialog({ open, onOpenChange, setAccounts }: AddAccount
                   {accountTypes.liability.map((type) => (
                     <button
                       key={type.name}
-                      className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-accent transition-colors text-left"
+                      className="group w-full flex items-center gap-3 p-3 rounded-lg hover:bg-accent hover:text-white transition-colors text-left"
                       onClick={() => handleAccountTypeSelect(type.name)}
                     >
-                      <type.icon className="h-5 w-5 text-foreground" />
+                      <type.icon className="h-5 w-5 text-foreground group-hover:text-white" />
                       <span className="text-base">{type.name}</span>
                     </button>
                   ))}
@@ -182,16 +196,23 @@ export function AddAccountDialog({ open, onOpenChange, setAccounts }: AddAccount
               <DialogTitle className="text-xl pl-10">Add {selectedAccountType} Account</DialogTitle>
             </DialogHeader>
 
-            <div className="overflow-y-auto flex-1 space-y-6">
+            <div className="space-y-6">
               {/* Name Field */}
               <div>
                 <label className="text-base font-medium mb-2 block">Name</label>
                 <Input
                   value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  onChange={(e) => {
+                    setFormData({ ...formData, name: e.target.value });
+                    if (errors.name) setErrors((prev) => ({ ...prev, name: undefined }));
+                  }}
                   className="w-full"
                   placeholder={`My ${selectedAccountType} Account`}
+                  aria-invalid={!!errors.name}
                 />
+                {errors.name && (
+                  <p className="text-sm text-destructive mt-1">{errors.name}</p>
+                )}
               </div>
 
               {/* Type/Subtype Field */}
@@ -199,9 +220,12 @@ export function AddAccountDialog({ open, onOpenChange, setAccounts }: AddAccount
                 <label className="text-base font-medium mb-2 block">Type</label>
                 <Select
                   value={formData.subtype}
-                  onValueChange={(value) => setFormData({ ...formData, subtype: value })}
+                  onValueChange={(value) => {
+                    setFormData({ ...formData, subtype: value });
+                    if (errors.subtype) setErrors((prev) => ({ ...prev, subtype: undefined }));
+                  }}
                 >
-                  <SelectTrigger className="w-full">
+                  <SelectTrigger className="w-full" aria-invalid={!!errors.subtype}>
                     <SelectValue placeholder="Select type" />
                   </SelectTrigger>
                   <SelectContent>
@@ -212,17 +236,52 @@ export function AddAccountDialog({ open, onOpenChange, setAccounts }: AddAccount
                     ))}
                   </SelectContent>
                 </Select>
+                {errors.subtype && (
+                  <p className="text-sm text-destructive mt-1">{errors.subtype}</p>
+                )}
               </div>
 
               {/* Balance Field */}
               <div>
                 <label className="text-base font-medium mb-2 block">Balance</label>
                 <Input
-                  value={formData.balance}
-                  onChange={(e) => setFormData({ ...formData, balance: e.target.value })}
-                  className="w-full"
+                  type="text"
+                  value={displayBalance}
+                  className="w-full text-lg"
                   placeholder="$0.00"
+                  aria-invalid={!!errors.balance}
+                  onChange={(e) => {
+                    if (errors.balance) setErrors((prev) => ({ ...prev, balance: undefined }));
+                    let value = e.target.value.replace(/[^0-9.]/g, '');
+
+                    if (value === '') {
+                      setBalance('');
+                      setDisplayBalance('$');
+                      return;
+                    }
+
+                    const parts = value.split('.');
+                    if (parts.length > 2) {
+                      value = parts[0] + '.' + parts.slice(1).join('');
+                    }
+                    if (parts.length === 2 && parts[1].length > 2) {
+                      value = parts[0] + '.' + parts[1].slice(0, 2);
+                    }
+
+                    setBalance(value);
+
+                    const [integerPart, decimalPart] = value.split('.');
+                    const formattedInteger = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+                    const formatted =
+                      decimalPart !== undefined
+                        ? `$${formattedInteger}.${decimalPart}`
+                        : `$${formattedInteger}`;
+                    setDisplayBalance(formatted);
+                  }}
                 />
+                {errors.balance && (
+                  <p className="text-sm text-destructive mt-1">{errors.balance}</p>
+                )}
               </div>
             </div>
 
