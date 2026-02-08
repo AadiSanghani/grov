@@ -1,5 +1,6 @@
 "use client"
 
+import * as React from "react"
 import { Transaction } from "@/lib/types"
 import { format } from "date-fns"
 import { ChevronRight } from "lucide-react"
@@ -19,7 +20,7 @@ interface GroupedTransactions {
   }
 }
 
-export function TransactionList({ transactions, categories, onTransactionClick }: TransactionListProps) {
+export const TransactionList = React.memo(function TransactionList({ transactions, categories, onTransactionClick }: TransactionListProps) {
   // Group transactions by date
   const groupedTransactions: GroupedTransactions = transactions.reduce((acc, transaction) => {
     const dateKey = format(transaction.date, "MMMM dd, yyyy")
@@ -113,4 +114,4 @@ export function TransactionList({ transactions, categories, onTransactionClick }
       ))}
     </div>
   )
-}
+})

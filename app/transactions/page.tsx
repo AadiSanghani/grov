@@ -1,7 +1,7 @@
 "use client"
 
 import { Button } from "@/components/ui/button"
-import { useState, useEffect, useMemo } from "react"
+import { useState, useEffect, useMemo, useCallback } from "react"
 import { Plus } from "lucide-react"
 import { AddTransactionDialog } from "@/components/add-transaction-dialog"
 import { EditTransactionDialog } from "@/components/edit-transaction-dialog"
@@ -140,12 +140,12 @@ export default function Transactions() {
     return filtered
   }, [transactions, filters])
 
-  const handleTransactionClick = (transaction: Transaction) => {
+  const handleTransactionClick = useCallback((transaction: Transaction) => {
     setSelectedTransaction(transaction)
     setIsEditTransactionOpen(true)
-  }
+  }, [])
 
-  const handleOptimisticCreate = (data: TransactionFormData) => {
+  const handleOptimisticCreate = useCallback((data: TransactionFormData) => {
     const optimisticTx: Transaction = {
       id: `temp-${Date.now()}`,
       transaction_type: data.transaction_type,
@@ -157,17 +157,17 @@ export default function Transactions() {
       notes: data.notes || "",
     }
     setTransactions(prev => [optimisticTx, ...prev])
-  }
+  }, [])
 
-  const handleOptimisticUpdate = (id: string, data: Partial<Transaction>) => {
+  const handleOptimisticUpdate = useCallback((id: string, data: Partial<Transaction>) => {
     setTransactions(prev =>
       prev.map(t => (t.id === id ? { ...t, ...data } : t))
     )
-  }
+  }, [])
 
-  const handleOptimisticDelete = (id: string) => {
+  const handleOptimisticDelete = useCallback((id: string) => {
     setTransactions(prev => prev.filter(t => t.id !== id))
-  }
+  }, [])
 
   if (loading) {
     return (

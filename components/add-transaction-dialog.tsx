@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { useState, useEffect } from "react"
+import { useState, useMemo } from "react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import {
@@ -31,7 +31,7 @@ import { CalendarIcon, Check, ChevronsUpDown, MinusCircle, PlusCircle } from "lu
 import { format } from "date-fns"
 import { type Account } from "@/lib/accounts"
 import { createTransaction } from "@/lib/transactions"
-import { type Category, type CategoryGroup } from "@/lib/categories"
+import { type Category } from "@/lib/categories"
 import { useDataContext } from "@/app/data-context"
 
 export interface TransactionFormData {
@@ -73,16 +73,12 @@ export function AddTransactionDialog({
   const [category, setCategory] = useState("")
   const [categoryOpen, setCategoryOpen] = useState(false)
   const [notes, setNotes] = useState("")
-  const [formattedCategories, setFormattedCategories] = useState<CategoryGroup[]>([])
-
   const { merchants, addMerchant } = useDataContext()
-  const merchantNames = merchants.map((m) => m.name)
-
-  useEffect(() => {
-    if (categories.length > 0) {
-      setFormattedCategories(formatCategoriesForUI(categories))
-    }
-  }, [categories])
+  const merchantNames = useMemo(() => merchants.map((m) => m.name), [merchants])
+  const formattedCategories = useMemo(
+    () => (categories.length > 0 ? formatCategoriesForUI(categories) : []),
+    [categories]
+  )
 
   const resetForm = () => {
     setTransactionType("outgoing")
@@ -135,21 +131,24 @@ export function AddTransactionDialog({
     onAfterSave?.()
   }
 
-  const filteredMerchants = merchantNames.filter((m) =>
-    m.toLowerCase().includes(merchant.toLowerCase())
+  const filteredMerchants = useMemo(
+    () => merchantNames.filter((m) => m.toLowerCase().includes(merchant.toLowerCase())),
+    [merchantNames, merchant]
   )
 
   // Check if the current merchant is custom (not in the saved list)
-  const isCustomMerchant = merchant && !merchantNames.some(m => 
+  const isCustomMerchant = merchant && !merchantNames.some(m =>
     m.toLowerCase() === merchant.toLowerCase()
   )
 
-  const selectedCategory = formattedCategories.flatMap((group) => group.items).find(
-    (item) => item.value === category
+  const selectedCategory = useMemo(
+    () => formattedCategories.flatMap((group) => group.items).find((item) => item.value === category),
+    [formattedCategories, category]
   )
 
-  const selectedAccount = accounts.find(
-    (account) => account.id?.toString() === accountTypeId
+  const selectedAccount = useMemo(
+    () => accounts.find((account) => account.id?.toString() === accountTypeId),
+    [accounts, accountTypeId]
   )
 
   return (

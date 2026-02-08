@@ -1,5 +1,6 @@
 "use client"
 
+import * as React from "react"
 import { TransactionFilters } from "@/lib/types"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -30,7 +31,7 @@ interface TransactionFiltersProps {
   categories: Category[]
 }
 
-export function TransactionFiltersPanel({ filters, onFiltersChange, accountTypes, categories }: TransactionFiltersProps) {
+export const TransactionFiltersPanel = React.memo(function TransactionFiltersPanel({ filters, onFiltersChange, accountTypes, categories }: TransactionFiltersProps) {
   const handleSortChange = (value: string) => {
     onFiltersChange({
       ...filters,
@@ -207,4 +208,4 @@ export function TransactionFiltersPanel({ filters, onFiltersChange, accountTypes
       </div>
     </div>
   )
-}
+})

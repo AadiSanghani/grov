@@ -1,5 +1,6 @@
 "use client"
 
+import * as React from "react"
 import { Transaction } from "@/lib/types"
 import { useMemo } from "react"
 import { format } from "date-fns"
@@ -9,7 +10,7 @@ interface TransactionSummaryProps {
   transactions: Transaction[]
 }
 
-export function TransactionSummary({ transactions }: TransactionSummaryProps) {
+export const TransactionSummary = React.memo(function TransactionSummary({ transactions }: TransactionSummaryProps) {
   const summary = useMemo(() => {
     if (transactions.length === 0) {
       return {
@@ -143,4 +144,4 @@ export function TransactionSummary({ transactions }: TransactionSummaryProps) {
       </div>
     </div>
   )
-}
+})
