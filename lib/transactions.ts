@@ -38,6 +38,33 @@ export async function getTransactions() {
   })) as Transaction[]
 }
 
+export async function getTransactionsInRange(startDate: string, endDate: string) {
+  const supabase = createServerSupabaseClient()
+  const { userId } = await auth()
+
+  if (!userId) {
+    throw new Error('User not authenticated')
+  }
+
+  const { data, error } = await supabase
+    .from('transactions')
+    .select('*')
+    .eq('user_id', userId)
+    .gte('date', startDate)
+    .lte('date', endDate)
+    .order('date', { ascending: false })
+
+  if (error) throw error
+
+  return data?.map(transaction => ({
+    ...transaction,
+    account_type_id: transaction.account_type_id.toString(),
+    date: new Date(transaction.date),
+    created_at: transaction.created_at ? new Date(transaction.created_at) : undefined,
+    updated_at: transaction.updated_at ? new Date(transaction.updated_at) : undefined,
+  })) as Transaction[]
+}
+
 export async function createTransaction(data: {
   transaction_type: "outgoing" | "incoming"
   amount: number
