@@ -62,7 +62,7 @@ function ReportsDateSelect() {
   return (
     <div className="flex items-center gap-2">
       <Select value={timeline} onValueChange={setTimeline}>
-        <SelectTrigger className="w-[180px]">
+        <SelectTrigger className="h-9 min-w-[200px] text-sm font-normal">
           <SelectValue placeholder="Select range" />
         </SelectTrigger>
         <SelectContent>
