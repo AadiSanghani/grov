@@ -32,6 +32,7 @@ import { format } from "date-fns"
 import { type Account } from "@/lib/accounts"
 import { createTransaction } from "@/lib/transactions"
 import { type Category, type CategoryGroup } from "@/lib/categories"
+import { useDataContext } from "@/app/data-context"
 
 export interface TransactionFormData {
   transaction_type: "outgoing" | "incoming"
@@ -74,21 +75,9 @@ export function AddTransactionDialog({
   const [notes, setNotes] = useState("")
   const [formattedCategories, setFormattedCategories] = useState<CategoryGroup[]>([])
 
-  // Popular merchants for autocomplete
-  const popularMerchants = [
-    "Amazon",
-    "Walmart",
-    "Target",
-    "Starbucks",
-    "McDonald's",
-    "Costco",
-    "Apple",
-    "Netflix",
-    "Spotify",
-    "Uber",
-  ]
+  const { merchants, addMerchant } = useDataContext()
+  const merchantNames = merchants.map((m) => m.name)
 
-  // Format categories when they change
   useEffect(() => {
     if (categories.length > 0) {
       setFormattedCategories(formatCategoriesForUI(categories))
@@ -146,12 +135,12 @@ export function AddTransactionDialog({
     onAfterSave?.()
   }
 
-  const filteredMerchants = popularMerchants.filter((m) =>
+  const filteredMerchants = merchantNames.filter((m) =>
     m.toLowerCase().includes(merchant.toLowerCase())
   )
 
-  // Check if the current merchant is custom (not in the popular list)
-  const isCustomMerchant = merchant && !popularMerchants.some(m => 
+  // Check if the current merchant is custom (not in the saved list)
+  const isCustomMerchant = merchant && !merchantNames.some(m => 
     m.toLowerCase() === merchant.toLowerCase()
   )
 
@@ -273,10 +262,12 @@ export function AddTransactionDialog({
                     {isCustomMerchant && (
                       <CommandItem
                         onSelect={() => {
+                          // Persist the custom merchant to the database
+                          addMerchant(merchant).catch(console.error)
                           setMerchantOpen(false)
                         }}
                       >
-                        Use "{merchant}"
+                        Add "{merchant}"
                       </CommandItem>
                     )}
                     <CommandEmpty>No merchant found.</CommandEmpty>

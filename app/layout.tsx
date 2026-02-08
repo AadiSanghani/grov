@@ -1,6 +1,7 @@
 import { SidebarProvider } from "@/components/ui/sidebar"
 import { AppSidebar } from "@/components/app-sidebar"
 import { Toaster } from "@/components/ui/sonner"
+import { DataProvider } from "@/app/data-context"
 import type { Metadata } from "next"
 import {
   ClerkProvider,
@@ -31,12 +32,14 @@ export default function RootLayout({
         </head>
         <body>
           <SignedIn>
-            <SidebarProvider>
-              <AppSidebar />
-              <main className="flex-1 w-full overflow-auto">
-                {children}
-              </main>
-            </SidebarProvider>
+            <DataProvider>
+              <SidebarProvider>
+                <AppSidebar />
+                <main className="flex-1 w-full overflow-auto">
+                  {children}
+                </main>
+              </SidebarProvider>
+            </DataProvider>
           </SignedIn>
           <Toaster />
         </body>

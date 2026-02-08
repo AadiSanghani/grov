@@ -33,6 +33,7 @@ import { type Account } from "@/lib/accounts"
 import { Transaction } from "@/lib/types"
 import { updateTransaction, deleteTransaction } from "@/lib/transactions"
 import { type Category, type CategoryGroup } from "@/lib/categories"
+import { useDataContext } from "@/app/data-context"
 
 interface EditTransactionDialogProps {
   open: boolean
@@ -71,19 +72,8 @@ export function EditTransactionDialog({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
 
-  // Popular merchants for autocomplete
-  const popularMerchants = [
-    "Amazon",
-    "Walmart",
-    "Target",
-    "Starbucks",
-    "McDonald's",
-    "Costco",
-    "Apple",
-    "Netflix",
-    "Spotify",
-    "Uber",
-  ]
+  const { merchants, addMerchant } = useDataContext()
+  const merchantNames = merchants.map((m) => m.name)
 
   // Format categories when they change
   useEffect(() => {
@@ -176,12 +166,11 @@ export function EditTransactionDialog({
     onAfterSave?.()
   }
 
-  const filteredMerchants = popularMerchants.filter((m) =>
+  const filteredMerchants = merchantNames.filter((m) =>
     m.toLowerCase().includes(merchant.toLowerCase())
   )
 
-  // Check if the current merchant is custom (not in the popular list)
-  const isCustomMerchant = merchant && !popularMerchants.some(m => 
+  const isCustomMerchant = merchant && !merchantNames.some(m => 
     m.toLowerCase() === merchant.toLowerCase()
   )
 
@@ -306,10 +295,12 @@ export function EditTransactionDialog({
                       {isCustomMerchant && (
                         <CommandItem
                           onSelect={() => {
+                            // Persist the custom merchant to the database
+                            addMerchant(merchant).catch(console.error)
                             setMerchantOpen(false)
                           }}
                         >
-                          Use "{merchant}"
+                          Add "{merchant}"
                         </CommandItem>
                       )}
                       <CommandEmpty>No merchant found.</CommandEmpty>

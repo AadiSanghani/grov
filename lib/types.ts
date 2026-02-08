@@ -42,6 +42,13 @@ export interface TransactionFilters {
   tags: string[]
 }
 
+export interface Merchant {
+  id?: number
+  user_id?: string
+  name: string
+  created_at?: Date
+}
+
 export interface TransactionSummary {
   totalTransactions: number
   largestIncome: number
