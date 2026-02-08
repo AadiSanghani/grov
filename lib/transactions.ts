@@ -6,12 +6,10 @@ import { auth } from '@clerk/nextjs/server'
 import { Transaction } from './types'
 import { getAccountById, updateAccountBalance } from './accounts'
 import { 
-  ensureDailyBalance, 
-  rippleForwardBalances,
   recordTransactionBalance,
   reverseTransactionBalance
 } from './balances'
-import { calculateBalanceDelta, getCategoryFromAccountType } from './utils'
+import { calculateBalanceDelta } from './utils'
 
 export async function getTransactions() {
   const supabase = createServerSupabaseClient()
@@ -29,7 +27,6 @@ export async function getTransactions() {
     
   if (error) throw error
   
-  // Convert date strings to Date objects and ensure account_type_id is a string
   return data?.map(transaction => ({
     ...transaction,
     account_type_id: transaction.account_type_id.toString(),
