@@ -12,6 +12,7 @@ import { Transaction, TransactionFilters } from "@/lib/types"
 import { getAccounts, type Account } from "@/lib/accounts"
 import { getTransactions } from "@/lib/transactions"
 import { getCategories, type Category } from "@/lib/categories"
+import { type TransactionFormData } from "@/components/add-transaction-dialog"
 
 export default function Transactions() {
   const [isAddTransactionOpen, setIsAddTransactionOpen] = useState(false)
@@ -139,8 +140,28 @@ export default function Transactions() {
     setIsEditTransactionOpen(true)
   }
 
-  const handleTransactionUpdated = () => {
-    refreshData()
+  const handleOptimisticCreate = (data: TransactionFormData) => {
+    const optimisticTx: Transaction = {
+      id: `temp-${Date.now()}`,
+      transaction_type: data.transaction_type,
+      amount: data.amount,
+      merchant: data.merchant,
+      date: data.date,
+      account_type_id: data.account_type_id,
+      category: data.category,
+      notes: data.notes || "",
+    }
+    setTransactions(prev => [optimisticTx, ...prev])
+  }
+
+  const handleOptimisticUpdate = (id: string, data: Partial<Transaction>) => {
+    setTransactions(prev =>
+      prev.map(t => (t.id === id ? { ...t, ...data } : t))
+    )
+  }
+
+  const handleOptimisticDelete = (id: string) => {
+    setTransactions(prev => prev.filter(t => t.id !== id))
   }
 
   if (loading) {
@@ -218,7 +239,8 @@ export default function Transactions() {
       <AddTransactionDialog
         open={isAddTransactionOpen}
         onOpenChange={setIsAddTransactionOpen}
-        onTransactionCreated={handleTransactionUpdated}
+        onTransactionCreated={handleOptimisticCreate}
+        onAfterSave={refreshData}
         accounts={accounts}
         categories={categories}
       />
@@ -227,7 +249,9 @@ export default function Transactions() {
         open={isEditTransactionOpen}
         onOpenChange={setIsEditTransactionOpen}
         transaction={selectedTransaction}
-        onTransactionUpdated={handleTransactionUpdated}
+        onTransactionUpdated={handleOptimisticUpdate}
+        onTransactionDeleted={handleOptimisticDelete}
+        onAfterSave={refreshData}
         accounts={accounts}
         categories={categories}
       />

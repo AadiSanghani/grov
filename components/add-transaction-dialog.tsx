@@ -32,10 +32,21 @@ import { type Account } from "@/lib/accounts"
 import { createTransaction } from "@/lib/transactions"
 import { type Category, type CategoryGroup } from "@/lib/categories"
 
+export interface TransactionFormData {
+  transaction_type: "outgoing" | "incoming"
+  amount: number
+  merchant: string
+  date: Date
+  account_type_id: string
+  category: string
+  notes?: string
+}
+
 interface AddTransactionDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  onTransactionCreated?: () => void
+  onTransactionCreated?: (data: TransactionFormData) => void
+  onAfterSave?: () => void
   accounts: Account[]
   categories: Category[]
 }
@@ -44,6 +55,7 @@ export function AddTransactionDialog({
   open,
   onOpenChange,
   onTransactionCreated,
+  onAfterSave,
   accounts,
   categories,
 }: AddTransactionDialogProps) {
@@ -118,15 +130,15 @@ export function AddTransactionDialog({
     resetForm()
     onOpenChange(false)
 
+    onTransactionCreated?.(transactionData)
+
     try {
       await createTransaction(transactionData)
     } catch (error) {
       console.error("Failed to create transaction:", error)
     }
 
-    if (onTransactionCreated) {
-      onTransactionCreated()
-    }
+    onAfterSave?.()
   }
 
   const filteredMerchants = popularMerchants.filter((m) =>

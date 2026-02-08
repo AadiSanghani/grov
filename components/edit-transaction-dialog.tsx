@@ -37,7 +37,9 @@ interface EditTransactionDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   transaction: Transaction | null
-  onTransactionUpdated: () => void
+  onTransactionUpdated: (id: string, data: Partial<Transaction>) => void
+  onTransactionDeleted?: (id: string) => void
+  onAfterSave?: () => void
   accounts: Account[]
   categories: Category[]
 }
@@ -47,6 +49,8 @@ export function EditTransactionDialog({
   onOpenChange,
   transaction,
   onTransactionUpdated,
+  onTransactionDeleted,
+  onAfterSave,
   accounts,
   categories,
 }: EditTransactionDialogProps) {
@@ -128,15 +132,16 @@ export function EditTransactionDialog({
     // Close dialog immediately for snappy UX
     onOpenChange(false)
 
-    // Update transaction in the background
+
+    onTransactionUpdated(transactionId, updateData)
+
     try {
       await updateTransaction(transactionId, updateData)
     } catch (error) {
       console.error("Failed to update transaction:", error)
     }
 
-    // Notify parent to refresh the transaction list
-    onTransactionUpdated()
+    onAfterSave?.()
   }
 
   const handleDelete = async () => {
@@ -149,6 +154,9 @@ export function EditTransactionDialog({
     setShowDeleteConfirm(false)
     onOpenChange(false)
 
+    // Optimistic: remove from the list instantly
+    onTransactionDeleted?.(transactionId)
+
     // Delete transaction in the background
     try {
       await deleteTransaction(transactionId)
@@ -156,8 +164,8 @@ export function EditTransactionDialog({
       console.error("Failed to delete transaction:", error)
     }
 
-    // Notify parent to refresh the transaction list
-    onTransactionUpdated()
+    // Sync with real server data
+    onAfterSave?.()
   }
 
   const filteredMerchants = popularMerchants.filter((m) =>
