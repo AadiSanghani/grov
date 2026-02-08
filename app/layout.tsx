@@ -1,5 +1,6 @@
 import { SidebarProvider } from "@/components/ui/sidebar"
 import { AppSidebar } from "@/components/app-sidebar"
+import { Toaster } from "@/components/ui/sonner"
 import type { Metadata } from "next"
 import {
   ClerkProvider,
@@ -37,6 +38,7 @@ export default function RootLayout({
               </main>
             </SidebarProvider>
           </SignedIn>
+          <Toaster />
         </body>
       </html>
     </ClerkProvider>

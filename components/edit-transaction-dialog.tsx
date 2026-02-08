@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import { useState, useEffect } from "react"
+import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -139,6 +140,10 @@ export function EditTransactionDialog({
       await updateTransaction(transactionId, updateData)
     } catch (error) {
       console.error("Failed to update transaction:", error)
+      toast.error("Failed to update transaction. Please try again. Error: " + error, {
+        duration: 5000,
+        position: "top-right",
+      })
     }
 
     onAfterSave?.()
@@ -162,9 +167,12 @@ export function EditTransactionDialog({
       await deleteTransaction(transactionId)
     } catch (error) {
       console.error("Failed to delete transaction:", error)
+      toast.error("Failed to delete transaction. Please try again. Error: " + error, {
+        duration: 5000,
+        position: "top-right",
+      })
     }
 
-    // Sync with real server data
     onAfterSave?.()
   }
 

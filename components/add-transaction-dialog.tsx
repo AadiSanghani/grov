@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import { useState, useEffect } from "react"
+import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -136,6 +137,10 @@ export function AddTransactionDialog({
       await createTransaction(transactionData)
     } catch (error) {
       console.error("Failed to create transaction:", error)
+      toast.error("Failed to create transaction. Please try again. Error: " + error, {
+        duration: 5000,
+        position: "top-right",
+      })
     }
 
     onAfterSave?.()
