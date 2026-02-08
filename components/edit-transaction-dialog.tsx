@@ -113,47 +113,51 @@ export function EditTransactionDialog({
       return
     }
 
-    try {
-      await updateTransaction(transaction.id, {
-        transaction_type: transactionType,
-        amount: numAmount,
-        merchant,
-        date,
-        account_type_id: accountTypeId,
-        category,
-        notes,
-      })
+    // Capture form data before closing
+    const transactionId = transaction.id
+    const updateData = {
+      transaction_type: transactionType,
+      amount: numAmount,
+      merchant,
+      date,
+      account_type_id: accountTypeId,
+      category,
+      notes,
+    }
 
-      // Notify parent to refresh
-      onTransactionUpdated()
-      
-      // Close dialog
-      onOpenChange(false)
+    // Close dialog immediately for snappy UX
+    onOpenChange(false)
+
+    // Update transaction in the background
+    try {
+      await updateTransaction(transactionId, updateData)
     } catch (error) {
       console.error("Failed to update transaction:", error)
-      alert("Failed to update transaction. Please try again.")
     }
+
+    // Notify parent to refresh the transaction list
+    onTransactionUpdated()
   }
 
   const handleDelete = async () => {
     if (!transaction?.id) return
-    
-    setIsDeleting(true)
+
+    // Capture the ID before closing
+    const transactionId = transaction.id
+
+    // Close dialogs immediately for snappy UX
+    setShowDeleteConfirm(false)
+    onOpenChange(false)
+
+    // Delete transaction in the background
     try {
-      await deleteTransaction(transaction.id)
-      
-      // Notify parent to refresh
-      onTransactionUpdated()
-      
-      // Close dialogs
-      setShowDeleteConfirm(false)
-      onOpenChange(false)
+      await deleteTransaction(transactionId)
     } catch (error) {
       console.error("Failed to delete transaction:", error)
-      alert("Failed to delete transaction. Please try again.")
-    } finally {
-      setIsDeleting(false)
     }
+
+    // Notify parent to refresh the transaction list
+    onTransactionUpdated()
   }
 
   const filteredMerchants = popularMerchants.filter((m) =>

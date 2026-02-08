@@ -82,6 +82,17 @@ export function AddTransactionDialog({
     }
   }, [categories])
 
+  const resetForm = () => {
+    setTransactionType("outgoing")
+    setAmount("")
+    setDisplayAmount("$")
+    setMerchant("")
+    setDate(new Date())
+    setAccountTypeId("")
+    setCategory("")
+    setNotes("")
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
@@ -92,37 +103,29 @@ export function AddTransactionDialog({
       return
     }
 
+    // Capture form data before resetting
+    const transactionData = {
+      transaction_type: transactionType,
+      amount: numAmount,
+      merchant,
+      date,
+      account_type_id: accountTypeId,
+      category,
+      notes,
+    }
+
+
+    resetForm()
+    onOpenChange(false)
+
     try {
-      await createTransaction({
-        transaction_type: transactionType,
-        amount: numAmount,
-        merchant,
-        date,
-        account_type_id: accountTypeId,
-        category,
-        notes,
-      })
-
-      // Notify parent to refresh transaction list
-      if (onTransactionCreated) {
-        onTransactionCreated()
-      }
-
-      // Reset form
-      setTransactionType("outgoing")
-      setAmount("")
-      setDisplayAmount("$")
-      setMerchant("")
-      setDate(new Date())
-      setAccountTypeId("")
-      setCategory("")
-      setNotes("")
-      
-      // Close dialog
-      onOpenChange(false)
+      await createTransaction(transactionData)
     } catch (error) {
       console.error("Failed to create transaction:", error)
-      alert("Failed to create transaction. Please try again.")
+    }
+
+    if (onTransactionCreated) {
+      onTransactionCreated()
     }
   }
 
