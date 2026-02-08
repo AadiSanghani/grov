@@ -2,7 +2,7 @@
 
 import { createServerSupabaseClient } from '@/ssr/client'
 import { auth } from '@clerk/nextjs/server'
-import { getCategoryFromAccountType } from './utils'
+import { getCategoryFromAccountType, toLocalDateString } from './utils'
 
 export interface Account {
   id?: number
@@ -69,7 +69,7 @@ export async function createAccount(data: {
   }
   
   // Create initial entry in account_daily_balances for this account
-  const today = new Date().toISOString().split('T')[0]
+  const today = toLocalDateString(new Date())
   await supabase
     .from('account_daily_balances')
     .upsert({

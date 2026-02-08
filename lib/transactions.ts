@@ -9,7 +9,7 @@ import {
   recordTransactionBalance,
   reverseTransactionBalance
 } from './balances'
-import { calculateBalanceDelta } from './utils'
+import { calculateBalanceDelta, toLocalDateString, parseLocalDate } from './utils'
 
 export async function getTransactions() {
   const supabase = createServerSupabaseClient()
@@ -30,7 +30,7 @@ export async function getTransactions() {
   return data?.map(transaction => ({
     ...transaction,
     account_type_id: transaction.account_type_id.toString(),
-    date: new Date(transaction.date),
+    date: parseLocalDate(transaction.date),
     created_at: transaction.created_at ? new Date(transaction.created_at) : undefined,
     updated_at: transaction.updated_at ? new Date(transaction.updated_at) : undefined,
   })) as Transaction[]
@@ -57,7 +57,7 @@ export async function getTransactionsInRange(startDate: string, endDate: string)
   return data?.map(transaction => ({
     ...transaction,
     account_type_id: transaction.account_type_id.toString(),
-    date: new Date(transaction.date),
+    date: parseLocalDate(transaction.date),
     created_at: transaction.created_at ? new Date(transaction.created_at) : undefined,
     updated_at: transaction.updated_at ? new Date(transaction.updated_at) : undefined,
   })) as Transaction[]
@@ -79,7 +79,7 @@ export async function createTransaction(data: {
     throw new Error('User not authenticated')
   }
   
-  const transactionDate = data.date.toISOString().split('T')[0] // YYYY-MM-DD
+  const transactionDate = toLocalDateString(data.date)
   
   const transactionData = {
     user_id: userId,
@@ -156,7 +156,7 @@ export async function updateTransaction(id: string, data: Partial<Transaction>) 
   if (data.transaction_type) updateData.transaction_type = data.transaction_type
   if (data.amount !== undefined) updateData.amount = data.amount
   if (data.merchant) updateData.merchant = data.merchant
-  if (data.date) updateData.date = data.date.toISOString().split('T')[0]
+  if (data.date) updateData.date = toLocalDateString(data.date)
   if (data.account_type_id) updateData.account_type_id = data.account_type_id
   if (data.category) updateData.category = data.category
   if (data.notes !== undefined) updateData.notes = data.notes
@@ -184,7 +184,7 @@ export async function updateTransaction(id: string, data: Partial<Transaction>) 
   const oldType = oldTransaction.transaction_type as 'outgoing' | 'incoming'
   const newType = (data.transaction_type || oldType) as 'outgoing' | 'incoming'
   const oldDate = oldTransaction.date
-  const newDate = data.date ? data.date.toISOString().split('T')[0] : oldDate
+  const newDate = data.date ? toLocalDateString(data.date) : oldDate
 
   // Schedule balance bookkeeping to run after the response is sent.
   after(async () => {

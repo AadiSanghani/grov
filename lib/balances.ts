@@ -4,7 +4,7 @@ import { createServerSupabaseClient } from '@/ssr/client'
 import { auth } from '@clerk/nextjs/server'
 import { DailyBalance, NetWorthDataPoint } from './types'
 import { getAccountById } from './accounts'
-import { calculateBalanceDelta, getCategoryFromAccountType } from './utils'
+import { calculateBalanceDelta, getCategoryFromAccountType, toLocalDateString } from './utils'
 
 /**
  * Ripple forward: update all balances from a given date forward.
@@ -355,7 +355,7 @@ export async function backfillAccountBalances(accountId: number): Promise<void> 
   
   if (!transactions || transactions.length === 0) {
     // No transactions, just create today's balance with current account balance
-    const today = new Date().toISOString().split('T')[0]
+    const today = toLocalDateString(new Date())
     await ensureDailyBalance(accountId, today, userId)
     return
   }
@@ -434,7 +434,7 @@ export async function backfillAllBalances(): Promise<{ success: boolean; account
   
   if (error) throw error
   
-  const today = new Date().toISOString().split('T')[0]
+  const today = toLocalDateString(new Date())
   let processed = 0
   
   for (const account of accounts || []) {
