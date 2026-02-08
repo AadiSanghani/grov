@@ -40,13 +40,14 @@ export const TransactionSummary = React.memo(function TransactionSummary({ trans
         if (transaction.amount > largestIncome) {
           largestIncome = transaction.amount
         }
-      } else {
+      } else if (transaction.transaction_type === "outgoing") {
         const spending = getSpendingAmount(transaction)
         totalSpending += spending
         if (spending > largestExpense) {
           largestExpense = spending
         }
       }
+      // transfers excluded from income and spending
     })
 
     // Sort dates to find first and last

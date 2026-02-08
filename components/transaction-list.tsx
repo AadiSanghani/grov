@@ -6,10 +6,12 @@ import { format } from "date-fns"
 import { ChevronRight } from "lucide-react"
 import { cn, findCategoryByValue, getSpendingAmount } from "@/lib/utils"
 import { Category } from "@/lib/categories"
+import { type Account } from "@/lib/accounts"
 
 interface TransactionListProps {
   transactions: Transaction[]
   categories: Category[]
+  accounts?: Account[]
   onTransactionClick: (transaction: Transaction) => void
 }
 
@@ -20,8 +22,9 @@ interface GroupedTransactions {
   }
 }
 
-export const TransactionList = React.memo(function TransactionList({ transactions, categories, onTransactionClick }: TransactionListProps) {
-  // Group transactions by date
+export const TransactionList = React.memo(function TransactionList({ transactions, categories, accounts = [], onTransactionClick }: TransactionListProps) {
+  const accountName = (id: string) => accounts.find((a) => a.id?.toString() === id)?.account_name ?? id
+
   const groupedTransactions: GroupedTransactions = transactions.reduce((acc, transaction) => {
     const dateKey = format(transaction.date, "MMMM dd, yyyy")
     
@@ -34,11 +37,13 @@ export const TransactionList = React.memo(function TransactionList({ transaction
     
     acc[dateKey].transactions.push(transaction)
     
-    // Calculate daily total (incoming positive, outgoing negative using spending amount)
-    const amount = transaction.transaction_type === "incoming" 
-      ? transaction.amount 
-      : -getSpendingAmount(transaction)
-    acc[dateKey].total += amount
+    if (transaction.transaction_type === "transfer") {
+      // Transfers don't affect income/expense total
+    } else if (transaction.transaction_type === "incoming") {
+      acc[dateKey].total += transaction.amount
+    } else {
+      acc[dateKey].total -= getSpendingAmount(transaction)
+    }
     
     return acc
   }, {} as GroupedTransactions)
@@ -70,7 +75,11 @@ export const TransactionList = React.memo(function TransactionList({ transaction
           {/* Transaction Rows */}
           <div className="space-y-1">
             {transactions.map((transaction) => {
+              const isTransfer = transaction.transaction_type === "transfer"
               const categoryInfo = findCategoryByValue(categories, transaction.category)
+              const transferLabel = isTransfer && transaction.to_account_type_id
+                ? `${accountName(transaction.account_type_id)} \u2192 ${accountName(transaction.to_account_type_id)}`
+                : null
               
               return (
                 <button
@@ -79,13 +88,13 @@ export const TransactionList = React.memo(function TransactionList({ transaction
                   className="w-full flex items-center justify-between px-4 py-3 hover:bg-muted/50 rounded-lg transition-colors text-left group"
                 >
                   <div className="flex items-center gap-4 flex-1 min-w-0">
-                    {/* Merchant */}
                     <div className="min-w-[180px]">
-                      <p className="font-medium truncate">{transaction.merchant}</p>
+                      <p className="font-medium truncate">
+                        {isTransfer ? (transferLabel ?? transaction.merchant) : transaction.merchant}
+                      </p>
                     </div>
 
-                    {/* Category */}
-                    {categoryInfo && (
+                    {!isTransfer && categoryInfo && (
                       <div className="flex items-center gap-2 min-w-[150px]">
                         <span className="text-sm">{categoryInfo.emoji}</span>
                         <span className="text-sm text-muted-foreground">{categoryInfo.label}</span>
@@ -93,7 +102,6 @@ export const TransactionList = React.memo(function TransactionList({ transaction
                     )}
                   </div>
 
-                  {/* Amount */}
                   <div className="flex items-center gap-2">
                     <div className="text-right">
                       <span className={cn(

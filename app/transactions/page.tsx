@@ -204,6 +204,7 @@ export default function Transactions() {
                 <TransactionList 
                   transactions={filteredTransactions}
                   categories={categories}
+                  accounts={accounts}
                   onTransactionClick={handleTransactionClick}
                 />
               </div>

@@ -21,31 +21,47 @@ function escapeCsvValue(value: string): string {
   return safe
 }
 
-function buildSankeyCsv(transactions: Transaction[]): string {
+export type AccountMap = Record<string, { name: string; category: "asset" | "liability" }>
+
+function buildSankeyCsv(
+  transactions: Transaction[],
+  accountsMap?: AccountMap
+): string {
   const incomeBySource: Record<string, number> = {}
   const expenseByCategory: Record<string, number> = {}
+  const assetTransferByDestination: Record<string, number> = {}
   let totalIncome = 0
   let totalExpenses = 0
+  let totalAssetTransfers = 0
 
   transactions.forEach((t) => {
-    const category = t.category || (t.transaction_type === "incoming" ? "Income" : "Expense")
     if (t.transaction_type === "incoming") {
       const amount = Number(t.amount) || 0
+      const category = t.category || "Income"
       const sourceName = (t.merchant || "").trim()
       const incomeLabel = sourceName ? `${category} - ${sourceName}` : category
       incomeBySource[incomeLabel] = (incomeBySource[incomeLabel] || 0) + amount
       totalIncome += amount
-    } else {
+    } else if (t.transaction_type === "outgoing") {
+      const category = t.category || "Expense"
       const amount = getSpendingAmount(t)
       expenseByCategory[category] = (expenseByCategory[category] || 0) + amount
       totalExpenses += amount
+    } else if (t.transaction_type === "transfer" && t.to_account_type_id && accountsMap) {
+      const toAccount = accountsMap[t.to_account_type_id]
+      if (toAccount?.category === "asset") {
+        const label = `To ${toAccount.name}`
+        const amount = Number(t.amount) || 0
+        assetTransferByDestination[label] = (assetTransferByDestination[label] || 0) + amount
+        totalAssetTransfers += amount
+      }
+      // Transfers to liability (e.g. CC payments) are excluded from diagram
     }
   })
 
   const lines: string[] = []
   const totalIncomeLabel = "Total Income"
   const savingsLabel = "Savings"
-  const netIncome = totalIncome - totalExpenses
 
   Object.entries(incomeBySource).forEach(([sourceLabel, amount]) => {
     if (amount > 0) {
@@ -59,8 +75,15 @@ function buildSankeyCsv(transactions: Transaction[]): string {
     }
   })
 
-  if (netIncome > 0) {
-    lines.push(`${escapeCsvValue(totalIncomeLabel)}, ${escapeCsvValue(savingsLabel)}, ${netIncome}`)
+  Object.entries(assetTransferByDestination).forEach(([label, amount]) => {
+    if (amount > 0) {
+      lines.push(`${escapeCsvValue(totalIncomeLabel)}, ${escapeCsvValue(label)}, ${amount}`)
+    }
+  })
+
+  const savings = totalIncome - totalExpenses - totalAssetTransfers
+  if (savings > 0) {
+    lines.push(`${escapeCsvValue(totalIncomeLabel)}, ${escapeCsvValue(savingsLabel)}, ${savings}`)
   }
 
   if (lines.length === 0) {
@@ -71,16 +94,17 @@ function buildSankeyCsv(transactions: Transaction[]): string {
 
 interface MermaidSankeyProps {
   transactions: Transaction[]
+  accountsMap?: AccountMap
   className?: string
 }
 
-export function MermaidSankey({ transactions, className }: MermaidSankeyProps) {
+export function MermaidSankey({ transactions, accountsMap, className }: MermaidSankeyProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const reactId = useId().replace(/:/g, "-")
   const renderCountRef = useRef(0)
 
   useLayoutEffect(() => {
-    const csv = buildSankeyCsv(transactions)
+    const csv = buildSankeyCsv(transactions, accountsMap)
     if (!csv) return
 
     renderCountRef.current += 1
@@ -118,9 +142,9 @@ export function MermaidSankey({ transactions, className }: MermaidSankeyProps) {
       cancelled = true
       cancelAnimationFrame(rafId)
     }
-  }, [transactions, reactId]);
+  }, [transactions, accountsMap, reactId]);
 
-  const csv = buildSankeyCsv(transactions)
+  const csv = buildSankeyCsv(transactions, accountsMap)
   if (!csv) {
     return (
       <div className={className}>

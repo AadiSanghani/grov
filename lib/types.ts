@@ -1,7 +1,7 @@
 export interface Transaction {
   id?: string
   user_id?: string
-  transaction_type: "outgoing" | "incoming"
+  transaction_type: "outgoing" | "incoming" | "transfer"
   amount: number
   merchant: string
   date: Date
@@ -9,6 +9,7 @@ export interface Transaction {
   category: string
   notes?: string
   spending_amount?: number | null
+  to_account_type_id?: string | null
   created_at?: Date
   updated_at?: Date
 }

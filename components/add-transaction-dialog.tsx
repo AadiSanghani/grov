@@ -27,7 +27,7 @@ import {
   CommandList,
 } from "@/components/ui/command"
 import { cn, formatCategoriesForUI } from "@/lib/utils"
-import { CalendarIcon, Check, ChevronsUpDown, MinusCircle, PlusCircle } from "lucide-react"
+import { CalendarIcon, Check, ChevronsUpDown, MinusCircle, PlusCircle, ArrowRightLeft } from "lucide-react"
 import { format } from "date-fns"
 import { type Account } from "@/lib/accounts"
 import { createTransaction } from "@/lib/transactions"
@@ -35,7 +35,7 @@ import { type Category } from "@/lib/categories"
 import { useDataContext } from "@/app/data-context"
 
 export interface TransactionFormData {
-  transaction_type: "outgoing" | "incoming"
+  transaction_type: "outgoing" | "incoming" | "transfer"
   amount: number
   merchant: string
   date: Date
@@ -43,6 +43,7 @@ export interface TransactionFormData {
   category: string
   notes?: string
   spending_amount?: number | null
+  to_account_type_id?: string | null
 }
 
 interface AddTransactionDialogProps {
@@ -62,7 +63,7 @@ export function AddTransactionDialog({
   accounts,
   categories,
 }: AddTransactionDialogProps) {
-  const [transactionType, setTransactionType] = useState<"outgoing" | "incoming">("outgoing")
+  const [transactionType, setTransactionType] = useState<"outgoing" | "incoming" | "transfer">("outgoing")
   const [amount, setAmount] = useState("")
   const [displayAmount, setDisplayAmount] = useState("$")
   const [merchant, setMerchant] = useState("")
@@ -71,6 +72,8 @@ export function AddTransactionDialog({
   const [dateOpen, setDateOpen] = useState(false)
   const [accountTypeId, setAccountTypeId] = useState("")
   const [accountOpen, setAccountOpen] = useState(false)
+  const [toAccountTypeId, setToAccountTypeId] = useState("")
+  const [toAccountOpen, setToAccountOpen] = useState(false)
   const [category, setCategory] = useState("")
   const [categoryOpen, setCategoryOpen] = useState(false)
   const [notes, setNotes] = useState("")
@@ -92,6 +95,7 @@ export function AddTransactionDialog({
     setMerchant("")
     setDate(new Date())
     setAccountTypeId("")
+    setToAccountTypeId("")
     setCategory("")
     setNotes("")
   }
@@ -99,10 +103,26 @@ export function AddTransactionDialog({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
-    // Validate amount is a number
     const numAmount = parseFloat(amount)
     if (isNaN(numAmount) || numAmount <= 0) {
       alert("Please enter a valid amount")
+      return
+    }
+
+    if (transactionType === "transfer") {
+      if (!accountTypeId || !toAccountTypeId) {
+        alert("Please select both From and To accounts")
+        return
+      }
+      if (accountTypeId === toAccountTypeId) {
+        alert("From and To accounts must be different")
+        return
+      }
+    } else if (transactionType === "outgoing" && !accountTypeId) {
+      alert("Please select an account")
+      return
+    } else if (transactionType === "incoming" && !accountTypeId) {
+      alert("Please select an account")
       return
     }
 
@@ -116,23 +136,23 @@ export function AddTransactionDialog({
       parsedSpendingAmount = num
     }
 
-    // Capture form data before resetting
-    const transactionData = {
+    const transactionData: Parameters<typeof createTransaction>[0] = {
       transaction_type: transactionType,
       amount: numAmount,
-      merchant,
+      merchant: transactionType === "transfer" ? (merchant || "Transfer") : merchant,
       date,
       account_type_id: accountTypeId,
-      category,
+      category: transactionType === "transfer" ? (category || "transfer") : category,
       notes,
-      spending_amount: parsedSpendingAmount,
+      spending_amount: transactionType === "outgoing" ? parsedSpendingAmount : undefined,
     }
-
+    if (transactionType === "transfer") {
+      transactionData.to_account_type_id = toAccountTypeId
+    }
 
     resetForm()
     onOpenChange(false)
-
-    onTransactionCreated?.(transactionData)
+    onTransactionCreated?.(transactionData as TransactionFormData)
 
     try {
       await createTransaction(transactionData)
@@ -143,7 +163,6 @@ export function AddTransactionDialog({
         position: "top-right",
       })
     }
-
     onAfterSave?.()
   }
 
@@ -176,7 +195,7 @@ export function AddTransactionDialog({
 
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Transaction Type Toggle */}
-          <div className="flex gap-4">
+          <div className="flex gap-2">
             <Button
               type="button"
               variant={transactionType === "outgoing" ? "default" : "outline"}
@@ -208,6 +227,20 @@ export function AddTransactionDialog({
             >
               <PlusCircle className="w-4 h-4 mr-0.5" />
               INCOMING
+            </Button>
+            <Button
+              type="button"
+              variant={transactionType === "transfer" ? "default" : "outline"}
+              className={cn(
+                "flex-1",
+                transactionType === "transfer" 
+                  ? "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground" 
+                  : "hover:bg-muted hover:text-foreground"
+              )}
+              onClick={() => setTransactionType("transfer")}
+            >
+              <ArrowRightLeft className="w-4 h-4 mr-0.5" />
+              TRANSFER
             </Button>
           </div>
 
@@ -390,9 +423,9 @@ export function AddTransactionDialog({
             </Popover>
           </div>
 
-          {/* Account */}
+          {/* From account / Account */}
           <div className="space-y-2">
-            <Label htmlFor="account">Account</Label>
+            <Label htmlFor="account">{transactionType === "transfer" ? "From account" : "Account"}</Label>
             <Popover open={accountOpen} onOpenChange={setAccountOpen}>
               <PopoverTrigger asChild>
                 <Button
@@ -404,7 +437,7 @@ export function AddTransactionDialog({
                     {selectedAccount ? (
                       selectedAccount.account_name
                     ) : (
-                      "Select account..."
+                      transactionType === "transfer" ? "Select from account..." : "Select account..."
                     )}
                   <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                 </Button>
@@ -442,7 +475,58 @@ export function AddTransactionDialog({
             </Popover>
           </div>
 
-          {/* Category */}
+          {/* To account (transfer only) */}
+          {transactionType === "transfer" && (
+            <div className="space-y-2">
+              <Label>To account</Label>
+              <Popover open={toAccountOpen} onOpenChange={setToAccountOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={toAccountOpen}
+                    className="w-full justify-between font-normal"
+                  >
+                    {accounts.find((a) => a.id?.toString() === toAccountTypeId)?.account_name ?? "Select to account..."}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-(--radix-popover-trigger-width) p-0" align="start">
+                  <Command>
+                    <CommandInput placeholder="Search accounts..." />
+                    <CommandList>
+                      <CommandEmpty>No account found.</CommandEmpty>
+                      <CommandGroup>
+                        {accounts
+                          .filter((account) => account.id?.toString() !== accountTypeId)
+                          .map((account) => (
+                            <CommandItem
+                              key={account.id}
+                              value={account.account_name}
+                              onSelect={() => {
+                                setToAccountTypeId(account.id?.toString() || "")
+                                setToAccountOpen(false)
+                              }}
+                            >
+                              <Check
+                                className={cn(
+                                  "mr-2 h-4 w-4",
+                                  toAccountTypeId === account.id?.toString() ? "opacity-100" : "opacity-0"
+                                )}
+                              />
+                              {account.account_name}
+                            </CommandItem>
+                          ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+            </div>
+          )}
+
+          {/* Category (hidden for transfer, optional elsewhere) */}
+          {transactionType !== "transfer" && (
           <div className="space-y-2">
             <Label htmlFor="category">Category</Label>
             <Popover open={categoryOpen} onOpenChange={setCategoryOpen}>
@@ -497,6 +581,7 @@ export function AddTransactionDialog({
               </PopoverContent>
             </Popover>
           </div>
+          )}
 
           {/* Notes */}
           <div className="space-y-2">

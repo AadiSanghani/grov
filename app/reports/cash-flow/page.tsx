@@ -5,8 +5,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { useReportsContext } from "../context"
 import { getTransactionsInRange } from "@/lib/transactions"
 import { Transaction } from "@/lib/types"
-import { MermaidSankey } from "@/components/mermaid-sankey"
+import { MermaidSankey, type AccountMap } from "@/components/mermaid-sankey"
 import { getSpendingAmount } from "@/lib/utils"
+import { getAccounts } from "@/lib/accounts"
 
 function formatCurrency(amount: number) {
   return new Intl.NumberFormat("en-US", {
@@ -20,17 +21,23 @@ function formatCurrency(amount: number) {
 export default function CashFlowPage() {
   const { startDate, endDate } = useReportsContext()
   const [transactions, setTransactions] = useState<Transaction[]>([])
+  const [accounts, setAccounts] = useState<Awaited<ReturnType<typeof getAccounts>>>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true)
       try {
-        const data = await getTransactionsInRange(startDate, endDate)
-        setTransactions(data ?? [])
+        const [txData, accData] = await Promise.all([
+          getTransactionsInRange(startDate, endDate),
+          getAccounts(),
+        ])
+        setTransactions(txData ?? [])
+        setAccounts(accData ?? [])
       } catch (err) {
-        console.error("Failed to fetch transactions:", err)
+        console.error("Failed to fetch data:", err)
         setTransactions([])
+        setAccounts([])
       } finally {
         setLoading(false)
       }
@@ -38,12 +45,26 @@ export default function CashFlowPage() {
     fetchData()
   }, [startDate, endDate])
 
+  const accountsMap: AccountMap = useMemo(() => {
+    const map: AccountMap = {}
+    for (const acc of accounts) {
+      if (acc.id != null) {
+        map[String(acc.id)] = {
+          name: acc.account_name,
+          category: acc.category ?? "asset",
+        }
+      }
+    }
+    return map
+  }, [accounts])
+
   const summary = useMemo(() => {
     let totalIncome = 0
     let totalExpenses = 0
     transactions.forEach((t) => {
       if (t.transaction_type === "incoming") totalIncome += Number(t.amount) || 0
-      else totalExpenses += getSpendingAmount(t)
+      else if (t.transaction_type === "outgoing") totalExpenses += getSpendingAmount(t)
+      // transfers excluded from both
     })
     const netIncome = totalIncome - totalExpenses
     const savingsRate = totalIncome > 0 ? (netIncome / totalIncome) * 100 : 0
@@ -124,7 +145,7 @@ export default function CashFlowPage() {
           </p>
         </CardHeader>
         <CardContent>
-          <MermaidSankey transactions={transactions} className="w-full overflow-x-auto" />
+          <MermaidSankey transactions={transactions} accountsMap={accountsMap} className="w-full overflow-x-auto" />
         </CardContent>
       </Card>
     </div>

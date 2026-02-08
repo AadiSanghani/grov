@@ -27,7 +27,7 @@ import {
   CommandList,
 } from "@/components/ui/command"
 import { cn, formatCategoriesForUI } from "@/lib/utils"
-import { CalendarIcon, Check, ChevronsUpDown, MinusCircle, PlusCircle, Trash2 } from "lucide-react"
+import { CalendarIcon, Check, ChevronsUpDown, MinusCircle, PlusCircle, Trash2, ArrowRightLeft } from "lucide-react"
 import { format } from "date-fns"
 import { type Account } from "@/lib/accounts"
 import { Transaction } from "@/lib/types"
@@ -56,7 +56,7 @@ export function EditTransactionDialog({
   accounts,
   categories,
 }: EditTransactionDialogProps) {
-  const [transactionType, setTransactionType] = useState<"outgoing" | "incoming">("outgoing")
+  const [transactionType, setTransactionType] = useState<"outgoing" | "incoming" | "transfer">("outgoing")
   const [amount, setAmount] = useState("")
   const [displayAmount, setDisplayAmount] = useState("$")
   const [merchant, setMerchant] = useState("")
@@ -65,6 +65,8 @@ export function EditTransactionDialog({
   const [dateOpen, setDateOpen] = useState(false)
   const [accountTypeId, setAccountTypeId] = useState("")
   const [accountOpen, setAccountOpen] = useState(false)
+  const [toAccountTypeId, setToAccountTypeId] = useState("")
+  const [toAccountOpen, setToAccountOpen] = useState(false)
   const [category, setCategory] = useState("")
   const [categoryOpen, setCategoryOpen] = useState(false)
   const [notes, setNotes] = useState("")
@@ -89,6 +91,7 @@ export function EditTransactionDialog({
       setMerchant(transaction.merchant)
       setDate(transaction.date)
       setAccountTypeId(transaction.account_type_id.toString())
+      setToAccountTypeId(transaction.to_account_type_id != null ? String(transaction.to_account_type_id) : "")
       setCategory(transaction.category)
       setNotes(transaction.notes || "")
       if (transaction.spending_amount != null) {
@@ -113,6 +116,17 @@ export function EditTransactionDialog({
       return
     }
 
+    if (transactionType === "transfer") {
+      if (!accountTypeId || !toAccountTypeId) {
+        alert("Please select both From and To accounts")
+        return
+      }
+      if (accountTypeId === toAccountTypeId) {
+        alert("From and To accounts must be different")
+        return
+      }
+    }
+
     let parsedSpendingAmount: number | null = null
     if (transactionType === "outgoing" && spendingAmount !== "") {
       const num = parseFloat(spendingAmount)
@@ -123,17 +137,21 @@ export function EditTransactionDialog({
       parsedSpendingAmount = num
     }
 
-    // Capture form data before closing
     const transactionId = transaction.id
-    const updateData = {
+    const updateData: Partial<Transaction> = {
       transaction_type: transactionType,
       amount: numAmount,
-      merchant,
+      merchant: transactionType === "transfer" ? (merchant || "Transfer") : merchant,
       date,
       account_type_id: accountTypeId,
-      category,
+      category: transactionType === "transfer" ? (category || "transfer") : category,
       notes,
-      spending_amount: parsedSpendingAmount,
+      spending_amount: transactionType === "outgoing" ? parsedSpendingAmount ?? null : null,
+    }
+    if (transactionType === "transfer") {
+      updateData.to_account_type_id = toAccountTypeId
+    } else {
+      updateData.to_account_type_id = null
     }
 
     // Close dialog immediately for snappy UX
@@ -213,7 +231,7 @@ export function EditTransactionDialog({
 
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Transaction Type Toggle */}
-            <div className="flex gap-4">
+            <div className="flex gap-2">
               <Button
                 type="button"
                 variant={transactionType === "outgoing" ? "default" : "outline"}
@@ -245,6 +263,20 @@ export function EditTransactionDialog({
               >
                 <PlusCircle className="w-4 h-4 mr-0.5" />
                 INCOMING
+              </Button>
+              <Button
+                type="button"
+                variant={transactionType === "transfer" ? "default" : "outline"}
+                className={cn(
+                  "flex-1",
+                  transactionType === "transfer" 
+                    ? "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground" 
+                    : "hover:bg-muted hover:text-foreground"
+                )}
+                onClick={() => setTransactionType("transfer")}
+              >
+                <ArrowRightLeft className="w-4 h-4 mr-0.5" />
+                TRANSFER
               </Button>
             </div>
 
@@ -427,9 +459,9 @@ export function EditTransactionDialog({
               </Popover>
             </div>
 
-            {/* Account */}
+            {/* From account / Account */}
             <div className="space-y-2">
-              <Label htmlFor="account">Account</Label>
+              <Label htmlFor="account">{transactionType === "transfer" ? "From account" : "Account"}</Label>
               <Popover open={accountOpen} onOpenChange={setAccountOpen}>
                 <PopoverTrigger asChild>
                   <Button
@@ -441,7 +473,7 @@ export function EditTransactionDialog({
                     {selectedAccount ? (
                       selectedAccount.account_name
                     ) : (
-                      "Select account..."
+                      transactionType === "transfer" ? "Select from account..." : "Select account..."
                     )}
                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                   </Button>
@@ -479,7 +511,57 @@ export function EditTransactionDialog({
               </Popover>
             </div>
 
-            {/* Category */}
+            {/* To account (transfer only) */}
+            {transactionType === "transfer" && (
+              <div className="space-y-2">
+                <Label>To account</Label>
+                <Popover open={toAccountOpen} onOpenChange={setToAccountOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={toAccountOpen}
+                      className="w-full justify-between font-normal"
+                    >
+                      {accounts.find((a) => a.id?.toString() === toAccountTypeId)?.account_name ?? "Select to account..."}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-(--radix-popover-trigger-width) p-0" align="start">
+                    <Command>
+                      <CommandInput placeholder="Search accounts..." />
+                      <CommandList>
+                        <CommandEmpty>No account found.</CommandEmpty>
+                        <CommandGroup>
+                          {accounts
+                            .filter((account) => account.id?.toString() !== accountTypeId)
+                            .map((account) => (
+                              <CommandItem
+                                key={account.id}
+                                value={account.account_name}
+                                onSelect={() => {
+                                  setToAccountTypeId(account.id?.toString() || "")
+                                  setToAccountOpen(false)
+                                }}
+                              >
+                                <Check
+                                  className={cn(
+                                    "mr-2 h-4 w-4",
+                                    toAccountTypeId === account.id?.toString() ? "opacity-100" : "opacity-0"
+                                  )}
+                                />
+                                {account.account_name}
+                              </CommandItem>
+                            ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+              </div>
+            )}
+
+            {transactionType !== "transfer" && (
             <div className="space-y-2">
               <Label htmlFor="category">Category</Label>
               <Popover open={categoryOpen} onOpenChange={setCategoryOpen}>
@@ -534,6 +616,7 @@ export function EditTransactionDialog({
                 </PopoverContent>
               </Popover>
             </div>
+            )}
 
             {/* Notes */}
             <div className="space-y-2">
