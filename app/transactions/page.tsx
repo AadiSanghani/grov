@@ -55,6 +55,23 @@ export default function Transactions() {
     }
   }
 
+  // Refresh data in the background without showing the full loading state
+  const refreshData = async () => {
+    try {
+      const [transactionsData, accountsData, categoriesData] = await Promise.all([
+        getTransactions(),
+        getAccounts(),
+        getCategories()
+      ])
+      
+      setTransactions(transactionsData || [])
+      setAccounts(accountsData || [])
+      setCategories(categoriesData || [])
+    } catch (error) {
+      console.error("Failed to refresh data:", error)
+    }
+  }
+
   // Apply filters to transactions
   const filteredTransactions = useMemo(() => {
     let filtered = [...transactions]
@@ -123,8 +140,7 @@ export default function Transactions() {
   }
 
   const handleTransactionUpdated = () => {
-    // Reload transactions after update or delete
-    loadData()
+    refreshData()
   }
 
   if (loading) {
