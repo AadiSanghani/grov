@@ -3,6 +3,7 @@
 import * as React from "react"
 import { Transaction } from "@/lib/types"
 import { useMemo } from "react"
+import { getSpendingAmount } from "@/lib/utils"
 import { format } from "date-fns"
 import { Separator } from "@/components/ui/separator"
 
@@ -40,9 +41,10 @@ export const TransactionSummary = React.memo(function TransactionSummary({ trans
           largestIncome = transaction.amount
         }
       } else {
-        totalSpending += transaction.amount
-        if (transaction.amount > largestExpense) {
-          largestExpense = transaction.amount
+        const spending = getSpendingAmount(transaction)
+        totalSpending += spending
+        if (spending > largestExpense) {
+          largestExpense = spending
         }
       }
     })

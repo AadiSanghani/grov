@@ -4,7 +4,7 @@ import * as React from "react"
 import { Transaction } from "@/lib/types"
 import { format } from "date-fns"
 import { ChevronRight } from "lucide-react"
-import { cn, findCategoryByValue } from "@/lib/utils"
+import { cn, findCategoryByValue, getSpendingAmount } from "@/lib/utils"
 import { Category } from "@/lib/categories"
 
 interface TransactionListProps {
@@ -34,10 +34,10 @@ export const TransactionList = React.memo(function TransactionList({ transaction
     
     acc[dateKey].transactions.push(transaction)
     
-    // Calculate daily total (incoming positive, outgoing negative)
+    // Calculate daily total (incoming positive, outgoing negative using spending amount)
     const amount = transaction.transaction_type === "incoming" 
       ? transaction.amount 
-      : -transaction.amount
+      : -getSpendingAmount(transaction)
     acc[dateKey].total += amount
     
     return acc
@@ -95,15 +95,22 @@ export const TransactionList = React.memo(function TransactionList({ transaction
 
                   {/* Amount */}
                   <div className="flex items-center gap-2">
-                    <span className={cn(
-                      "font-semibold",
-                      transaction.transaction_type === "incoming" 
-                        ? "text-green-600" 
-                        : "text-foreground"
-                    )}>
-                      {transaction.transaction_type === "incoming" ? "+" : ""}
-                      ${transaction.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </span>
+                    <div className="text-right">
+                      <span className={cn(
+                        "font-semibold",
+                        transaction.transaction_type === "incoming" 
+                          ? "text-green-600" 
+                          : "text-foreground"
+                      )}>
+                        {transaction.transaction_type === "incoming" ? "+" : ""}
+                        ${transaction.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </span>
+                      {transaction.transaction_type === "outgoing" && transaction.spending_amount != null && transaction.spending_amount !== transaction.amount && (
+                        <p className="text-xs text-muted-foreground">
+                          your share: ${transaction.spending_amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </p>
+                      )}
+                    </div>
                     <ChevronRight className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
                   </div>
                 </button>

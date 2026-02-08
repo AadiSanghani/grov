@@ -1,6 +1,7 @@
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
 import { Category, CategoryGroup, CategoryItem } from "./categories"
+import { Transaction } from "./types"
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -67,6 +68,18 @@ export function findCategoryByValue(
   }
   
   return null
+}
+
+/**
+ * For outgoing transactions, returns spending_amount when set, otherwise amount.
+ * For incoming transactions, always returns amount.
+ * Use this everywhere spending/category totals are computed or displayed.
+ */
+export function getSpendingAmount(t: Transaction): number {
+  if (t.transaction_type === 'outgoing' && t.spending_amount != null) {
+    return t.spending_amount
+  }
+  return t.amount
 }
 
 // Account type classification

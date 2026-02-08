@@ -3,6 +3,7 @@
 import { useLayoutEffect, useRef, useId } from "react"
 import mermaid from "mermaid"
 import { Transaction } from "@/lib/types"
+import { getSpendingAmount } from "@/lib/utils"
 
 /** Sanitize label for Mermaid sankey-beta (ASCII only; non-ASCII breaks the parser). */
 function sanitizeLabel(value: string): string {
@@ -28,13 +29,14 @@ function buildSankeyCsv(transactions: Transaction[]): string {
 
   transactions.forEach((t) => {
     const category = t.category || (t.transaction_type === "incoming" ? "Income" : "Expense")
-    const amount = Number(t.amount) || 0
     if (t.transaction_type === "incoming") {
+      const amount = Number(t.amount) || 0
       const sourceName = (t.merchant || "").trim()
       const incomeLabel = sourceName ? `${category} - ${sourceName}` : category
       incomeBySource[incomeLabel] = (incomeBySource[incomeLabel] || 0) + amount
       totalIncome += amount
     } else {
+      const amount = getSpendingAmount(t)
       expenseByCategory[category] = (expenseByCategory[category] || 0) + amount
       totalExpenses += amount
     }

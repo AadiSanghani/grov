@@ -8,6 +8,7 @@ export interface Transaction {
   account_type_id: string
   category: string
   notes?: string
+  spending_amount?: number | null
   created_at?: Date
   updated_at?: Date
 }

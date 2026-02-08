@@ -68,6 +68,8 @@ export function EditTransactionDialog({
   const [category, setCategory] = useState("")
   const [categoryOpen, setCategoryOpen] = useState(false)
   const [notes, setNotes] = useState("")
+  const [spendingAmount, setSpendingAmount] = useState("")
+  const [displaySpendingAmount, setDisplaySpendingAmount] = useState("$")
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
 
@@ -89,6 +91,13 @@ export function EditTransactionDialog({
       setAccountTypeId(transaction.account_type_id.toString())
       setCategory(transaction.category)
       setNotes(transaction.notes || "")
+      if (transaction.spending_amount != null) {
+        setSpendingAmount(transaction.spending_amount.toString())
+        setDisplaySpendingAmount(`$${transaction.spending_amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`)
+      } else {
+        setSpendingAmount("")
+        setDisplaySpendingAmount("$")
+      }
     }
   }, [open, transaction])
 
@@ -104,6 +113,16 @@ export function EditTransactionDialog({
       return
     }
 
+    let parsedSpendingAmount: number | null = null
+    if (transactionType === "outgoing" && spendingAmount !== "") {
+      const num = parseFloat(spendingAmount)
+      if (isNaN(num) || num < 0 || num > numAmount) {
+        alert("My share must be between $0 and the total amount")
+        return
+      }
+      parsedSpendingAmount = num
+    }
+
     // Capture form data before closing
     const transactionId = transaction.id
     const updateData = {
@@ -114,6 +133,7 @@ export function EditTransactionDialog({
       account_type_id: accountTypeId,
       category,
       notes,
+      spending_amount: parsedSpendingAmount,
     }
 
     // Close dialog immediately for snappy UX
@@ -217,7 +237,11 @@ export function EditTransactionDialog({
                     ? "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground" 
                     : "hover:bg-muted hover:text-foreground"
                 )}
-                onClick={() => setTransactionType("incoming")}
+                onClick={() => {
+                  setTransactionType("incoming")
+                  setSpendingAmount("")
+                  setDisplaySpendingAmount("$")
+                }}
               >
                 <PlusCircle className="w-4 h-4 mr-0.5" />
                 INCOMING
@@ -267,6 +291,49 @@ export function EditTransactionDialog({
                 className="text-lg"
               />
             </div>
+
+            {/* My Share (outgoing only) */}
+            {transactionType === "outgoing" && (
+              <div className="space-y-2">
+                <Label htmlFor="spending-amount">My share</Label>
+                <Input
+                  id="spending-amount"
+                  type="text"
+                  placeholder="$0.00"
+                  value={displaySpendingAmount}
+                  onChange={(e) => {
+                    let value = e.target.value.replace(/[^0-9.]/g, "")
+                    
+                    if (value === "") {
+                      setSpendingAmount("")
+                      setDisplaySpendingAmount("$")
+                      return
+                    }
+                    
+                    const parts = value.split(".")
+                    if (parts.length > 2) {
+                      value = parts[0] + "." + parts.slice(1).join("")
+                    }
+                    if (parts.length === 2 && parts[1].length > 2) {
+                      value = parts[0] + "." + parts[1].slice(0, 2)
+                    }
+                    
+                    setSpendingAmount(value)
+                    
+                    const [integerPart, decimalPart] = value.split(".")
+                    const formattedInteger = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, ",")
+                    const formatted = decimalPart !== undefined 
+                      ? `$${formattedInteger}.${decimalPart}` 
+                      : `$${formattedInteger}`
+                    
+                    setDisplaySpendingAmount(formatted)
+                  }}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Optional &mdash; leave blank to count the full amount as spending
+                </p>
+              </div>
+            )}
 
             {/* Merchant */}
             <div className="space-y-2">

@@ -42,6 +42,7 @@ export interface TransactionFormData {
   account_type_id: string
   category: string
   notes?: string
+  spending_amount?: number | null
 }
 
 interface AddTransactionDialogProps {
@@ -73,6 +74,8 @@ export function AddTransactionDialog({
   const [category, setCategory] = useState("")
   const [categoryOpen, setCategoryOpen] = useState(false)
   const [notes, setNotes] = useState("")
+  const [spendingAmount, setSpendingAmount] = useState("")
+  const [displaySpendingAmount, setDisplaySpendingAmount] = useState("$")
   const { merchants, addMerchant } = useDataContext()
   const merchantNames = useMemo(() => merchants.map((m) => m.name), [merchants])
   const formattedCategories = useMemo(
@@ -84,6 +87,8 @@ export function AddTransactionDialog({
     setTransactionType("outgoing")
     setAmount("")
     setDisplayAmount("$")
+    setSpendingAmount("")
+    setDisplaySpendingAmount("$")
     setMerchant("")
     setDate(new Date())
     setAccountTypeId("")
@@ -101,6 +106,16 @@ export function AddTransactionDialog({
       return
     }
 
+    let parsedSpendingAmount: number | null = null
+    if (transactionType === "outgoing" && spendingAmount !== "") {
+      const num = parseFloat(spendingAmount)
+      if (isNaN(num) || num < 0 || num > numAmount) {
+        alert("My share must be between $0 and the total amount")
+        return
+      }
+      parsedSpendingAmount = num
+    }
+
     // Capture form data before resetting
     const transactionData = {
       transaction_type: transactionType,
@@ -110,6 +125,7 @@ export function AddTransactionDialog({
       account_type_id: accountTypeId,
       category,
       notes,
+      spending_amount: parsedSpendingAmount,
     }
 
 
@@ -184,7 +200,11 @@ export function AddTransactionDialog({
                   ? "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground" 
                   : "hover:bg-muted hover:text-foreground"
               )}
-              onClick={() => setTransactionType("incoming")}
+              onClick={() => {
+                setTransactionType("incoming")
+                setSpendingAmount("")
+                setDisplaySpendingAmount("$")
+              }}
             >
               <PlusCircle className="w-4 h-4 mr-0.5" />
               INCOMING
@@ -234,6 +254,49 @@ export function AddTransactionDialog({
               className="text-lg"
             />
           </div>
+
+          {/* My Share (outgoing only) */}
+          {transactionType === "outgoing" && (
+            <div className="space-y-2">
+              <Label htmlFor="spending-amount">My share</Label>
+              <Input
+                id="spending-amount"
+                type="text"
+                placeholder="$0.00"
+                value={displaySpendingAmount}
+                onChange={(e) => {
+                  let value = e.target.value.replace(/[^0-9.]/g, "")
+                  
+                  if (value === "") {
+                    setSpendingAmount("")
+                    setDisplaySpendingAmount("$")
+                    return
+                  }
+                  
+                  const parts = value.split(".")
+                  if (parts.length > 2) {
+                    value = parts[0] + "." + parts.slice(1).join("")
+                  }
+                  if (parts.length === 2 && parts[1].length > 2) {
+                    value = parts[0] + "." + parts[1].slice(0, 2)
+                  }
+                  
+                  setSpendingAmount(value)
+                  
+                  const [integerPart, decimalPart] = value.split(".")
+                  const formattedInteger = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, ",")
+                  const formatted = decimalPart !== undefined 
+                    ? `$${formattedInteger}.${decimalPart}` 
+                    : `$${formattedInteger}`
+                  
+                  setDisplaySpendingAmount(formatted)
+                }}
+              />
+              <p className="text-xs text-muted-foreground">
+                Optional &mdash; leave blank to count the full amount as spending
+              </p>
+            </div>
+          )}
 
           {/* Merchant */}
           <div className="space-y-2">

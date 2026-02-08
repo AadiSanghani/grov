@@ -6,6 +6,7 @@ import { useReportsContext } from "../context"
 import { getTransactionsInRange } from "@/lib/transactions"
 import { Transaction } from "@/lib/types"
 import { MermaidSankey } from "@/components/mermaid-sankey"
+import { getSpendingAmount } from "@/lib/utils"
 
 function formatCurrency(amount: number) {
   return new Intl.NumberFormat("en-US", {
@@ -42,7 +43,7 @@ export default function CashFlowPage() {
     let totalExpenses = 0
     transactions.forEach((t) => {
       if (t.transaction_type === "incoming") totalIncome += Number(t.amount) || 0
-      else totalExpenses += Number(t.amount) || 0
+      else totalExpenses += getSpendingAmount(t)
     })
     const netIncome = totalIncome - totalExpenses
     const savingsRate = totalIncome > 0 ? (netIncome / totalIncome) * 100 : 0

@@ -16,7 +16,7 @@ import { getTransactionsInRange } from "@/lib/transactions"
 import { getCategories } from "@/lib/categories"
 import { Transaction } from "@/lib/types"
 import { Category } from "@/lib/categories"
-import { findCategoryByValue } from "@/lib/utils"
+import { findCategoryByValue, getSpendingAmount } from "@/lib/utils"
 import { cn } from "@/lib/utils"
 import { X } from "lucide-react"
 
@@ -77,7 +77,7 @@ function SpendingTransactionList({
       acc[dateKey].total +=
         transaction.transaction_type === "incoming"
           ? transaction.amount
-          : -transaction.amount
+          : -getSpendingAmount(transaction)
       return acc
     }, {} as GroupedByDate)
   }, [transactions])
@@ -142,7 +142,11 @@ function SpendingTransactionList({
                     )}
                   >
                     {transaction.transaction_type === "incoming" ? "+" : ""}
-                    {formatCurrency(transaction.amount)}
+                    {formatCurrency(
+                      transaction.transaction_type === "outgoing"
+                        ? getSpendingAmount(transaction)
+                        : transaction.amount
+                    )}
                   </span>
                 </div>
               )
@@ -203,7 +207,7 @@ export default function SpendingPage() {
           label: info?.label ?? t.category,
         }
       }
-      byCategory[key].amount += Number(t.amount) || 0
+      byCategory[key].amount += getSpendingAmount(t)
     })
     const total = Object.values(byCategory).reduce((s, x) => s + x.amount, 0)
     return Object.entries(byCategory)
@@ -220,7 +224,7 @@ export default function SpendingPage() {
 
   const summary = useMemo(() => {
     const totalSpending = outgoingTransactions.reduce(
-      (s, t) => s + (Number(t.amount) || 0),
+      (s, t) => s + getSpendingAmount(t),
       0
     )
     const categoryCount = categorySpendData.length

@@ -71,6 +71,7 @@ export async function createTransaction(data: {
   account_type_id: string
   category: string
   notes?: string
+  spending_amount?: number | null
 }) {
   const supabase = createServerSupabaseClient()
   const { userId } = await auth()
@@ -90,6 +91,9 @@ export async function createTransaction(data: {
     account_type_id: data.account_type_id,
     category: data.category,
     notes: data.notes || null,
+    spending_amount: (data.transaction_type === 'outgoing' && data.spending_amount != null)
+      ? data.spending_amount
+      : null,
   }
   
   const { data: result, error } = await supabase
@@ -161,6 +165,13 @@ export async function updateTransaction(id: string, data: Partial<Transaction>) 
   if (data.category) updateData.category = data.category
   if (data.notes !== undefined) updateData.notes = data.notes
   
+  const effectiveType = data.transaction_type || oldTransaction.transaction_type
+  if (effectiveType === 'incoming') {
+    updateData.spending_amount = null
+  } else if (data.spending_amount !== undefined) {
+    updateData.spending_amount = data.spending_amount
+  }
+
   updateData.updated_at = new Date().toISOString()
   
   const { data: result, error } = await supabase
