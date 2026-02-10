@@ -169,6 +169,11 @@ export function MermaidSankey({ transactions, accountsMap, deductionsMap, classN
       startOnLoad: false,
       theme: "base",
       securityLevel: "loose",
+      sankey: {
+        width: 1400,
+        height: 700,
+        useMaxWidth: true,
+      },
     })
 
     let cancelled = false
@@ -177,6 +182,14 @@ export function MermaidSankey({ transactions, accountsMap, deductionsMap, classN
         const { svg } = await mermaid.render(diagramId, csv)
         if (!cancelled && containerRef.current) {
           containerRef.current.innerHTML = svg
+          const svgEl = containerRef.current.querySelector("svg")
+          if (svgEl) {
+            svgEl.removeAttribute("width")
+            svgEl.removeAttribute("height")
+            svgEl.setAttribute("preserveAspectRatio", "xMidYMid meet")
+            svgEl.style.width = "100%"
+            svgEl.style.height = "100%"
+          }
         }
       } catch (err) {
         if (!cancelled && containerRef.current) {
@@ -212,7 +225,7 @@ export function MermaidSankey({ transactions, accountsMap, deductionsMap, classN
     <div
       ref={containerRef}
       className={className}
-      style={{ minHeight: 200 }}
+      style={{ minHeight: "70vh", width: "100%" }}
     />
   )
 }

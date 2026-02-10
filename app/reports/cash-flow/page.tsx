@@ -180,15 +180,15 @@ export default function CashFlowPage() {
         </div>
       )}
 
-      <Card>
+      <Card className="overflow-hidden">
         <CardHeader>
           <CardTitle>Cash Flow</CardTitle>
           <p className="text-sm text-muted-foreground">
             Income and expenses by category for the selected period.
           </p>
         </CardHeader>
-        <CardContent>
-          <MermaidSankey transactions={transactions} accountsMap={accountsMap} deductionsMap={deductionsMap} className="w-full overflow-x-auto" />
+        <CardContent className="min-h-[70vh] w-full p-4">
+          <MermaidSankey transactions={transactions} accountsMap={accountsMap} deductionsMap={deductionsMap} className="h-full min-h-[65vh] w-full" />
         </CardContent>
       </Card>
     </div>
