@@ -2,7 +2,7 @@
 
 import { useLayoutEffect, useRef, useId } from "react"
 import mermaid from "mermaid"
-import { Transaction } from "@/lib/types"
+import { Transaction, PayrollDeduction } from "@/lib/types"
 import { getSpendingAmount } from "@/lib/utils"
 
 /** Sanitize label for Mermaid sankey-beta (ASCII only; non-ASCII breaks the parser). */
@@ -21,27 +21,60 @@ function escapeCsvValue(value: string): string {
   return safe
 }
 
-export type AccountMap = Record<string, { name: string; category: "asset" | "liability" }>
+export type AccountMap = Record<string, { name: string; category: "asset" | "liability"; accountType: string }>
+
+/** Map of transaction id -> PayrollDeduction[] */
+export type DeductionsMap = Record<string, PayrollDeduction[]>
 
 function buildSankeyCsv(
   transactions: Transaction[],
-  accountsMap?: AccountMap
+  accountsMap?: AccountMap,
+  deductionsMap?: DeductionsMap
 ): string {
   const incomeBySource: Record<string, number> = {}
   const expenseByCategory: Record<string, number> = {}
   const assetTransferByDestination: Record<string, number> = {}
+  const deductionByLabel: Record<string, number> = {}
+  const investmentContribByDest: Record<string, number> = {}
   let totalIncome = 0
   let totalExpenses = 0
   let totalAssetTransfers = 0
+  let totalDeductions = 0
+  let totalInvestmentContributions = 0
 
   transactions.forEach((t) => {
     if (t.transaction_type === "incoming") {
-      const amount = Number(t.amount) || 0
-      const category = t.category || "Income"
-      const sourceName = (t.merchant || "").trim()
-      const incomeLabel = sourceName ? `${category} - ${sourceName}` : category
-      incomeBySource[incomeLabel] = (incomeBySource[incomeLabel] || 0) + amount
-      totalIncome += amount
+      const netAmount = Number(t.amount) || 0
+      const account = accountsMap?.[t.account_type_id]
+      const isInvestment = account?.accountType === "Investments"
+
+      if (isInvestment && account) {
+        // Investment contributions (e.g. direct RRSP/TFSA deposits) — separate flow
+        const label = `To ${account.name}`
+        investmentContribByDest[label] = (investmentContribByDest[label] || 0) + netAmount
+        totalInvestmentContributions += netAmount
+      } else {
+        // Regular cash income — flows into Total Income
+        const category = t.category || "Income"
+        const sourceName = (t.merchant || "").trim()
+        const incomeLabel = sourceName ? `${category} - ${sourceName}` : category
+
+        // Sum deductions for this transaction to compute gross
+        const txDeductions = (t.id && deductionsMap?.[t.id]) || t.deductions || []
+        const deductionSum = txDeductions.reduce((s, d) => s + (Number(d.amount) || 0), 0)
+        const grossAmount = netAmount + deductionSum
+
+        incomeBySource[incomeLabel] = (incomeBySource[incomeLabel] || 0) + grossAmount
+        totalIncome += grossAmount
+
+        // Accumulate deductions by label
+        for (const d of txDeductions) {
+          const dedLabel = d.label || "Deduction"
+          const dedAmount = Number(d.amount) || 0
+          deductionByLabel[dedLabel] = (deductionByLabel[dedLabel] || 0) + dedAmount
+          totalDeductions += dedAmount
+        }
+      }
     } else if (t.transaction_type === "outgoing") {
       const category = t.category || "Expense"
       const amount = getSpendingAmount(t)
@@ -61,29 +94,50 @@ function buildSankeyCsv(
 
   const lines: string[] = []
   const totalIncomeLabel = "Total Income"
+  const investmentContribLabel = "Investment Contributions"
   const savingsLabel = "Savings"
 
+  // Income sources (gross) → Total Income
   Object.entries(incomeBySource).forEach(([sourceLabel, amount]) => {
     if (amount > 0) {
       lines.push(`${escapeCsvValue(sourceLabel)}, ${escapeCsvValue(totalIncomeLabel)}, ${amount}`)
     }
   })
 
+  // Total Income → expense categories
   Object.entries(expenseByCategory).forEach(([category, amount]) => {
     if (amount > 0) {
       lines.push(`${escapeCsvValue(totalIncomeLabel)}, ${escapeCsvValue(category)}, ${amount}`)
     }
   })
 
+  // Total Income → asset transfers
   Object.entries(assetTransferByDestination).forEach(([label, amount]) => {
     if (amount > 0) {
       lines.push(`${escapeCsvValue(totalIncomeLabel)}, ${escapeCsvValue(label)}, ${amount}`)
     }
   })
 
-  const savings = totalIncome - totalExpenses - totalAssetTransfers
+  // Total Income → deductions (taxes, CPP, etc.)
+  Object.entries(deductionByLabel).forEach(([label, amount]) => {
+    if (amount > 0) {
+      lines.push(`${escapeCsvValue(totalIncomeLabel)}, ${escapeCsvValue(label)}, ${amount}`)
+    }
+  })
+
+  // Savings residual: gross income - expenses - transfers - deductions
+  const savings = totalIncome - totalExpenses - totalAssetTransfers - totalDeductions
   if (savings > 0) {
     lines.push(`${escapeCsvValue(totalIncomeLabel)}, ${escapeCsvValue(savingsLabel)}, ${savings}`)
+  }
+
+  // Investment contributions as a separate flow (not part of Total Income)
+  if (totalInvestmentContributions > 0) {
+    Object.entries(investmentContribByDest).forEach(([label, amount]) => {
+      if (amount > 0) {
+        lines.push(`${escapeCsvValue(investmentContribLabel)}, ${escapeCsvValue(label)}, ${amount}`)
+      }
+    })
   }
 
   if (lines.length === 0) {
@@ -95,16 +149,17 @@ function buildSankeyCsv(
 interface MermaidSankeyProps {
   transactions: Transaction[]
   accountsMap?: AccountMap
+  deductionsMap?: DeductionsMap
   className?: string
 }
 
-export function MermaidSankey({ transactions, accountsMap, className }: MermaidSankeyProps) {
+export function MermaidSankey({ transactions, accountsMap, deductionsMap, className }: MermaidSankeyProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const reactId = useId().replace(/:/g, "-")
   const renderCountRef = useRef(0)
 
   useLayoutEffect(() => {
-    const csv = buildSankeyCsv(transactions, accountsMap)
+    const csv = buildSankeyCsv(transactions, accountsMap, deductionsMap)
     if (!csv) return
 
     renderCountRef.current += 1
@@ -142,9 +197,9 @@ export function MermaidSankey({ transactions, accountsMap, className }: MermaidS
       cancelled = true
       cancelAnimationFrame(rafId)
     }
-  }, [transactions, accountsMap, reactId]);
+  }, [transactions, accountsMap, deductionsMap, reactId]);
 
-  const csv = buildSankeyCsv(transactions, accountsMap)
+  const csv = buildSankeyCsv(transactions, accountsMap, deductionsMap)
   if (!csv) {
     return (
       <div className={className}>

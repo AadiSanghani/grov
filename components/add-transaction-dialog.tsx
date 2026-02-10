@@ -27,7 +27,7 @@ import {
   CommandList,
 } from "@/components/ui/command"
 import { cn, formatCategoriesForUI } from "@/lib/utils"
-import { CalendarIcon, Check, ChevronsUpDown, MinusCircle, PlusCircle, ArrowRightLeft } from "lucide-react"
+import { CalendarIcon, Check, ChevronsUpDown, MinusCircle, PlusCircle, ArrowRightLeft, Plus, Trash2, ChevronDown, ChevronUp } from "lucide-react"
 import { format } from "date-fns"
 import { type Account } from "@/lib/accounts"
 import { createTransaction } from "@/lib/transactions"
@@ -79,11 +79,18 @@ export function AddTransactionDialog({
   const [notes, setNotes] = useState("")
   const [spendingAmount, setSpendingAmount] = useState("")
   const [displaySpendingAmount, setDisplaySpendingAmount] = useState("$")
+  const [deductionsOpen, setDeductionsOpen] = useState(false)
+  const [deductions, setDeductions] = useState<{ label: string; amount: string; displayAmount: string; targetAccountId: string }[]>([])
   const { merchants, addMerchant } = useDataContext()
   const merchantNames = useMemo(() => merchants.map((m) => m.name), [merchants])
   const formattedCategories = useMemo(
     () => (categories.length > 0 ? formatCategoriesForUI(categories) : []),
     [categories]
+  )
+
+  const investmentAccounts = useMemo(
+    () => accounts.filter((a) => a.account_type === "Investments"),
+    [accounts]
   )
 
   const resetForm = () => {
@@ -98,7 +105,47 @@ export function AddTransactionDialog({
     setToAccountTypeId("")
     setCategory("")
     setNotes("")
+    setDeductions([])
+    setDeductionsOpen(false)
   }
+
+  const addDeductionRow = () => {
+    setDeductions((prev) => [...prev, { label: "", amount: "", displayAmount: "$", targetAccountId: "" }])
+  }
+
+  const removeDeductionRow = (index: number) => {
+    setDeductions((prev) => prev.filter((_, i) => i !== index))
+  }
+
+  const updateDeduction = (index: number, field: string, value: string) => {
+    setDeductions((prev) =>
+      prev.map((d, i) => {
+        if (i !== index) return d
+        if (field === "amount") {
+          let v = value.replace(/[^0-9.]/g, "")
+          if (v === "") return { ...d, amount: "", displayAmount: "$" }
+          const parts = v.split(".")
+          if (parts.length > 2) v = parts[0] + "." + parts.slice(1).join("")
+          if (parts.length === 2 && parts[1].length > 2) v = parts[0] + "." + parts[1].slice(0, 2)
+          const [intPart, decPart] = v.split(".")
+          const fmtInt = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ",")
+          const display = decPart !== undefined ? `$${fmtInt}.${decPart}` : `$${fmtInt}`
+          return { ...d, amount: v, displayAmount: display }
+        }
+        return { ...d, [field]: value }
+      })
+    )
+  }
+
+  const deductionTotal = useMemo(
+    () => deductions.reduce((sum, d) => sum + (parseFloat(d.amount) || 0), 0),
+    [deductions]
+  )
+
+  const grossIncome = useMemo(() => {
+    const net = parseFloat(amount) || 0
+    return net + deductionTotal
+  }, [amount, deductionTotal])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -136,6 +183,27 @@ export function AddTransactionDialog({
       parsedSpendingAmount = num
     }
 
+    // Parse deductions for incoming transactions
+    let parsedDeductions: { label: string; amount: number; target_account_id?: number | null }[] = []
+    if (transactionType === "incoming" && deductions.length > 0) {
+      for (const d of deductions) {
+        const dedAmount = parseFloat(d.amount)
+        if (!d.label.trim()) {
+          alert("Please enter a label for all deductions")
+          return
+        }
+        if (isNaN(dedAmount) || dedAmount <= 0) {
+          alert("Please enter a valid amount for all deductions")
+          return
+        }
+        parsedDeductions.push({
+          label: d.label.trim(),
+          amount: dedAmount,
+          target_account_id: d.targetAccountId ? parseInt(d.targetAccountId, 10) : null,
+        })
+      }
+    }
+
     const transactionData: Parameters<typeof createTransaction>[0] = {
       transaction_type: transactionType,
       amount: numAmount,
@@ -145,6 +213,7 @@ export function AddTransactionDialog({
       category: transactionType === "transfer" ? (category || "transfer") : category,
       notes,
       spending_amount: transactionType === "outgoing" ? parsedSpendingAmount : undefined,
+      deductions: parsedDeductions.length > 0 ? parsedDeductions : undefined,
     }
     if (transactionType === "transfer") {
       transactionData.to_account_type_id = toAccountTypeId
@@ -328,6 +397,108 @@ export function AddTransactionDialog({
               <p className="text-xs text-muted-foreground">
                 Optional &mdash; leave blank to count the full amount as spending
               </p>
+            </div>
+          )}
+
+          {/* Payroll Deductions (incoming only) */}
+          {transactionType === "incoming" && (
+            <div className="space-y-3">
+              <button
+                type="button"
+                className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+                onClick={() => {
+                  setDeductionsOpen(!deductionsOpen)
+                  if (!deductionsOpen && deductions.length === 0) addDeductionRow()
+                }}
+              >
+                {deductionsOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                Payroll Deductions
+                {deductions.length > 0 && (
+                  <span className="text-xs bg-muted rounded-full px-2 py-0.5">
+                    {deductions.length}
+                  </span>
+                )}
+              </button>
+
+              {deductionsOpen && (
+                <div className="space-y-3 rounded-lg border p-4">
+                  {deductions.map((ded, index) => (
+                    <div key={index} className="space-y-2">
+                      {index > 0 && <div className="border-t" />}
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1 space-y-1">
+                          <Label className="text-xs">Label</Label>
+                          <Input
+                            placeholder="e.g. RRSP, Income Tax, CPP, EI"
+                            value={ded.label}
+                            onChange={(e) => updateDeduction(index, "label", e.target.value)}
+                          />
+                        </div>
+                        <div className="w-[140px] space-y-1">
+                          <Label className="text-xs">Amount</Label>
+                          <Input
+                            placeholder="$0.00"
+                            value={ded.displayAmount}
+                            onChange={(e) => updateDeduction(index, "amount", e.target.value)}
+                          />
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="mt-5 shrink-0"
+                          onClick={() => removeDeductionRow(index)}
+                        >
+                          <Trash2 className="h-4 w-4 text-muted-foreground" />
+                        </Button>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Credit to Account (optional)</Label>
+                        <select
+                          className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                          value={ded.targetAccountId}
+                          onChange={(e) => updateDeduction(index, "targetAccountId", e.target.value)}
+                        >
+                          <option value="">None (e.g. taxes)</option>
+                          {investmentAccounts.map((acc) => (
+                            <option key={acc.id} value={acc.id?.toString() ?? ""}>
+                              {acc.account_name} ({acc.account_subtype})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  ))}
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                    onClick={addDeductionRow}
+                  >
+                    <Plus className="h-4 w-4 mr-1" />
+                    Add deduction
+                  </Button>
+
+                  {deductions.length > 0 && parseFloat(amount) > 0 && (
+                    <div className="text-sm text-muted-foreground border-t pt-3 space-y-1">
+                      <div className="flex justify-between">
+                        <span>Deposit (net)</span>
+                        <span>${parseFloat(amount).toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Deductions</span>
+                        <span>${deductionTotal.toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
+                      </div>
+                      <div className="flex justify-between font-medium text-foreground">
+                        <span>Gross</span>
+                        <span>${grossIncome.toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
 

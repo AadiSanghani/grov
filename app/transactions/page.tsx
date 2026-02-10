@@ -31,7 +31,6 @@ export default function Transactions() {
     tags: [],
   })
 
-  // Load transactions and accounts on mount
   useEffect(() => {
     loadData()
   }, [])
@@ -56,7 +55,6 @@ export default function Transactions() {
     }
   }
 
-  // Refresh data in the background without showing the full loading state
   const refreshData = async () => {
     try {
       const [transactionsData, accountsData, categoriesData] = await Promise.all([
@@ -73,7 +71,6 @@ export default function Transactions() {
     }
   }
 
-  // Apply filters to transactions
   const filteredTransactions = useMemo(() => {
     let filtered = [...transactions]
 

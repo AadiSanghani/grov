@@ -9,6 +9,11 @@ import {
   recordTransactionBalance,
   reverseTransactionBalance
 } from './balances'
+import {
+  createDeductions,
+  getDeductionsByTransactionId,
+  deleteDeductionsByTransactionId,
+} from './deductions'
 import { calculateBalanceDelta, toLocalDateString, parseLocalDate } from './utils'
 
 export async function getTransactions() {
@@ -75,6 +80,7 @@ export async function createTransaction(data: {
   notes?: string
   spending_amount?: number | null
   to_account_type_id?: string | null
+  deductions?: { label: string; amount: number; target_account_id?: number | null }[]
 }) {
   const supabase = createServerSupabaseClient()
   const { userId } = await auth()
@@ -117,6 +123,20 @@ export async function createTransaction(data: {
     console.error('Supabase error:', error)
     throw error
   }
+
+  // Insert payroll deductions if provided (only for incoming transactions)
+  const deductionsInput = data.transaction_type === 'incoming' && data.deductions?.length
+    ? data.deductions
+    : []
+  if (deductionsInput.length > 0 && result?.id) {
+    try {
+      await createDeductions(result.id, deductionsInput)
+    } catch (dedError) {
+      console.error('Failed to create payroll deductions:', dedError)
+    }
+  }
+
+  const deductionsForBalance = deductionsInput.filter((d) => d.target_account_id)
 
   after(async () => {
     try {
@@ -171,6 +191,24 @@ export async function createTransaction(data: {
           updateAccountBalance(data.account_type_id, newBalance),
         ])
       }
+
+      for (const ded of deductionsForBalance) {
+        if (!ded.target_account_id) continue
+        const targetAcc = await getAccountById(ded.target_account_id)
+        const targetCategory = targetAcc.category || 'asset'
+        const targetBalance = parseFloat(targetAcc.account_balance)
+        const targetDelta = calculateBalanceDelta('incoming', ded.amount, targetCategory)
+        await Promise.all([
+          updateAccountBalance(ded.target_account_id, targetBalance + targetDelta),
+          recordTransactionBalance(
+            ded.target_account_id,
+            transactionDate,
+            'incoming',
+            ded.amount,
+            targetCategory
+          ),
+        ])
+      }
     } catch (balanceError) {
       console.error('Failed to update account balance:', balanceError)
     }
@@ -179,7 +217,12 @@ export async function createTransaction(data: {
   return result
 }
 
-export async function updateTransaction(id: string, data: Partial<Transaction>) {
+export async function updateTransaction(
+  id: string,
+  data: Partial<Transaction> & {
+    deductions?: { label: string; amount: number; target_account_id?: number | null }[]
+  }
+) {
   const supabase = createServerSupabaseClient()
   const { userId } = await auth()
   
@@ -198,6 +241,19 @@ export async function updateTransaction(id: string, data: Partial<Transaction>) 
   if (fetchError) {
     console.error('Supabase error:', fetchError)
     throw fetchError
+  }
+
+  // Fetch old deductions for reversal
+  let oldDeductions: { amount: number; target_account_id: number | null }[] = []
+  if (oldTransaction.transaction_type === 'incoming') {
+    try {
+      const deds = await getDeductionsByTransactionId(id)
+      oldDeductions = deds
+        .filter((d) => d.target_account_id)
+        .map((d) => ({ amount: d.amount, target_account_id: d.target_account_id ?? null }))
+    } catch (e) {
+      console.error('Failed to fetch old deductions:', e)
+    }
   }
   
   const updateData: any = {}
@@ -236,6 +292,24 @@ export async function updateTransaction(id: string, data: Partial<Transaction>) 
     console.error('Supabase error:', error)
     throw error
   }
+
+  // Replace deductions if provided
+  const newDeductionsInput = effectiveType === 'incoming' && data.deductions
+    ? data.deductions
+    : []
+  // Delete old deductions and insert new ones
+  if (data.deductions !== undefined) {
+    try {
+      await deleteDeductionsByTransactionId(id)
+      if (newDeductionsInput.length > 0) {
+        await createDeductions(Number(id), newDeductionsInput)
+      }
+    } catch (dedError) {
+      console.error('Failed to update deductions:', dedError)
+    }
+  }
+
+  const newDeductionsForBalance = newDeductionsInput.filter((d) => d.target_account_id)
   
   // Capture values needed for balance bookkeeping before entering after()
   const oldFromId = oldTransaction.account_type_id
@@ -311,7 +385,33 @@ export async function updateTransaction(id: string, data: Partial<Transaction>) 
       }
 
       await reverseOld()
+
+      // Reverse old deduction balance effects
+      for (const ded of oldDeductions) {
+        if (!ded.target_account_id) continue
+        const acc = await getAccountById(ded.target_account_id)
+        const cat = acc.category || 'asset'
+        const delta = calculateBalanceDelta('incoming', ded.amount, cat)
+        await Promise.all([
+          updateAccountBalance(ded.target_account_id, parseFloat(acc.account_balance) - delta),
+          reverseTransactionBalance(ded.target_account_id, oldDate, 'incoming', ded.amount, cat),
+        ])
+      }
+
       await applyNew()
+
+      // Apply new deduction balance effects
+      for (const ded of newDeductionsForBalance) {
+        if (!ded.target_account_id) continue
+        const acc = await getAccountById(ded.target_account_id)
+        const cat = acc.category || 'asset'
+        const bal = parseFloat(acc.account_balance)
+        const delta = calculateBalanceDelta('incoming', ded.amount, cat)
+        await Promise.all([
+          updateAccountBalance(ded.target_account_id, bal + delta),
+          recordTransactionBalance(ded.target_account_id, newDate, 'incoming', ded.amount, cat),
+        ])
+      }
     } catch (balanceError) {
       console.error('Failed to update account balance:', balanceError)
     }
@@ -340,6 +440,19 @@ export async function deleteTransaction(id: string) {
     console.error('Supabase error:', fetchError)
     throw fetchError
   }
+
+  // Fetch deductions BEFORE deleting (CASCADE will remove them)
+  let deductionsToReverse: { amount: number; target_account_id: number | null }[] = []
+  if (transaction.transaction_type === 'incoming') {
+    try {
+      const deds = await getDeductionsByTransactionId(id)
+      deductionsToReverse = deds
+        .filter((d) => d.target_account_id)
+        .map((d) => ({ amount: d.amount, target_account_id: d.target_account_id ?? null }))
+    } catch (e) {
+      console.error('Failed to fetch deductions for reversal:', e)
+    }
+  }
   
   const { error } = await supabase
     .from('transactions')
@@ -356,6 +469,7 @@ export async function deleteTransaction(id: string) {
   const deletedTransaction = transaction
   const wasTransfer = deletedTransaction.transaction_type === 'transfer'
   const toId = deletedTransaction.to_account_type_id != null ? deletedTransaction.to_account_type_id.toString() : null
+  const txDate = deletedTransaction.date
 
   after(async () => {
     try {
@@ -401,6 +515,25 @@ export async function deleteTransaction(id: string) {
             transactionType,
             deletedTransaction.amount,
             accountCategory
+          ),
+        ])
+      }
+
+      // Reverse deduction balance effects
+      for (const ded of deductionsToReverse) {
+        if (!ded.target_account_id) continue
+        const targetAcc = await getAccountById(ded.target_account_id)
+        const targetCategory = targetAcc.category || 'asset'
+        const targetBalance = parseFloat(targetAcc.account_balance)
+        const targetDelta = calculateBalanceDelta('incoming', ded.amount, targetCategory)
+        await Promise.all([
+          updateAccountBalance(ded.target_account_id, targetBalance - targetDelta),
+          reverseTransactionBalance(
+            ded.target_account_id,
+            txDate,
+            'incoming',
+            ded.amount,
+            targetCategory
           ),
         ])
       }

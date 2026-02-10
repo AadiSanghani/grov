@@ -1,3 +1,13 @@
+export interface PayrollDeduction {
+  id?: number
+  transaction_id?: number
+  user_id?: string
+  label: string
+  amount: number
+  target_account_id?: number | null
+  created_at?: Date
+}
+
 export interface Transaction {
   id?: string
   user_id?: string
@@ -10,6 +20,7 @@ export interface Transaction {
   notes?: string
   spending_amount?: number | null
   to_account_type_id?: string | null
+  deductions?: PayrollDeduction[]
   created_at?: Date
   updated_at?: Date
 }

@@ -5,9 +5,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { useReportsContext } from "../context"
 import { getTransactionsInRange } from "@/lib/transactions"
 import { Transaction } from "@/lib/types"
-import { MermaidSankey, type AccountMap } from "@/components/mermaid-sankey"
+import { MermaidSankey, type AccountMap, type DeductionsMap } from "@/components/mermaid-sankey"
 import { getSpendingAmount } from "@/lib/utils"
 import { getAccounts } from "@/lib/accounts"
+import { getDeductionsForTransactions } from "@/lib/deductions"
 
 function formatCurrency(amount: number) {
   return new Intl.NumberFormat("en-US", {
@@ -22,6 +23,7 @@ export default function CashFlowPage() {
   const { startDate, endDate } = useReportsContext()
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [accounts, setAccounts] = useState<Awaited<ReturnType<typeof getAccounts>>>([])
+  const [deductionsMap, setDeductionsMap] = useState<DeductionsMap>({})
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -32,12 +34,25 @@ export default function CashFlowPage() {
           getTransactionsInRange(startDate, endDate),
           getAccounts(),
         ])
-        setTransactions(txData ?? [])
+        const txs = txData ?? []
+        setTransactions(txs)
         setAccounts(accData ?? [])
+
+        // Fetch deductions for all incoming transactions
+        const incomingIds = txs
+          .filter((t) => t.transaction_type === "incoming" && t.id)
+          .map((t) => t.id as string)
+        if (incomingIds.length > 0) {
+          const dedMap = await getDeductionsForTransactions(incomingIds)
+          setDeductionsMap(dedMap)
+        } else {
+          setDeductionsMap({})
+        }
       } catch (err) {
         console.error("Failed to fetch data:", err)
         setTransactions([])
         setAccounts([])
+        setDeductionsMap({})
       } finally {
         setLoading(false)
       }
@@ -52,6 +67,7 @@ export default function CashFlowPage() {
         map[String(acc.id)] = {
           name: acc.account_name,
           category: acc.category ?? "asset",
+          accountType: acc.account_type ?? "Cash",
         }
       }
     }
@@ -59,17 +75,27 @@ export default function CashFlowPage() {
   }, [accounts])
 
   const summary = useMemo(() => {
-    let totalIncome = 0
+    let totalNetIncome = 0
     let totalExpenses = 0
+    let totalInvestmentContributions = 0
     transactions.forEach((t) => {
-      if (t.transaction_type === "incoming") totalIncome += Number(t.amount) || 0
-      else if (t.transaction_type === "outgoing") totalExpenses += getSpendingAmount(t)
+      if (t.transaction_type === "incoming") {
+        const amount = Number(t.amount) || 0
+        const account = accountsMap[t.account_type_id]
+        if (account?.accountType === "Investments") {
+          totalInvestmentContributions += amount
+        } else {
+          totalNetIncome += amount
+        }
+      } else if (t.transaction_type === "outgoing") {
+        totalExpenses += getSpendingAmount(t)
+      }
       // transfers excluded from both
     })
-    const netIncome = totalIncome - totalExpenses
-    const savingsRate = totalIncome > 0 ? (netIncome / totalIncome) * 100 : 0
-    return { totalIncome, totalExpenses, netIncome, savingsRate }
-  }, [transactions])
+    const netIncome = totalNetIncome - totalExpenses
+    const savingsRate = totalNetIncome > 0 ? (netIncome / totalNetIncome) * 100 : 0
+    return { totalNetIncome, totalExpenses, netIncome, savingsRate, totalInvestmentContributions }
+  }, [transactions, accountsMap])
 
   if (loading) {
     return (
@@ -90,7 +116,7 @@ export default function CashFlowPage() {
           </CardHeader>
           <CardContent>
             <span className="text-2xl font-semibold text-green-600">
-              +{formatCurrency(summary.totalIncome)}
+              +{formatCurrency(summary.totalNetIncome)}
             </span>
           </CardContent>
         </Card>
@@ -137,6 +163,23 @@ export default function CashFlowPage() {
         </Card>
       </div>
 
+      {summary.totalInvestmentContributions > 0 && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Investment Contributions
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <span className="text-2xl font-semibold text-blue-600">
+                {formatCurrency(summary.totalInvestmentContributions)}
+              </span>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
       <Card>
         <CardHeader>
           <CardTitle>Cash Flow</CardTitle>
@@ -145,7 +188,7 @@ export default function CashFlowPage() {
           </p>
         </CardHeader>
         <CardContent>
-          <MermaidSankey transactions={transactions} accountsMap={accountsMap} className="w-full overflow-x-auto" />
+          <MermaidSankey transactions={transactions} accountsMap={accountsMap} deductionsMap={deductionsMap} className="w-full overflow-x-auto" />
         </CardContent>
       </Card>
     </div>

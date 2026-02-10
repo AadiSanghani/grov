@@ -12,7 +12,6 @@ import { getNetWorthHistory } from '@/lib/balances';
 import { NetWorthDataPoint } from '@/lib/types';
 import { format, subDays, subMonths, startOfMonth, startOfYear } from 'date-fns';
 
-// Timeline select options
 const TIMELINE_OPTIONS = [
   { value: "last-30-days", label: "Last 30 Days" },
   { value: "month-to-date", label: "Month to Date" },
@@ -21,7 +20,6 @@ const TIMELINE_OPTIONS = [
   { value: "all-time", label: "All Time" },
 ];
 
-// Client-only Timeline Select to avoid hydration mismatch with Radix UI's generated IDs
 function TimelineSelectInner({ value, onValueChange }: { value: string; onValueChange: (value: string) => void }) {
   const { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } = require("@/components/ui/select");
   
@@ -41,7 +39,6 @@ function TimelineSelectInner({ value, onValueChange }: { value: string; onValueC
   );
 }
 
-// Dynamically import the entire Select component to avoid SSR hydration issues
 const TimelineSelect = dynamic(() => Promise.resolve(TimelineSelectInner), {
   ssr: false,
   loading: () => (
