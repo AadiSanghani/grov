@@ -184,7 +184,7 @@ export default function Transactions() {
       description="View, filter, and manage all your transactions."
       action={
         <Button onClick={() => setIsAddTransactionOpen(true)}>
-          <Plus className="w-4 h-4 mr-2" />
+          <Plus className="w-4 h-4" />
           Add transaction
         </Button>
       }

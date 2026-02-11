@@ -201,7 +201,7 @@ export default function Accounts() {
       description="Manage accounts and track net worth over time."
       action={
         <Button onClick={() => setIsAddAccountOpen(true)}>
-          <Plus className="w-4 h-4 mr-2" />
+          <Plus className="w-4 h-4" />
           Add Account
         </Button>
       }
