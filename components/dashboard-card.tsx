@@ -25,15 +25,17 @@ export function DashboardCard({
   ...props
 }: DashboardCardProps) {
   return (
-    <Card className={cn("h-full", className)} {...props}>
-      <CardHeader className="border-b">
-        <CardTitle>{title}</CardTitle>
+    <Card className={cn("gap-0 py-0", className)} {...props}>
+      <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2 border-b px-4 py-2.5 pb-2.5!">
+        <CardTitle className="text-lg font-semibold tracking-tight">
+          {title}
+        </CardTitle>
         {description ? (
-          <CardDescription>{description}</CardDescription>
+          <CardDescription className="w-full">{description}</CardDescription>
         ) : null}
-        {actions ? <CardAction>{actions}</CardAction> : null}
+        {actions ? <div className="flex shrink-0">{actions}</div> : null}
       </CardHeader>
-      <CardContent className="pt-6">{children}</CardContent>
+      <CardContent className="px-4 pt-2 pb-3">{children}</CardContent>
     </Card>
   )
 }

@@ -163,7 +163,6 @@ export async function getSpendingSeries(
     }
   }
 
-  // Fallback to this_month_vs_last_month if an unknown key is passed
   return getSpendingSeries("this_month_vs_last_month")
 }
 

@@ -3,8 +3,8 @@
 import { useMemo, useTransition } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import {
-  Line,
-  LineChart,
+  Area,
+  AreaChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -55,11 +55,6 @@ function formatCurrency(amount: number): string {
   }).format(amount)
 }
 
-function getPercentageChange(current: number, previous: number): number | null {
-  if (previous === 0) return null
-  return ((current - previous) / previous) * 100
-}
-
 export function SpendingCard({ rangeKey, data, loading }: SpendingCardProps) {
   const router = useRouter()
   const pathname = usePathname()
@@ -75,13 +70,7 @@ export function SpendingCard({ rangeKey, data, loading }: SpendingCardProps) {
     })
   }
 
-  const {
-    chartData,
-    comparisonLabel,
-    lastMonthTotal,
-    sameMonthLastYearLabel,
-    sameMonthLastYearTotal,
-  } = useMemo(() => {
+  const { chartData, comparisonLabel } = useMemo(() => {
     const currentPoints = data.current.points
     const comparisonPoints = data.comparison?.points ?? []
 
@@ -117,21 +106,8 @@ export function SpendingCard({ rangeKey, data, loading }: SpendingCardProps) {
     return {
       chartData: merged,
       comparisonLabel: data.comparison?.label ?? "Last month",
-      lastMonthTotal: data.comparison?.total ?? 0,
-      sameMonthLastYearLabel: data.sameMonthLastYear?.label,
-      sameMonthLastYearTotal: data.sameMonthLastYear?.total ?? 0,
     }
   }, [data])
-
-  const headline = formatCurrency(data.current.total)
-  const pctVsLastMonth = getPercentageChange(
-    data.current.total,
-    lastMonthTotal,
-  )
-  const pctVsSameMonthLastYear =
-    sameMonthLastYearTotal != null
-      ? getPercentageChange(data.current.total, sameMonthLastYearTotal)
-      : null
 
   const isLoading = loading || isPending
 
@@ -161,25 +137,21 @@ export function SpendingCard({ rangeKey, data, loading }: SpendingCardProps) {
         </Select>
       }
     >
-      <div className="h-[260px]">
+      <div className="h-[300px]">
         {isLoading ? (
-          <div className="flex h-full items-center justify-center rounded-lg border bg-muted/40">
-            <p className="text-sm text-muted-foreground">
-              Loading spending data...
-            </p>
+          <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
+            Loading spending data...
           </div>
         ) : chartData.length === 0 ? (
-          <div className="flex h-full items-center justify-center rounded-lg border bg-muted/40">
-            <p className="text-sm text-muted-foreground">
-              No spending data yet. Add some transactions to see your spending
-              over time.
-            </p>
+          <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
+            No spending data yet. Add some transactions to see your spending
+            over time.
           </div>
         ) : (
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart
+            <AreaChart
               data={chartData}
-              margin={{ top: 16, right: 24, left: 0, bottom: 8 }}
+              margin={{ top: 8, right: 16, left: 0, bottom: 4 }}
             >
               <CartesianGrid strokeDasharray="3 3" vertical={false} />
               <XAxis dataKey="name" tick={{ fontSize: 12 }} />
@@ -199,28 +171,32 @@ export function SpendingCard({ rangeKey, data, loading }: SpendingCardProps) {
                 labelStyle={{ color: "var(--foreground)" }}
               />
               {data.comparison && <Legend />}
-              <Line
+              <Area
                 type="monotone"
                 dataKey="current"
                 name="This month"
-                stroke="#3b82f6"
+                stroke="#ef4444"
+                fill="#ef4444"
+                fillOpacity={0.2}
                 strokeWidth={2}
                 dot={false}
                 isAnimationActive={false}
               />
               {data.comparison && (
-                <Line
+                <Area
                   type="monotone"
                   dataKey="comparison"
                   name={comparisonLabel}
                   stroke="#9ca3af"
+                  fill="#9ca3af"
+                  fillOpacity={0.15}
                   strokeWidth={2}
                   strokeDasharray="4 2"
                   dot={false}
                   isAnimationActive={false}
                 />
               )}
-            </LineChart>
+            </AreaChart>
           </ResponsiveContainer>
         )}
       </div>
