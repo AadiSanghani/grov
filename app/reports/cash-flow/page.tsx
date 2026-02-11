@@ -115,7 +115,6 @@ export default function CashFlowPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {/* Test */}
             <span className="text-2xl font-semibold text-accent">
               +{formatCurrency(summary.totalNetIncome)}
             </span>
