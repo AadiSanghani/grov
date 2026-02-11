@@ -193,7 +193,7 @@ export default function Accounts() {
     }).format(amount);
   };
 
-  const netWorthChartColor = currentNetWorth < 0 ? 'var(--destructive)' : 'var(--primary)';
+  const netWorthChartColor = currentNetWorth < 0 ? 'var(--destructive)' : 'var(--accent)';
 
   return (
     <PageLayout

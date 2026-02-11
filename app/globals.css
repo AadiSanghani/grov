@@ -153,7 +153,7 @@
 }
 
 .text-positive {
-  color: var(--chart-3);
+  color: var(--accent);
 }
 .text-negative {
   color: var(--destructive);

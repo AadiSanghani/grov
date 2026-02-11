@@ -88,7 +88,7 @@ export const TransactionSummary = React.memo(function TransactionSummary({ trans
         {/* Largest transaction */}
         <div className="flex justify-between items-center">
           <span className="text-base text-muted-foreground">Largest Income</span>
-          <span className="font-semibold text-base text-primary">
+          <span className="font-semibold text-base text-accent">
             {formatCurrency(summary.largestIncome)}
           </span>
         </div>
@@ -104,7 +104,7 @@ export const TransactionSummary = React.memo(function TransactionSummary({ trans
         {/* Average transaction */}
         <div className="flex justify-between items-center">
           <span className="text-base text-muted-foreground">Average Transaction</span>
-          <span className="font-semibold text-base text-primary">
+          <span className="font-semibold text-base text-accent">
             +{formatCurrency(summary.averageTransaction)}
           </span>
         </div>
@@ -114,7 +114,7 @@ export const TransactionSummary = React.memo(function TransactionSummary({ trans
         {/* Total income */}
         <div className="flex justify-between items-center">
           <span className="text-base text-muted-foreground">Total Income</span>
-          <span className="font-semibold text-base text-primary">
+          <span className="font-semibold text-base text-accent">
             +{formatCurrency(summary.totalIncome)}
           </span>
         </div>
@@ -127,23 +127,6 @@ export const TransactionSummary = React.memo(function TransactionSummary({ trans
           </span>
         </div>
 
-        <Separator />
-
-        {/* First transaction */}
-        <div className="flex justify-between items-center">
-          <span className="text-base text-muted-foreground">First Transaction</span>
-          <span className="font-medium text-sm">
-            {formatDate(summary.firstTransactionDate)}
-          </span>
-        </div>
-
-        {/* Last transaction */}
-        <div className="flex justify-between items-center">
-          <span className="text-base text-muted-foreground">Last Transaction</span>
-          <span className="font-medium text-sm">
-            {formatDate(summary.lastTransactionDate)}
-          </span>
-        </div>
       </div>
     </div>
   )

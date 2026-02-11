@@ -75,7 +75,7 @@ export function NetWorthCard({ rangeKey, data, loading }: NetWorthCardProps) {
   const chartColor =
     chartData.length > 0 && chartData[chartData.length - 1].value < 0
       ? "var(--destructive)"
-      : "var(--primary)"
+      : "var(--accent)"
 
   return (
     <DashboardCard
