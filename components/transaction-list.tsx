@@ -66,7 +66,7 @@ export const TransactionList = React.memo(function TransactionList({ transaction
             <h3 className="font-semibold text-sm">{date}</h3>
             <span className={cn(
               "font-semibold text-sm",
-              total >= 0 ? "text-green-600" : "text-foreground"
+              total >= 0 ? "text-primary" : "text-foreground"
             )}>
               {total >= 0 ? "+" : ""}${Math.abs(total).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </span>
@@ -107,7 +107,7 @@ export const TransactionList = React.memo(function TransactionList({ transaction
                       <span className={cn(
                         "font-semibold",
                         transaction.transaction_type === "incoming" 
-                          ? "text-green-600" 
+                          ? "text-primary" 
                           : "text-foreground"
                       )}>
                         {transaction.transaction_type === "incoming" ? "+" : ""}

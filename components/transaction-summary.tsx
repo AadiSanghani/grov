@@ -88,7 +88,7 @@ export const TransactionSummary = React.memo(function TransactionSummary({ trans
         {/* Largest transaction */}
         <div className="flex justify-between items-center">
           <span className="text-base text-muted-foreground">Largest Income</span>
-          <span className="font-semibold text-base text-green-600">
+          <span className="font-semibold text-base text-primary">
             {formatCurrency(summary.largestIncome)}
           </span>
         </div>
@@ -104,7 +104,7 @@ export const TransactionSummary = React.memo(function TransactionSummary({ trans
         {/* Average transaction */}
         <div className="flex justify-between items-center">
           <span className="text-base text-muted-foreground">Average Transaction</span>
-          <span className="font-semibold text-base text-green-600">
+          <span className="font-semibold text-base text-primary">
             +{formatCurrency(summary.averageTransaction)}
           </span>
         </div>
@@ -114,7 +114,7 @@ export const TransactionSummary = React.memo(function TransactionSummary({ trans
         {/* Total income */}
         <div className="flex justify-between items-center">
           <span className="text-base text-muted-foreground">Total Income</span>
-          <span className="font-semibold text-base text-green-600">
+          <span className="font-semibold text-base text-primary">
             +{formatCurrency(summary.totalIncome)}
           </span>
         </div>

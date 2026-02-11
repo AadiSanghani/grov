@@ -4,8 +4,9 @@ import dynamic from 'next/dynamic';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Button } from '@/components/ui/button';
+import { PageLayout } from '@/components/page-layout';
 import { AddAccountDialog } from '@/components/add-account-dialog';
-import { ChevronDown, ChevronRight } from 'lucide-react';
+import { ChevronDown, ChevronRight, Plus } from 'lucide-react';
 import { accountIcons, CATEGORY_COLORS } from '@/lib/constants';
 import { getAccounts } from '@/lib/accounts';
 import { getNetWorthHistory } from '@/lib/balances';
@@ -192,21 +193,19 @@ export default function Accounts() {
     }).format(amount);
   };
 
-  // Dynamic area color: red when net worth is negative, blue when positive
-  const netWorthChartColor = currentNetWorth < 0 ? '#ef4444' : '#3b82f6';
+  const netWorthChartColor = currentNetWorth < 0 ? 'var(--destructive)' : 'var(--primary)';
 
   return (
-    <div className="w-full p-6">
-        <div className="flex items-center justify-between mb-6">
-            <h1 className="text-2xl font-bold">Accounts</h1>
-            <Button 
-              className="bg-primary text-primary-foreground hover:bg-primary/90"
-              onClick={() => setIsAddAccountOpen(true)}
-            >
-              Add Account
-            </Button>
-        </div>
-
+    <PageLayout
+      title="Accounts"
+      description="Manage accounts and track net worth over time."
+      action={
+        <Button onClick={() => setIsAddAccountOpen(true)}>
+          <Plus className="w-4 h-4 mr-2" />
+          Add Account
+        </Button>
+      }
+    >
     {/* Net Worth Chart */}
     <Card className="w-full mb-6">
         <CardHeader>
@@ -429,6 +428,6 @@ export default function Accounts() {
             </div>
         </div>
 
-    </div>
+    </PageLayout>
   );
 }

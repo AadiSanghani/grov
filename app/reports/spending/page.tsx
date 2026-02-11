@@ -102,7 +102,7 @@ function SpendingTransactionList({
             <span
               className={cn(
                 "font-semibold text-sm",
-                total >= 0 ? "text-green-600" : "text-foreground"
+                total >= 0 ? "text-primary" : "text-foreground"
               )}
             >
               {total >= 0 ? "+" : ""}
@@ -137,7 +137,7 @@ function SpendingTransactionList({
                     className={cn(
                       "font-semibold",
                       transaction.transaction_type === "incoming"
-                        ? "text-green-600"
+                        ? "text-primary"
                         : "text-foreground"
                     )}
                   >

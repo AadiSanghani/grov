@@ -1,6 +1,7 @@
 "use client"
 
 import { Button } from "@/components/ui/button"
+import { PageLayout } from "@/components/page-layout"
 import { useState, useEffect, useMemo, useCallback } from "react"
 import { Plus } from "lucide-react"
 import { AddTransactionDialog } from "@/components/add-transaction-dialog"
@@ -168,36 +169,35 @@ export default function Transactions() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-full">
+      <PageLayout
+        title="Transactions"
+        description="View, filter, and manage all your transactions."
+      >
         <p className="text-muted-foreground">Loading transactions...</p>
-      </div>
+      </PageLayout>
     )
   }
 
   return (
-    <div className="h-screen bg-muted/30 p-6 flex flex-col">
-      <div className="max-w-[1800px] mx-auto w-full flex flex-col flex-1 space-y-4">
-        {/* Header */}
-        <div className="flex items-center justify-between shrink-0">
-          <h1 className="text-3xl font-bold">Transactions</h1>
-          <Button 
-            className="bg-[#FF6B4A] hover:bg-[#FF6B4A]/90 text-white"
-            onClick={() => setIsAddTransactionOpen(true)}
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            Add transaction
-          </Button>
-        </div>
-
-        {/* Three Section Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 flex-1 min-h-0">
-          {/* Transactions Section */}
-          <div className="lg:col-span-4 flex flex-col">
-            <div className="bg-background rounded-xl hover:shadow-xl border overflow-hidden flex flex-col h-full transition-shadow duration-200">
-              <div className="px-6 py-4 border-b shrink-0">
+    <PageLayout
+      title="Transactions"
+      description="View, filter, and manage all your transactions."
+      action={
+        <Button onClick={() => setIsAddTransactionOpen(true)}>
+          <Plus className="w-4 h-4 mr-2" />
+          Add transaction
+        </Button>
+      }
+      contentClassName="flex flex-col gap-4"
+    >
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-5">
+          {/* Transactions Section - grows with content, page scrolls */}
+          <div className="lg:col-span-4">
+            <div className="overflow-hidden rounded-xl border bg-background transition-shadow duration-200 hover:shadow-xl">
+              <div className="px-6 py-4 border-b">
                 <h2 className="text-xl font-semibold">Transactions</h2>
               </div>
-              <div className="flex-1 overflow-y-auto p-6">
+              <div className="p-6">
                 <TransactionList 
                   transactions={filteredTransactions}
                   categories={categories}
@@ -208,35 +208,36 @@ export default function Transactions() {
             </div>
           </div>
 
-          {/* Right Column with Filter & Summary - Sticky */}
-          <div className="space-y-4 flex flex-col sticky top-6 self-start h-[calc(100vh-3rem)]">
-            {/* Filter & Sort Section */}
-            <div className="bg-background rounded-xl hover:shadow-xl border overflow-hidden flex flex-col shrink-0 transition-shadow duration-200">
-              <div className="px-4 py-3 border-b shrink-0">
-                <h2 className="text-lg font-semibold">Filter & sort</h2>
+          {/* Right Column with Filter & Summary - Sticky while page scrolls */}
+          <div className="lg:col-span-1">
+            <div className="space-y-4 lg:sticky lg:top-6 lg:h-fit">
+              {/* Filter & Sort Section */}
+              <div className="bg-background rounded-xl hover:shadow-xl border overflow-hidden transition-shadow duration-200">
+                <div className="px-4 py-3 border-b shrink-0">
+                  <h2 className="text-lg font-semibold">Filter & sort</h2>
+                </div>
+                <div>
+                  <TransactionFiltersPanel
+                    filters={filters}
+                    onFiltersChange={setFilters}
+                    accountTypes={accounts}
+                    categories={categories}
+                  />
+                </div>
               </div>
-              <div className="overflow-y-auto">
-                <TransactionFiltersPanel
-                  filters={filters}
-                  onFiltersChange={setFilters}
-                  accountTypes={accounts}
-                  categories={categories}
-                />
-              </div>
-            </div>
 
-            {/* Summary Section - Takes remaining height */}
-            <div className="bg-background rounded-xl hover:shadow-xl border overflow-hidden flex flex-col flex-1 min-h-0 transition-shadow duration-200">
-              <div className="px-4 py-3 border-b shrink-0">
-                <h2 className="text-lg font-semibold">Summary</h2>
-              </div>
-              <div className="overflow-y-auto">
-                <TransactionSummary transactions={filteredTransactions} />
+              {/* Summary Section */}
+              <div className="bg-background rounded-xl hover:shadow-xl border overflow-hidden transition-shadow duration-200">
+                <div className="px-4 py-3 border-b shrink-0">
+                  <h2 className="text-lg font-semibold">Summary</h2>
+                </div>
+                <div>
+                  <TransactionSummary transactions={filteredTransactions} />
+                </div>
               </div>
             </div>
           </div>
         </div>
-      </div>
 
       {/* Dialogs */}
       <AddTransactionDialog
@@ -258,6 +259,6 @@ export default function Transactions() {
         accounts={accounts}
         categories={categories}
       />
-    </div>
+    </PageLayout>
   )
 }

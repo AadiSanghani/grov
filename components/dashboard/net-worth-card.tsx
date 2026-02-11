@@ -74,8 +74,8 @@ export function NetWorthCard({ rangeKey, data, loading }: NetWorthCardProps) {
   const isLoading = loading || isPending
   const chartColor =
     chartData.length > 0 && chartData[chartData.length - 1].value < 0
-      ? "#ef4444"
-      : "#3b82f6"
+      ? "var(--destructive)"
+      : "var(--primary)"
 
   return (
     <DashboardCard

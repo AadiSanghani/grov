@@ -175,8 +175,8 @@ export function SpendingCard({ rangeKey, data, loading }: SpendingCardProps) {
                 type="monotone"
                 dataKey="current"
                 name="This month"
-                stroke="#ef4444"
-                fill="#ef4444"
+                stroke="var(--destructive)"
+                fill="var(--destructive)"
                 fillOpacity={0.2}
                 strokeWidth={2}
                 dot={false}

@@ -767,10 +767,7 @@ export function AddTransactionDialog({
 
           {/* Action Buttons */}
           <div className="flex gap-3 justify-end">
-            <Button
-              type="submit"
-              className="bg-[#FF6B4A] hover:bg-[#FF6B4A]/90 text-white"
-            >
+            <Button type="submit">
               Add transaction
             </Button>
           </div>

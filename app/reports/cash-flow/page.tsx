@@ -115,7 +115,7 @@ export default function CashFlowPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <span className="text-2xl font-semibold text-green-600">
+            <span className="text-2xl font-semibold text-primary">
               +{formatCurrency(summary.totalNetIncome)}
             </span>
           </CardContent>
@@ -141,7 +141,7 @@ export default function CashFlowPage() {
           <CardContent>
             <span
               className={`text-2xl font-semibold ${
-                summary.netIncome >= 0 ? "text-green-600" : "text-red-600"
+                summary.netIncome >= 0 ? "text-primary" : "text-destructive"
               }`}
             >
               {summary.netIncome >= 0 ? "+" : ""}
@@ -172,7 +172,7 @@ export default function CashFlowPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <span className="text-2xl font-semibold text-blue-600">
+              <span className="text-2xl font-semibold text-primary">
                 {formatCurrency(summary.totalInvestmentContributions)}
               </span>
             </CardContent>

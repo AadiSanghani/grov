@@ -102,7 +102,7 @@ function IncomeTransactionList({
             <span
               className={cn(
                 "font-semibold text-sm",
-                total >= 0 ? "text-green-600" : "text-foreground"
+                total >= 0 ? "text-primary" : "text-foreground"
               )}
             >
               {total >= 0 ? "+" : ""}
@@ -137,7 +137,7 @@ function IncomeTransactionList({
                     className={cn(
                       "font-semibold",
                       transaction.transaction_type === "incoming"
-                        ? "text-green-600"
+                        ? "text-primary"
                         : "text-foreground"
                     )}
                   >
@@ -271,7 +271,7 @@ export default function IncomePage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <span className="text-2xl font-semibold text-green-600">
+            <span className="text-2xl font-semibold text-primary">
               +{formatCurrency(summary.totalIncome)}
             </span>
           </CardContent>

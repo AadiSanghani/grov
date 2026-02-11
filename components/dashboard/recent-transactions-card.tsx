@@ -112,7 +112,7 @@ export function RecentTransactionsCard({
                       className={cn(
                         "text-sm font-semibold",
                         transaction.transaction_type === "incoming"
-                          ? "text-green-600 dark:text-green-400"
+                          ? "text-primary"
                           : "text-foreground",
                       )}
                     >

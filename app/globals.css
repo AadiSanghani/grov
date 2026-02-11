@@ -151,3 +151,10 @@
     --chart-5: #38A3A5; /* Tropical Teal */
   }
 }
+
+.text-positive {
+  color: var(--chart-3);
+}
+.text-negative {
+  color: var(--destructive);
+}

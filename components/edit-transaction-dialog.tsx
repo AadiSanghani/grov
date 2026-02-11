@@ -834,10 +834,7 @@ export function EditTransactionDialog({
                 <Trash2 className="w-4 h-4 mr-2" />
                 Delete
               </Button>
-              <Button
-                type="submit"
-                className="bg-[#FF6B4A] hover:bg-[#FF6B4A]/90 text-white"
-              >
+              <Button type="submit">
                 Update transaction
               </Button>
             </div>

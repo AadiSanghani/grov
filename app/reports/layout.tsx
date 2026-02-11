@@ -129,24 +129,29 @@ const TABS = [
 function ReportsTopBar() {
   const pathname = usePathname()
   return (
-    <div className="flex items-center justify-between border-b px-6 py-4 bg-background">
-      <nav className="flex items-center gap-1">
-        {TABS.map((tab) => (
-          <Link
-            key={tab.href}
-            href={tab.href}
-            className={cn(
-              "px-4 py-2 text-sm font-medium rounded-md transition-colors",
-              pathname === tab.href
-                ? "bg-primary text-primary-foreground"
-                : "text-muted-foreground hover:text-primary-foreground hover:bg-accent"
-            )}
-          >
-            {tab.label}
-          </Link>
-        ))}
-      </nav>
-      <ReportsDateSelectClient />
+    <div className="border-b bg-background">
+      <div className="flex items-center justify-between px-6 py-4">
+        <nav className="flex items-center gap-1">
+          {TABS.map((tab) => (
+            <Link
+              key={tab.href}
+              href={tab.href}
+              className={cn(
+                "px-4 py-2 text-sm font-medium rounded-md transition-colors",
+                pathname === tab.href
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:text-primary-foreground hover:bg-accent"
+              )}
+            >
+              {tab.label}
+            </Link>
+          ))}
+        </nav>
+        <ReportsDateSelectClient />
+      </div>
+      <p className="px-6 pb-3 text-sm text-muted-foreground">
+        View cash flow, spending, and income for the selected period.
+      </p>
     </div>
   )
 }
