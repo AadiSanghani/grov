@@ -11,7 +11,7 @@ interface DashboardSpendingSectionProps {
 }
 
 function getRangeKeyFromSearchParams(
-  searchParams?: DashboardSpendingSectionProps["searchParams"],
+  searchParams?: ResolvedSearchParams,
 ): SpendingRangeKey {
   const raw =
     typeof searchParams?.spendingRange === "string"
