@@ -65,7 +65,6 @@ export function DashboardSpendingSection(
         />
       }
     >
-      {/* @ts-expect-error Async Server Component */}
       <SpendingSectionInner {...props} />
     </Suspense>
   )
