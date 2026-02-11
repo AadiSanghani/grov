@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic"
 
 import { DashboardSpendingSection } from "@/components/dashboard/spending-section"
 import { DashboardNetWorthSection } from "@/components/dashboard/net-worth-section"
+import { DashboardRecentTransactionsSection } from "@/components/dashboard/recent-transactions-section"
 
 type ResolvedSearchParams = Record<string, string | string[] | undefined>
 
@@ -28,10 +29,13 @@ export default async function Home({ searchParams }: HomePageProps) {
 
         <section
           aria-label="Dashboard overview"
-          className="grid grid-cols-1 gap-6 lg:grid-cols-2"
+          className="flex flex-col gap-6"
         >
-          <DashboardSpendingSection searchParams={resolvedSearchParams} />
-          <DashboardNetWorthSection searchParams={resolvedSearchParams} />
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <DashboardSpendingSection searchParams={resolvedSearchParams} />
+            <DashboardNetWorthSection searchParams={resolvedSearchParams} />
+          </div>
+          <DashboardRecentTransactionsSection />
         </section>
       </main>
     </div>
