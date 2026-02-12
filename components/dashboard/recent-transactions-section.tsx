@@ -1,5 +1,4 @@
 import { Suspense } from "react"
-import { notFound } from "next/navigation"
 
 import { RecentTransactionsCard } from "./recent-transactions-card"
 import { getTransactions } from "@/lib/transactions"
@@ -27,7 +26,13 @@ async function RecentTransactionsSectionInner() {
     )
   } catch (error) {
     console.error("Failed to load recent transactions for dashboard:", error)
-    notFound()
+    return (
+      <RecentTransactionsCard
+        transactions={[]}
+        categories={[]}
+        accounts={[]}
+      />
+    )
   }
 }
 

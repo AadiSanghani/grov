@@ -1,5 +1,4 @@
 import { Suspense } from "react"
-import { notFound } from "next/navigation"
 import { format, startOfYear, subMonths } from "date-fns"
 
 import { NetWorthCard } from "@/components/dashboard/net-worth-card"
@@ -121,7 +120,15 @@ async function NetWorthSectionInner({
     return <NetWorthCard rangeKey={rangeKey} data={data} />
   } catch (error) {
     console.error("Failed to load net worth data for dashboard:", error)
-    notFound()
+    return (
+      <NetWorthCard
+        rangeKey={rangeKey}
+        data={{
+          rangeKey,
+          points: [],
+        }}
+      />
+    )
   }
 }
 

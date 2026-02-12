@@ -1,5 +1,4 @@
 import { Suspense } from "react"
-import { notFound } from "next/navigation"
 
 import { getSpendingSeries, type SpendingRangeKey } from "@/lib/spending"
 import { SpendingCard } from "@/components/dashboard/spending-card"
@@ -45,7 +44,15 @@ async function SpendingSectionInner({
     return <SpendingCard rangeKey={rangeKey} data={data} />
   } catch (error) {
     console.error("Failed to load spending data for dashboard:", error)
-    notFound()
+    return (
+      <SpendingCard
+        rangeKey={rangeKey}
+        data={{
+          rangeKey,
+          current: { label: "", total: 0, points: [] },
+        }}
+      />
+    )
   }
 }
 
