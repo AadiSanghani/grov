@@ -64,13 +64,6 @@ export async function createAccount(data: {
     .single()
 
   if (error) {
-    // Debug: full error and response (remove after fixing)
-    console.error('[createAccount] Supabase error:', {
-      message: error.message,
-      code: error.code,
-      details: error.details,
-      hint: error.hint,
-    })
     throw error
   }
   
