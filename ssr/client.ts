@@ -8,9 +8,6 @@ export function createServerSupabaseClient() {
     {
       async accessToken() {
         const token = await (await auth()).getToken()
-        if (process.env.NODE_ENV === 'development' && token) {
-          console.debug('[Supabase] Access token:', token)
-        }
         return token
       },
     },
