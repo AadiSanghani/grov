@@ -176,8 +176,9 @@ export const TransactionFiltersPanel = React.memo(function TransactionFiltersPan
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All accounts</SelectItem>
-              {accountTypes.map((account) => (
-                <SelectItem key={account.id} value={account.id?.toString() || ""}>
+              <SelectItem value="__unassigned__">Unassigned</SelectItem>
+              {accountTypes.filter((a) => a.id != null).map((account) => (
+                <SelectItem key={account.id} value={account.id!.toString()}>
                   {account.account_name}
                 </SelectItem>
               ))}

@@ -129,8 +129,6 @@ export async function getAccountById(accountId: string | number) {
   // Convert to number if it's a string
   const numericAccountId = typeof accountId === 'string' ? parseInt(accountId, 10) : accountId
   
-  console.log('Getting account by ID:', { accountId, numericAccountId, userId })
-  
   const { data, error } = await supabase
     .from('account_types')
     .select('*')
@@ -143,6 +141,77 @@ export async function getAccountById(accountId: string | number) {
     throw error
   }
   
-  console.log('Account retrieved:', data)
   return data
+}
+
+export async function updateAccount(
+  accountId: string | number,
+  data: { name?: string; type?: string; subtype?: string; balance?: number }
+) {
+  const supabase = createServerSupabaseClient()
+  const { userId } = await auth()
+
+  if (!userId) {
+    throw new Error('User not authenticated')
+  }
+
+  const numericAccountId = typeof accountId === 'string' ? parseInt(accountId, 10) : accountId
+
+  const updates: Partial<Account> = {}
+  if (data.name !== undefined) updates.account_name = data.name
+  if (data.type !== undefined) updates.account_type = data.type
+  if (data.subtype !== undefined) updates.account_subtype = data.subtype
+  if (data.type !== undefined) updates.category = getCategoryFromAccountType(data.type)
+  if (data.balance !== undefined) updates.account_balance = data.balance.toString()
+
+  if (Object.keys(updates).length === 0) {
+    const existing = await getAccountById(accountId)
+    return existing
+  }
+
+  const { data: result, error } = await supabase
+    .from('account_types')
+    .update(updates)
+    .eq('id', numericAccountId)
+    .eq('user_id', userId)
+    .select()
+    .single()
+
+  if (error) throw error
+
+  if (data.balance !== undefined) {
+    const today = toLocalDateString(new Date())
+    await supabase
+      .from('account_daily_balances')
+      .upsert(
+        {
+          user_id: userId,
+          account_id: numericAccountId,
+          date: today,
+          balance_amount: data.balance,
+        },
+        { onConflict: 'account_id,date' }
+      )
+  }
+
+  return result
+}
+
+export async function deleteAccount(accountId: string | number) {
+  const supabase = createServerSupabaseClient()
+  const { userId } = await auth()
+
+  if (!userId) {
+    throw new Error('User not authenticated')
+  }
+
+  const numericAccountId = typeof accountId === 'string' ? parseInt(accountId, 10) : accountId
+
+  const { error } = await supabase
+    .from('account_types')
+    .delete()
+    .eq('id', numericAccountId)
+    .eq('user_id', userId)
+
+  if (error) throw error
 }

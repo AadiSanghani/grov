@@ -6,9 +6,19 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { Button } from '@/components/ui/button';
 import { PageLayout } from '@/components/page-layout';
 import { AddAccountDialog } from '@/components/add-account-dialog';
-import { ChevronDown, ChevronRight, Plus } from 'lucide-react';
+import { EditAccountDialog } from '@/components/edit-account-dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { ChevronDown, ChevronRight, Pencil, Plus, Trash2 } from 'lucide-react';
 import { accountIcons, CATEGORY_COLORS } from '@/lib/constants';
-import { getAccounts } from '@/lib/accounts';
+import { getAccounts, deleteAccount } from '@/lib/accounts';
+import { toast } from 'sonner';
 import { getNetWorthHistory } from '@/lib/balances';
 import { NetWorthDataPoint } from '@/lib/types';
 import { format, subDays, subMonths, startOfMonth, startOfYear } from 'date-fns';
@@ -90,8 +100,21 @@ function getDateRange(timeline: string): { startDate: string; endDate: string; g
   }
 }
 
+const transformAccountsFromApi = (accountsData: Awaited<ReturnType<typeof getAccounts>>): Account[] =>
+  (accountsData || []).map((account) => ({
+    id: account.id?.toString() || '',
+    type: account.account_type,
+    name: account.account_name,
+    subtype: account.account_subtype || '',
+    balance: parseFloat(account.account_balance) || 0,
+    icon: accountIcons[account.account_type] || accountIcons['Cash'],
+    lastUpdated: 'Just now',
+  }));
+
 export default function Accounts() {
   const [isAddAccountOpen, setIsAddAccountOpen] = useState(false);
+  const [editingAccount, setEditingAccount] = useState<Account | null>(null);
+  const [accountToDelete, setAccountToDelete] = useState<Account | null>(null);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   const [netWorthTimeline, setNetWorthTimeline] = useState<string>("last-30-days");
@@ -102,21 +125,23 @@ export default function Accounts() {
   useEffect(() => {
     const fetchAccounts = async () => {
       const accountsData = await getAccounts();
-      
-      const transformedAccounts: Account[] = (accountsData || []).map((account) => ({
-        id: account.id?.toString() || '',
-        type: account.account_type,
-        name: account.account_name,
-        subtype: account.account_subtype || '',
-        balance: parseFloat(account.account_balance) || 0,
-        icon: accountIcons[account.account_type] || accountIcons['Cash'],
-        lastUpdated: 'Just now',
-      }));
-      
-      setAccounts(transformedAccounts);
+      setAccounts(transformAccountsFromApi(accountsData));
     };
     fetchAccounts();
   }, []);
+
+  const handleDeleteAccount = async () => {
+    if (!accountToDelete) return;
+    try {
+      await deleteAccount(accountToDelete.id);
+      const accountsData = await getAccounts();
+      setAccounts(transformAccountsFromApi(accountsData));
+      setAccountToDelete(null);
+      toast.success('Account deleted');
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Failed to delete account');
+    }
+  };
 
   // Fetch net worth history when timeline changes
   useEffect(() => {
@@ -268,6 +293,38 @@ export default function Accounts() {
           setAccounts={setAccounts}
         />
 
+        {/* Edit Account Dialog */}
+        <EditAccountDialog
+          open={!!editingAccount}
+          onOpenChange={(open) => !open && setEditingAccount(null)}
+          account={editingAccount}
+          setAccounts={setAccounts}
+        />
+
+        {/* Delete Account Confirmation Modal */}
+        <Dialog open={!!accountToDelete} onOpenChange={(open) => !open && setAccountToDelete(null)}>
+          <DialogContent showCloseButton={true}>
+            <DialogHeader>
+              <DialogTitle>Delete account</DialogTitle>
+              <DialogDescription>
+                {accountToDelete ? (
+                  <>
+                    Are you sure you want to delete <strong>{accountToDelete.name}</strong>? Transactions that used this account will remain but will no longer be linked to an account.
+                  </>
+                ) : null}
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setAccountToDelete(null)}>
+                Cancel
+              </Button>
+              <Button variant="destructive" onClick={handleDeleteAccount}>
+                Delete
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Accounts Grouped List - Takes 2 columns */}
             <div className="lg:col-span-2 space-y-4">
@@ -302,16 +359,24 @@ export default function Accounts() {
                                                 key={account.id}
                                                 className="flex items-center justify-between p-4 hover:bg-accent/50 transition-colors border-b last:border-b-0"
                                             >
-                                                <div className="flex items-center gap-4 flex-1">
-                                                    <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
+                                                <div className="flex items-center gap-4 flex-1 min-w-0">
+                                                    <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center shrink-0">
                                                         <IconComponent className="h-5 w-5" />
                                                     </div>
-                                                    <div className="flex-1">
+                                                    <div className="flex-1 min-w-0">
                                                         <div className="font-medium">{account.name}</div>
                                                         <div className="text-sm text-muted-foreground">{account.subtype}</div>
                                                     </div>
                                                 </div>
-                                                    <div className="text-right">
+                                                <div className="flex items-center gap-2 shrink-0">
+                                                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); setEditingAccount(account); }} aria-label="Edit account">
+                                                        <Pencil className="h-4 w-4" />
+                                                    </Button>
+                                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={(e) => { e.stopPropagation(); setAccountToDelete(account); }} aria-label="Delete account">
+                                                        <Trash2 className="h-4 w-4" />
+                                                    </Button>
+                                                </div>
+                                                <div className="text-right w-24 shrink-0">
                                                     <div className="font-semibold">{formatCurrency(account.balance)}</div>
                                                     <div className="text-sm text-muted-foreground">{account.lastUpdated}</div>
                                                 </div>

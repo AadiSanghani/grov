@@ -34,7 +34,7 @@ export async function getTransactions() {
   
   return data?.map(transaction => ({
     ...transaction,
-    account_type_id: transaction.account_type_id.toString(),
+    account_type_id: transaction.account_type_id != null ? transaction.account_type_id.toString() : null,
     to_account_type_id: transaction.to_account_type_id != null ? transaction.to_account_type_id.toString() : undefined,
     date: parseLocalDate(transaction.date),
     created_at: transaction.created_at ? new Date(transaction.created_at) : undefined,
@@ -62,7 +62,7 @@ export async function getTransactionsInRange(startDate: string, endDate: string)
 
   return data?.map(transaction => ({
     ...transaction,
-    account_type_id: transaction.account_type_id.toString(),
+    account_type_id: transaction.account_type_id != null ? transaction.account_type_id.toString() : null,
     to_account_type_id: transaction.to_account_type_id != null ? transaction.to_account_type_id.toString() : undefined,
     date: parseLocalDate(transaction.date),
     created_at: transaction.created_at ? new Date(transaction.created_at) : undefined,
@@ -262,7 +262,7 @@ export async function updateTransaction(
   if (data.amount !== undefined) updateData.amount = data.amount
   if (data.merchant) updateData.merchant = data.merchant
   if (data.date) updateData.date = toLocalDateString(data.date)
-  if (data.account_type_id) updateData.account_type_id = data.account_type_id
+  if (data.account_type_id !== undefined) updateData.account_type_id = data.account_type_id
   if (data.category) updateData.category = data.category
   if (data.notes !== undefined) updateData.notes = data.notes
   
@@ -312,10 +312,10 @@ export async function updateTransaction(
   const newDeductionsForBalance = newDeductionsInput.filter((d) => d.target_account_id)
   
   // Capture values needed for balance bookkeeping before entering after()
-  const oldFromId = oldTransaction.account_type_id
+  const oldFromId = oldTransaction.account_type_id != null ? oldTransaction.account_type_id.toString() : null
   const oldToId = oldTransaction.to_account_type_id != null ? oldTransaction.to_account_type_id.toString() : null
   const oldWasTransfer = oldTransaction.transaction_type === 'transfer'
-  const newFromId = (data.account_type_id || oldFromId).toString()
+  const newFromId = data.account_type_id ?? oldFromId
   const newToId = effectiveType === 'transfer'
     ? (data.to_account_type_id ?? (result?.to_account_type_id != null ? String(result.to_account_type_id) : null) ?? oldToId)
     : null
@@ -329,6 +329,7 @@ export async function updateTransaction(
   after(async () => {
     try {
       const reverseOld = async () => {
+        if (oldFromId == null) return
         if (oldWasTransfer && oldToId) {
           const [fromAcc, toAcc] = await Promise.all([
             getAccountById(oldFromId),
@@ -341,7 +342,7 @@ export async function updateTransaction(
           await Promise.all([
             updateAccountBalance(oldFromId, parseFloat(fromAcc.account_balance) - fromDelta),
             updateAccountBalance(oldToId, parseFloat(toAcc.account_balance) - toDelta),
-            reverseTransactionBalance(parseInt(oldFromId.toString(), 10), oldDate, 'outgoing', oldAmount, fromCat),
+            reverseTransactionBalance(parseInt(oldFromId, 10), oldDate, 'outgoing', oldAmount, fromCat),
             reverseTransactionBalance(parseInt(oldToId, 10), oldDate, 'incoming', oldAmount, toCat),
           ])
         } else {
@@ -351,12 +352,13 @@ export async function updateTransaction(
           const delta = calculateBalanceDelta(type, oldAmount, cat)
           await Promise.all([
             updateAccountBalance(oldFromId, parseFloat(acc.account_balance) - delta),
-            reverseTransactionBalance(parseInt(oldFromId.toString(), 10), oldDate, type, oldAmount, cat),
+            reverseTransactionBalance(parseInt(oldFromId, 10), oldDate, type, oldAmount, cat),
           ])
         }
       }
 
       const applyNew = async () => {
+        if (newFromId == null) return
         if (newIsTransfer && newToId) {
           const [fromAcc, toAcc] = await Promise.all([
             getAccountById(newFromId),
@@ -473,9 +475,12 @@ export async function deleteTransaction(id: string) {
 
   after(async () => {
     try {
-      if (wasTransfer && toId) {
+      const fromId = deletedTransaction.account_type_id != null ? deletedTransaction.account_type_id.toString() : null
+      if (fromId == null) {
+        // No account to reverse balance for; deductions reversal still runs below
+      } else if (wasTransfer && toId) {
         const [fromAccount, toAccount] = await Promise.all([
-          getAccountById(deletedTransaction.account_type_id),
+          getAccountById(fromId),
           getAccountById(toId),
         ])
         const fromCategory = fromAccount.category || 'asset'
@@ -483,10 +488,10 @@ export async function deleteTransaction(id: string) {
         const fromDelta = calculateBalanceDelta('outgoing', deletedTransaction.amount, fromCategory)
         const toDelta = calculateBalanceDelta('incoming', deletedTransaction.amount, toCategory)
         await Promise.all([
-          updateAccountBalance(deletedTransaction.account_type_id, parseFloat(fromAccount.account_balance) - fromDelta),
+          updateAccountBalance(fromId, parseFloat(fromAccount.account_balance) - fromDelta),
           updateAccountBalance(toId, parseFloat(toAccount.account_balance) - toDelta),
           reverseTransactionBalance(
-            parseInt(deletedTransaction.account_type_id.toString(), 10),
+            parseInt(fromId, 10),
             deletedTransaction.date,
             'outgoing',
             deletedTransaction.amount,
@@ -501,16 +506,16 @@ export async function deleteTransaction(id: string) {
           ),
         ])
       } else {
-        const account = await getAccountById(deletedTransaction.account_type_id)
+        const account = await getAccountById(fromId)
         const currentBalance = parseFloat(account.account_balance)
         const accountCategory = account.category || 'asset'
         const transactionType = deletedTransaction.transaction_type as 'outgoing' | 'incoming'
         const delta = calculateBalanceDelta(transactionType, deletedTransaction.amount, accountCategory)
         const newBalance = currentBalance - delta
         await Promise.all([
-          updateAccountBalance(deletedTransaction.account_type_id, newBalance),
+          updateAccountBalance(fromId, newBalance),
           reverseTransactionBalance(
-            parseInt(deletedTransaction.account_type_id.toString(), 10),
+            parseInt(fromId, 10),
             deletedTransaction.date,
             transactionType,
             deletedTransaction.amount,

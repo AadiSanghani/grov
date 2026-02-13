@@ -135,7 +135,7 @@ export function EditTransactionDialog({
       setDisplayAmount(`$${transaction.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`)
       setMerchant(transaction.merchant)
       setDate(transaction.date)
-      setAccountTypeId(transaction.account_type_id.toString())
+      setAccountTypeId(transaction.account_type_id != null ? transaction.account_type_id.toString() : "")
       setToAccountTypeId(transaction.to_account_type_id != null ? String(transaction.to_account_type_id) : "")
       setCategory(transaction.category)
       setNotes(transaction.notes || "")
@@ -235,7 +235,7 @@ export function EditTransactionDialog({
       amount: numAmount,
       merchant: transactionType === "transfer" ? (merchant || "Transfer") : merchant,
       date,
-      account_type_id: accountTypeId,
+      account_type_id: accountTypeId || null,
       category: transactionType === "transfer" ? (category || "transfer") : category,
       notes,
       spending_amount: transactionType === "outgoing" ? parsedSpendingAmount ?? null : null,

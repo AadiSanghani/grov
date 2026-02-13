@@ -15,7 +15,7 @@ export interface Transaction {
   amount: number
   merchant: string
   date: Date
-  account_type_id: string
+  account_type_id: string | null
   category: string
   notes?: string
   spending_amount?: number | null

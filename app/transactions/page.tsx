@@ -87,7 +87,12 @@ export default function Transactions() {
 
     // Account filter
     if (filters.account_types.length > 0) {
-      filtered = filtered.filter(t => filters.account_types.includes(t.account_type_id))
+      const hasUnassigned = filters.account_types.includes('__unassigned__')
+      filtered = filtered.filter((t) =>
+        hasUnassigned
+          ? t.account_type_id == null
+          : t.account_type_id != null && filters.account_types.includes(t.account_type_id)
+      )
     }
 
     // Category filter

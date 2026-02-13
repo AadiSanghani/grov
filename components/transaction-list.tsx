@@ -23,7 +23,11 @@ interface GroupedTransactions {
 }
 
 export const TransactionList = React.memo(function TransactionList({ transactions, categories, accounts = [], onTransactionClick }: TransactionListProps) {
-  const accountName = (id: string) => accounts.find((a) => a.id?.toString() === id)?.account_name ?? id
+  const accountName = (id: string | null | undefined) => {
+    if (id == null || id === '') return 'Unassigned'
+    const name = accounts.find((a) => a.id?.toString() === id)?.account_name
+    return name ?? 'Unassigned'
+  }
 
   const groupedTransactions: GroupedTransactions = transactions.reduce((acc, transaction) => {
     const dateKey = format(transaction.date, "MMMM dd, yyyy")
@@ -77,7 +81,7 @@ export const TransactionList = React.memo(function TransactionList({ transaction
             {transactions.map((transaction) => {
               const isTransfer = transaction.transaction_type === "transfer"
               const categoryInfo = findCategoryByValue(categories, transaction.category)
-              const transferLabel = isTransfer && transaction.to_account_type_id
+              const transferLabel = isTransfer && (transaction.to_account_type_id != null && transaction.to_account_type_id !== '')
                 ? `${accountName(transaction.account_type_id)} \u2192 ${accountName(transaction.to_account_type_id)}`
                 : null
               
