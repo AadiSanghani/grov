@@ -62,9 +62,15 @@ export async function createAccount(data: {
     .insert(accountData)
     .select()
     .single()
-    
+
   if (error) {
-    console.error('Supabase error:', error)
+    // Debug: full error and response (remove after fixing)
+    console.error('[createAccount] Supabase error:', {
+      message: error.message,
+      code: error.code,
+      details: error.details,
+      hint: error.hint,
+    })
     throw error
   }
   
