@@ -81,7 +81,7 @@ export default function CashFlowPage() {
     transactions.forEach((t) => {
       if (t.transaction_type === "incoming") {
         const amount = Number(t.amount) || 0
-        const account = accountsMap[t.account_type_id]
+        const account = t.account_type_id != null ? accountsMap[t.account_type_id] : undefined
         if (account?.accountType === "Investments") {
           totalInvestmentContributions += amount
         } else {

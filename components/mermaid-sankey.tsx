@@ -45,7 +45,7 @@ function buildSankeyCsv(
   transactions.forEach((t) => {
     if (t.transaction_type === "incoming") {
       const netAmount = Number(t.amount) || 0
-      const account = accountsMap?.[t.account_type_id]
+      const account = t.account_type_id != null ? accountsMap?.[t.account_type_id] : undefined
       const isInvestment = account?.accountType === "Investments"
 
       if (isInvestment && account) {

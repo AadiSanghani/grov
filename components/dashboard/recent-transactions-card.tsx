@@ -17,9 +17,10 @@ interface RecentTransactionsCardProps {
   loading?: boolean
 }
 
-function accountName(accounts: Account[], id: string): string {
+function accountName(accounts: Account[], id: string | null | undefined): string {
+  if (id == null || id === '') return 'Unassigned'
   const a = accounts.find((acc) => acc.id?.toString() === id)
-  return a?.account_name ?? id
+  return a?.account_name ?? 'Unassigned'
 }
 
 export function RecentTransactionsCard({
