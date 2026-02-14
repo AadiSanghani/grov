@@ -8,10 +8,33 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export function toLocalDateString(date: Date): string {
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
+  const isUtcMidnight =
+    date.getUTCHours() === 0 &&
+    date.getUTCMinutes() === 0 &&
+    date.getUTCSeconds() === 0 &&
+    date.getUTCMilliseconds() === 0
+
+  const year = isUtcMidnight ? date.getUTCFullYear() : date.getFullYear()
+  const month = String((isUtcMidnight ? date.getUTCMonth() : date.getMonth()) + 1).padStart(2, '0')
+  const day = String(isUtcMidnight ? date.getUTCDate() : date.getDate()).padStart(2, '0')
   return `${year}-${month}-${day}`
+}
+
+export function toDateOnlyString(input: Date | string): string {
+  if (input instanceof Date) {
+    return toLocalDateString(input)
+  }
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(input)) {
+    return input
+  }
+
+  const parsed = new Date(input)
+  if (Number.isNaN(parsed.getTime())) {
+    throw new Error(`Invalid date input: ${input}`)
+  }
+
+  return toLocalDateString(parsed)
 }
 
 export function parseLocalDate(dateStr: string): Date {

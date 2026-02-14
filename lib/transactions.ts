@@ -14,7 +14,7 @@ import {
   getDeductionsByTransactionId,
   deleteDeductionsByTransactionId,
 } from './deductions'
-import { calculateBalanceDelta, toLocalDateString, parseLocalDate } from './utils'
+import { calculateBalanceDelta, toDateOnlyString, parseLocalDate } from './utils'
 
 export async function getTransactions() {
   const supabase = createServerSupabaseClient()
@@ -74,7 +74,7 @@ export async function createTransaction(data: {
   transaction_type: "outgoing" | "incoming" | "transfer"
   amount: number
   merchant: string
-  date: Date
+  date: Date | string
   account_type_id: string
   category: string
   notes?: string
@@ -89,7 +89,7 @@ export async function createTransaction(data: {
     throw new Error('User not authenticated')
   }
   
-  const transactionDate = toLocalDateString(data.date)
+  const transactionDate = toDateOnlyString(data.date)
   
   const isTransfer = data.transaction_type === 'transfer'
   if (isTransfer && !data.to_account_type_id) {
@@ -261,7 +261,7 @@ export async function updateTransaction(
   if (data.transaction_type) updateData.transaction_type = data.transaction_type
   if (data.amount !== undefined) updateData.amount = data.amount
   if (data.merchant) updateData.merchant = data.merchant
-  if (data.date) updateData.date = toLocalDateString(data.date)
+  if (data.date) updateData.date = toDateOnlyString(data.date)
   if (data.account_type_id !== undefined) updateData.account_type_id = data.account_type_id
   if (data.category) updateData.category = data.category
   if (data.notes !== undefined) updateData.notes = data.notes
@@ -323,7 +323,7 @@ export async function updateTransaction(
   const oldAmount = oldTransaction.amount
   const newAmount = data.amount !== undefined ? data.amount : oldAmount
   const oldDate = oldTransaction.date
-  const newDate = data.date ? toLocalDateString(data.date) : oldDate
+  const newDate = data.date ? toDateOnlyString(data.date) : oldDate
 
   // Schedule balance bookkeeping to run after the response is sent.
   after(async () => {
