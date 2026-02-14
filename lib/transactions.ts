@@ -219,7 +219,8 @@ export async function createTransaction(data: {
 
 export async function updateTransaction(
   id: string,
-  data: Partial<Transaction> & {
+  data: Omit<Partial<Transaction>, 'date'> & {
+    date?: Date | string
     deductions?: { label: string; amount: number; target_account_id?: number | null }[]
   }
 ) {

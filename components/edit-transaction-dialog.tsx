@@ -26,7 +26,7 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command"
-import { cn, formatCategoriesForUI } from "@/lib/utils"
+import { cn, formatCategoriesForUI, toLocalDateString } from "@/lib/utils"
 import { CalendarIcon, Check, ChevronsUpDown, MinusCircle, PlusCircle, Trash2, ArrowRightLeft, Plus, ChevronDown, ChevronUp } from "lucide-react"
 import { format } from "date-fns"
 import { type Account } from "@/lib/accounts"
@@ -253,8 +253,13 @@ export function EditTransactionDialog({
 
     onTransactionUpdated(transactionId, updateData)
 
+    const serverUpdateData: Parameters<typeof updateTransaction>[1] = {
+      ...updateData,
+      date: toLocalDateString(date),
+    }
+
     try {
-      await updateTransaction(transactionId, updateData)
+      await updateTransaction(transactionId, serverUpdateData)
     } catch (error) {
       console.error("Failed to update transaction:", error)
       toast.error("Failed to update transaction. Please try again. Error: " + error, {

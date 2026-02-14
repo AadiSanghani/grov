@@ -26,7 +26,7 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command"
-import { cn, formatCategoriesForUI } from "@/lib/utils"
+import { cn, formatCategoriesForUI, toLocalDateString } from "@/lib/utils"
 import { CalendarIcon, Check, ChevronsUpDown, MinusCircle, PlusCircle, ArrowRightLeft, Plus, Trash2, ChevronDown, ChevronUp } from "lucide-react"
 import { format } from "date-fns"
 import { type Account } from "@/lib/accounts"
@@ -44,6 +44,7 @@ export interface TransactionFormData {
   notes?: string
   spending_amount?: number | null
   to_account_type_id?: string | null
+  deductions?: { label: string; amount: number; target_account_id?: number | null }[]
 }
 
 interface AddTransactionDialogProps {
@@ -204,7 +205,7 @@ export function AddTransactionDialog({
       }
     }
 
-    const transactionData: Parameters<typeof createTransaction>[0] = {
+    const optimisticData: TransactionFormData = {
       transaction_type: transactionType,
       amount: numAmount,
       merchant: transactionType === "transfer" ? (merchant || "Transfer") : merchant,
@@ -216,12 +217,18 @@ export function AddTransactionDialog({
       deductions: parsedDeductions.length > 0 ? parsedDeductions : undefined,
     }
     if (transactionType === "transfer") {
-      transactionData.to_account_type_id = toAccountTypeId
+      optimisticData.to_account_type_id = toAccountTypeId
+    }
+
+    const transactionData: Parameters<typeof createTransaction>[0] = {
+      ...optimisticData,
+      // Send a date-only value to the server to avoid timezone drift across serialization.
+      date: toLocalDateString(date),
     }
 
     resetForm()
     onOpenChange(false)
-    onTransactionCreated?.(transactionData as TransactionFormData)
+    onTransactionCreated?.(optimisticData)
 
     try {
       await createTransaction(transactionData)
@@ -776,4 +783,3 @@ export function AddTransactionDialog({
     </Dialog>
   )
 }
-
