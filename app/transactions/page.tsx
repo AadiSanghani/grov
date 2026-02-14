@@ -14,6 +14,7 @@ import { getAccounts, type Account } from "@/lib/accounts"
 import { getTransactions } from "@/lib/transactions"
 import { getCategories, type Category } from "@/lib/categories"
 import { type TransactionFormData } from "@/components/add-transaction-dialog"
+import { toLocalDateString } from "@/lib/utils"
 
 export default function Transactions() {
   const [isAddTransactionOpen, setIsAddTransactionOpen] = useState(false)
@@ -110,10 +111,12 @@ export default function Transactions() {
 
     // Date range filter
     if (filters.dateStart) {
-      filtered = filtered.filter(t => t.date >= filters.dateStart!)
+      const start = toLocalDateString(filters.dateStart)
+      filtered = filtered.filter((t) => toLocalDateString(t.date) >= start)
     }
     if (filters.dateEnd) {
-      filtered = filtered.filter(t => t.date <= filters.dateEnd!)
+      const end = toLocalDateString(filters.dateEnd)
+      filtered = filtered.filter((t) => toLocalDateString(t.date) <= end)
     }
 
     filtered.sort((a, b) => {

@@ -26,7 +26,7 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command"
-import { cn, formatCategoriesForUI, toLocalDateString } from "@/lib/utils"
+import { cn, formatCategoriesForUI, normalizeCalendarDate, toLocalDateString } from "@/lib/utils"
 import { CalendarIcon, Check, ChevronsUpDown, MinusCircle, PlusCircle, ArrowRightLeft, Plus, Trash2, ChevronDown, ChevronUp } from "lucide-react"
 import { format } from "date-fns"
 import { type Account } from "@/lib/accounts"
@@ -69,7 +69,7 @@ export function AddTransactionDialog({
   const [displayAmount, setDisplayAmount] = useState("$")
   const [merchant, setMerchant] = useState("")
   const [merchantOpen, setMerchantOpen] = useState(false)
-  const [date, setDate] = useState<Date>(new Date())
+  const [date, setDate] = useState<Date>(() => normalizeCalendarDate(new Date()))
   const [dateOpen, setDateOpen] = useState(false)
   const [accountTypeId, setAccountTypeId] = useState("")
   const [accountOpen, setAccountOpen] = useState(false)
@@ -101,7 +101,7 @@ export function AddTransactionDialog({
     setSpendingAmount("")
     setDisplaySpendingAmount("$")
     setMerchant("")
-    setDate(new Date())
+    setDate(normalizeCalendarDate(new Date()))
     setAccountTypeId("")
     setToAccountTypeId("")
     setCategory("")
@@ -592,7 +592,7 @@ export function AddTransactionDialog({
                   selected={date}
                   onSelect={(newDate) => {
                     if (newDate) {
-                      setDate(newDate)
+                      setDate(normalizeCalendarDate(newDate))
                       setDateOpen(false)
                     }
                   }}

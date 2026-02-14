@@ -20,6 +20,20 @@ export function toLocalDateString(date: Date): string {
   return `${year}-${month}-${day}`
 }
 
+export function normalizeCalendarDate(date: Date): Date {
+  const isUtcMidnight =
+    date.getUTCHours() === 0 &&
+    date.getUTCMinutes() === 0 &&
+    date.getUTCSeconds() === 0 &&
+    date.getUTCMilliseconds() === 0
+
+  const year = isUtcMidnight ? date.getUTCFullYear() : date.getFullYear()
+  const month = isUtcMidnight ? date.getUTCMonth() : date.getMonth()
+  const day = isUtcMidnight ? date.getUTCDate() : date.getDate()
+
+  return new Date(year, month, day)
+}
+
 export function toDateOnlyString(input: Date | string): string {
   if (input instanceof Date) {
     return toLocalDateString(input)
@@ -38,8 +52,11 @@ export function toDateOnlyString(input: Date | string): string {
 }
 
 export function parseLocalDate(dateStr: string): Date {
-  const [year, month, day] = dateStr.split('-').map(Number)
-  return new Date(year, month - 1, day)
+  const datePart = dateStr.slice(0, 10)
+  const [year, month, day] = datePart.split('-').map(Number)
+
+  // Use noon UTC to keep the same calendar day when serialized across server/client time zones.
+  return new Date(Date.UTC(year, month - 1, day, 12, 0, 0, 0))
 }
 
 /**

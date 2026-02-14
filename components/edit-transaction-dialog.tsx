@@ -26,7 +26,7 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command"
-import { cn, formatCategoriesForUI, toLocalDateString } from "@/lib/utils"
+import { cn, formatCategoriesForUI, normalizeCalendarDate, toLocalDateString } from "@/lib/utils"
 import { CalendarIcon, Check, ChevronsUpDown, MinusCircle, PlusCircle, Trash2, ArrowRightLeft, Plus, ChevronDown, ChevronUp } from "lucide-react"
 import { format } from "date-fns"
 import { type Account } from "@/lib/accounts"
@@ -62,7 +62,7 @@ export function EditTransactionDialog({
   const [displayAmount, setDisplayAmount] = useState("$")
   const [merchant, setMerchant] = useState("")
   const [merchantOpen, setMerchantOpen] = useState(false)
-  const [date, setDate] = useState<Date>(new Date())
+  const [date, setDate] = useState<Date>(() => normalizeCalendarDate(new Date()))
   const [dateOpen, setDateOpen] = useState(false)
   const [accountTypeId, setAccountTypeId] = useState("")
   const [accountOpen, setAccountOpen] = useState(false)
@@ -134,7 +134,7 @@ export function EditTransactionDialog({
       setAmount(transaction.amount.toString())
       setDisplayAmount(`$${transaction.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`)
       setMerchant(transaction.merchant)
-      setDate(transaction.date)
+      setDate(normalizeCalendarDate(transaction.date))
       setAccountTypeId(transaction.account_type_id != null ? transaction.account_type_id.toString() : "")
       setToAccountTypeId(transaction.to_account_type_id != null ? String(transaction.to_account_type_id) : "")
       setCategory(transaction.category)
@@ -650,7 +650,7 @@ export function EditTransactionDialog({
                     selected={date}
                     onSelect={(newDate) => {
                       if (newDate) {
-                        setDate(newDate)
+                        setDate(normalizeCalendarDate(newDate))
                         setDateOpen(false)
                       }
                     }}
