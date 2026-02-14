@@ -230,10 +230,11 @@ export function EditTransactionDialog({
     }
 
     const transactionId = transaction.id
+    const merchantValue = (transactionType === "transfer" ? (merchant || "Transfer") : merchant).trim()
     const updateData: Partial<Transaction> & { deductions?: { label: string; amount: number; target_account_id?: number | null }[] } = {
       transaction_type: transactionType,
       amount: numAmount,
-      merchant: transactionType === "transfer" ? (merchant || "Transfer") : merchant,
+      merchant: merchantValue,
       date,
       account_type_id: accountTypeId || null,
       category: transactionType === "transfer" ? (category || "transfer") : category,
@@ -258,7 +259,15 @@ export function EditTransactionDialog({
       date: toLocalDateString(date),
     }
 
+    const shouldPersistMerchant =
+      transactionType !== "transfer" &&
+      merchantValue.length > 0 &&
+      !merchantNames.some((m) => m.toLowerCase() === merchantValue.toLowerCase())
+
     try {
+      if (shouldPersistMerchant) {
+        await addMerchant(merchantValue)
+      }
       await updateTransaction(transactionId, serverUpdateData)
     } catch (error) {
       console.error("Failed to update transaction:", error)

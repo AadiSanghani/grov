@@ -205,10 +205,12 @@ export function AddTransactionDialog({
       }
     }
 
+    const merchantValue = (transactionType === "transfer" ? (merchant || "Transfer") : merchant).trim()
+
     const optimisticData: TransactionFormData = {
       transaction_type: transactionType,
       amount: numAmount,
-      merchant: transactionType === "transfer" ? (merchant || "Transfer") : merchant,
+      merchant: merchantValue,
       date,
       account_type_id: accountTypeId,
       category: transactionType === "transfer" ? (category || "transfer") : category,
@@ -219,6 +221,11 @@ export function AddTransactionDialog({
     if (transactionType === "transfer") {
       optimisticData.to_account_type_id = toAccountTypeId
     }
+
+    const shouldPersistMerchant =
+      transactionType !== "transfer" &&
+      merchantValue.length > 0 &&
+      !merchantNames.some((m) => m.toLowerCase() === merchantValue.toLowerCase())
 
     const transactionData: Parameters<typeof createTransaction>[0] = {
       ...optimisticData,
@@ -231,6 +238,9 @@ export function AddTransactionDialog({
     onTransactionCreated?.(optimisticData)
 
     try {
+      if (shouldPersistMerchant) {
+        await addMerchant(merchantValue)
+      }
       await createTransaction(transactionData)
     } catch (error) {
       console.error("Failed to create transaction:", error)
