@@ -61,6 +61,7 @@ interface AddTransactionDialogProps {
   onAfterSave?: () => void
   accounts: Account[]
   categories: Category[]
+  defaultDate?: Date
 }
 
 export function AddTransactionDialog({
@@ -70,13 +71,18 @@ export function AddTransactionDialog({
   onAfterSave,
   accounts,
   categories,
+  defaultDate,
 }: AddTransactionDialogProps) {
+  const resolvedDefaultDate = useMemo(
+    () => normalizeCalendarDate(defaultDate ?? new Date()),
+    [defaultDate]
+  )
   const [transactionType, setTransactionType] = useState<"outgoing" | "incoming" | "transfer">("outgoing")
   const [amount, setAmount] = useState("")
   const [displayAmount, setDisplayAmount] = useState("$")
   const [merchant, setMerchant] = useState("")
   const [merchantOpen, setMerchantOpen] = useState(false)
-  const [date, setDate] = useState<Date>(() => normalizeCalendarDate(new Date()))
+  const [date, setDate] = useState<Date>(() => resolvedDefaultDate)
   const [dateOpen, setDateOpen] = useState(false)
   const [accountTypeId, setAccountTypeId] = useState("")
   const [accountOpen, setAccountOpen] = useState(false)
@@ -108,7 +114,7 @@ export function AddTransactionDialog({
     setSpendingAmount("")
     setDisplaySpendingAmount("$")
     setMerchant("")
-    setDate(normalizeCalendarDate(new Date()))
+    setDate(resolvedDefaultDate)
     setAccountTypeId("")
     setToAccountTypeId("")
     setCategory("")
@@ -155,6 +161,12 @@ export function AddTransactionDialog({
     return net + deductionTotal
   }, [amount, deductionTotal])
 
+  React.useEffect(() => {
+    if (open) {
+      setDate(resolvedDefaultDate)
+    }
+  }, [open, resolvedDefaultDate])
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
@@ -192,7 +204,7 @@ export function AddTransactionDialog({
     }
 
     // Parse deductions for incoming transactions
-    let parsedDeductions: { label: string; amount: number; target_account_id?: number | null }[] = []
+    const parsedDeductions: { label: string; amount: number; target_account_id?: number | null }[] = []
     if (transactionType === "incoming" && deductions.length > 0) {
       for (const d of deductions) {
         const dedAmount = parseFloat(d.amount)
@@ -561,7 +573,7 @@ export function AddTransactionDialog({
                           setMerchantOpen(false)
                         }}
                       >
-                        Add "{merchant}"
+                        Add &quot;{merchant}&quot;
                       </CommandItem>
                     )}
                     <CommandEmpty>No merchant found.</CommandEmpty>

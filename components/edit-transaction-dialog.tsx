@@ -37,7 +37,7 @@ import { CalendarIcon, Check, ChevronsUpDown, MinusCircle, PlusCircle, Trash2, A
 import { format } from "date-fns"
 import { type Account } from "@/lib/accounts"
 import { Transaction } from "@/lib/types"
-import { updateTransaction, deleteTransaction } from "@/lib/transactions"
+import { updateTransaction } from "@/lib/transactions"
 import { getDeductionsByTransactionId } from "@/lib/deductions"
 import { type Category } from "@/lib/categories"
 import { useDataContext } from "@/app/data-context"
@@ -47,7 +47,6 @@ interface EditTransactionDialogProps {
   onOpenChange: (open: boolean) => void
   transaction: Transaction | null
   onTransactionUpdated: (id: string, data: Partial<Transaction>) => void
-  onTransactionDeleted?: (id: string) => void
   onAfterSave?: () => void
   accounts: Account[]
   categories: Category[]
@@ -58,7 +57,6 @@ export function EditTransactionDialog({
   onOpenChange,
   transaction,
   onTransactionUpdated,
-  onTransactionDeleted,
   onAfterSave,
   accounts,
   categories,
@@ -81,8 +79,6 @@ export function EditTransactionDialog({
   const [displaySpendingAmount, setDisplaySpendingAmount] = useState("$")
   const [deductionsOpen, setDeductionsOpen] = useState(false)
   const [deductions, setDeductions] = useState<{ label: string; amount: string; displayAmount: string; targetAccountId: string }[]>([])
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
-  const [isDeleting, setIsDeleting] = useState(false)
 
   const { merchants, addMerchant } = useDataContext()
   const merchantNames = useMemo(() => merchants.map((m) => m.name), [merchants])
@@ -134,6 +130,7 @@ export function EditTransactionDialog({
     return net + deductionTotal
   }, [amount, deductionTotal])
 
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (open && transaction) {
       setTransactionType(transaction.transaction_type)
@@ -180,6 +177,7 @@ export function EditTransactionDialog({
       }
     }
   }, [open, transaction])
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -215,7 +213,7 @@ export function EditTransactionDialog({
     }
 
     // Parse deductions for incoming transactions
-    let parsedDeductions: { label: string; amount: number; target_account_id?: number | null }[] = []
+    const parsedDeductions: { label: string; amount: number; target_account_id?: number | null }[] = []
     if (transactionType === "incoming" && deductions.length > 0) {
       for (const d of deductions) {
         const dedAmount = parseFloat(d.amount)
@@ -282,33 +280,6 @@ export function EditTransactionDialog({
     } catch (error) {
       console.error("Failed to update transaction:", error)
       toast.error("Failed to update transaction. Please try again. Error: " + error, {
-        duration: 5000,
-        position: "top-right",
-      })
-    }
-
-    onAfterSave?.()
-  }
-
-  const handleDelete = async () => {
-    if (!transaction?.id) return
-
-    // Capture the ID before closing
-    const transactionId = transaction.id
-
-    // Close dialogs immediately for snappy UX
-    setShowDeleteConfirm(false)
-    onOpenChange(false)
-
-    // Optimistic: remove from the list instantly
-    onTransactionDeleted?.(transactionId)
-
-    // Delete transaction in the background
-    try {
-      await deleteTransaction(transactionId)
-    } catch (error) {
-      console.error("Failed to delete transaction:", error)
-      toast.error("Failed to delete transaction. Please try again. Error: " + error, {
         duration: 5000,
         position: "top-right",
       })
@@ -617,7 +588,7 @@ export function EditTransactionDialog({
                             setMerchantOpen(false)
                           }}
                         >
-                          Add "{merchant}"
+                          Add &quot;{merchant}&quot;
                         </CommandItem>
                       )}
                       <CommandEmpty>No merchant found.</CommandEmpty>
@@ -849,48 +820,12 @@ export function EditTransactionDialog({
             </div>
 
             {/* Action Buttons */}
-            <div className="flex gap-3 justify-between">
-              <Button
-                type="button"
-                variant="destructive"
-                onClick={() => setShowDeleteConfirm(true)}
-              >
-                <Trash2 className="w-4 h-4 mr-2" />
-                Delete
-              </Button>
+            <div className="flex justify-end">
               <Button type="submit">
                 Update transaction
               </Button>
             </div>
           </form>
-        </DialogContent>
-      </Dialog>
-
-      {/* Delete Confirmation Dialog */}
-      <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Delete transaction?</DialogTitle>
-          </DialogHeader>
-          <p className="text-sm text-muted-foreground">
-            Are you sure you want to delete this transaction? This action cannot be undone.
-          </p>
-          <div className="flex gap-3 justify-end mt-4">
-            <Button
-              variant="outline"
-              onClick={() => setShowDeleteConfirm(false)}
-              disabled={isDeleting}
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={handleDelete}
-              disabled={isDeleting}
-            >
-              {isDeleting ? "Deleting..." : "Delete"}
-            </Button>
-          </div>
         </DialogContent>
       </Dialog>
     </>
