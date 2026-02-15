@@ -8,6 +8,45 @@ export interface PayrollDeduction {
   created_at?: Date
 }
 
+export type TripStatus = "planned" | "active" | "completed"
+
+export interface Trip {
+  id?: string
+  user_id?: string
+  name: string
+  start_date?: Date | null
+  end_date?: Date | null
+  status: TripStatus
+  created_at?: Date
+  updated_at?: Date
+}
+
+export interface TripSummaryMetrics {
+  totalSpend: number
+  transactionCount: number
+  avgPerDay: number
+  largestExpense: number
+}
+
+export interface TripCategorySpend {
+  category: string
+  amount: number
+}
+
+export interface TripDailySpendPoint {
+  date: string
+  amount: number
+}
+
+export interface TripMetrics extends TripSummaryMetrics {
+  topCategories: TripCategorySpend[]
+  dailySpend: TripDailySpendPoint[]
+}
+
+export interface TripWithMetrics extends Trip {
+  metrics: TripSummaryMetrics
+}
+
 export interface Transaction {
   id?: string
   user_id?: string
