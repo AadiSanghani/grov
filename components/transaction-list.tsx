@@ -4,7 +4,7 @@ import * as React from "react"
 import { Transaction } from "@/lib/types"
 import { format } from "date-fns"
 import { Copy, EllipsisVertical } from "lucide-react"
-import { cn, findCategoryByValue, getSpendingAmount } from "@/lib/utils"
+import { cn, findCategoryByValue, getSpendingAmount, isReimbursementTransaction } from "@/lib/utils"
 import { Category } from "@/lib/categories"
 import { type Account } from "@/lib/accounts"
 import { Button } from "@/components/ui/button"
@@ -91,6 +91,7 @@ export const TransactionList = React.memo(function TransactionList({
           <div className="space-y-1">
             {transactions.map((transaction) => {
               const isTransfer = transaction.transaction_type === "transfer"
+              const isReimbursement = isReimbursementTransaction(transaction)
               const categoryInfo = findCategoryByValue(categories, transaction.category)
               const transferLabel = isTransfer && (transaction.to_account_type_id != null && transaction.to_account_type_id !== '')
                 ? `${accountName(transaction.account_type_id)} \u2192 ${accountName(transaction.to_account_type_id)}`
@@ -107,8 +108,13 @@ export const TransactionList = React.memo(function TransactionList({
                   >
                     <div className="flex items-center gap-4 flex-1 min-w-0">
                       <div className="min-w-[180px]">
-                        <p className="font-medium truncate">
+                        <p className="font-medium truncate flex items-center gap-2">
                           {isTransfer ? (transferLabel ?? transaction.merchant) : transaction.merchant}
+                          {isReimbursement && (
+                            <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                              Reimbursement
+                            </span>
+                          )}
                         </p>
                       </div>
 

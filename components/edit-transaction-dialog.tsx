@@ -26,7 +26,13 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command"
-import { cn, formatCategoriesForUI, normalizeCalendarDate, toLocalDateString } from "@/lib/utils"
+import {
+  cn,
+  formatCategoriesForUI,
+  getDefaultIncomingSubtypeForCategory,
+  normalizeCalendarDate,
+  toLocalDateString,
+} from "@/lib/utils"
 import { CalendarIcon, Check, ChevronsUpDown, MinusCircle, PlusCircle, Trash2, ArrowRightLeft, Plus, ChevronDown, ChevronUp } from "lucide-react"
 import { format } from "date-fns"
 import { type Account } from "@/lib/accounts"
@@ -233,6 +239,10 @@ export function EditTransactionDialog({
     const merchantValue = (transactionType === "transfer" ? (merchant || "Transfer") : merchant).trim()
     const updateData: Partial<Transaction> & { deductions?: { label: string; amount: number; target_account_id?: number | null }[] } = {
       transaction_type: transactionType,
+      incoming_subtype:
+        transactionType === "incoming"
+          ? getDefaultIncomingSubtypeForCategory(category)
+          : null,
       amount: numAmount,
       merchant: merchantValue,
       date,

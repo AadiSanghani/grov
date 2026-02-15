@@ -26,7 +26,13 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command"
-import { cn, formatCategoriesForUI, normalizeCalendarDate, toLocalDateString } from "@/lib/utils"
+import {
+  cn,
+  formatCategoriesForUI,
+  getDefaultIncomingSubtypeForCategory,
+  normalizeCalendarDate,
+  toLocalDateString,
+} from "@/lib/utils"
 import { CalendarIcon, Check, ChevronsUpDown, MinusCircle, PlusCircle, ArrowRightLeft, Plus, Trash2, ChevronDown, ChevronUp } from "lucide-react"
 import { format } from "date-fns"
 import { type Account } from "@/lib/accounts"
@@ -36,6 +42,7 @@ import { useDataContext } from "@/app/data-context"
 
 export interface TransactionFormData {
   transaction_type: "outgoing" | "incoming" | "transfer"
+  incoming_subtype?: "income" | "reimbursement" | null
   amount: number
   merchant: string
   date: Date
@@ -209,6 +216,10 @@ export function AddTransactionDialog({
 
     const optimisticData: TransactionFormData = {
       transaction_type: transactionType,
+      incoming_subtype:
+        transactionType === "incoming"
+          ? getDefaultIncomingSubtypeForCategory(category)
+          : null,
       amount: numAmount,
       merchant: merchantValue,
       date,

@@ -3,7 +3,7 @@
 import * as React from "react"
 import { Transaction } from "@/lib/types"
 import { useMemo } from "react"
-import { getSpendingAmount } from "@/lib/utils"
+import { getSpendingAmount, isIncomeForReporting } from "@/lib/utils"
 import { format } from "date-fns"
 import { Separator } from "@/components/ui/separator"
 
@@ -35,7 +35,7 @@ export const TransactionSummary = React.memo(function TransactionSummary({ trans
     transactions.forEach((transaction) => {
       dates.push(transaction.date)
       
-      if (transaction.transaction_type === "incoming") {
+      if (isIncomeForReporting(transaction)) {
         totalIncome += transaction.amount
         if (transaction.amount > largestIncome) {
           largestIncome = transaction.amount
