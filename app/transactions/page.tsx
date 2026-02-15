@@ -156,6 +156,7 @@ export default function Transactions() {
     const optimisticTx: Transaction = {
       id: `temp-${Date.now()}`,
       transaction_type: data.transaction_type,
+      incoming_subtype: data.incoming_subtype ?? null,
       amount: data.amount,
       merchant: data.merchant,
       date: data.date,

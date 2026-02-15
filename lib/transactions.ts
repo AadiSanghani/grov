@@ -14,7 +14,7 @@ import {
   getDeductionsByTransactionId,
   deleteDeductionsByTransactionId,
 } from './deductions'
-import { calculateBalanceDelta, toDateOnlyString, parseLocalDate } from './utils'
+import { calculateBalanceDelta, normalizeIncomingSubtype, toDateOnlyString, parseLocalDate } from './utils'
 
 export async function getTransactions() {
   const supabase = createServerSupabaseClient()
@@ -72,6 +72,7 @@ export async function getTransactionsInRange(startDate: string, endDate: string)
 
 export async function createTransaction(data: {
   transaction_type: "outgoing" | "incoming" | "transfer"
+  incoming_subtype?: "income" | "reimbursement" | null
   amount: number
   merchant: string
   date: Date | string
@@ -90,6 +91,10 @@ export async function createTransaction(data: {
   }
   
   const transactionDate = toDateOnlyString(data.date)
+  const incomingSubtype =
+    data.transaction_type === 'incoming'
+      ? normalizeIncomingSubtype(data.incoming_subtype, data.category)
+      : null
   
   const isTransfer = data.transaction_type === 'transfer'
   if (isTransfer && !data.to_account_type_id) {
@@ -105,6 +110,7 @@ export async function createTransaction(data: {
     account_type_id: data.account_type_id,
     category: data.category,
     notes: data.notes || null,
+    incoming_subtype: incomingSubtype,
     spending_amount: (data.transaction_type === 'outgoing' && data.spending_amount != null)
       ? data.spending_amount
       : null,
@@ -260,6 +266,7 @@ export async function duplicateTransaction(id: string, date?: Date | string) {
 
   return createTransaction({
     transaction_type: sourceTx.transaction_type as 'outgoing' | 'incoming' | 'transfer',
+    incoming_subtype: sourceTx.incoming_subtype,
     amount: sourceTx.amount,
     merchant: sourceTx.merchant ?? 'Transaction Copy',
     date: duplicateDate,
@@ -323,13 +330,19 @@ export async function updateTransaction(
   if (data.notes !== undefined) updateData.notes = data.notes
   
   const effectiveType = (data.transaction_type || oldTransaction.transaction_type) as 'outgoing' | 'incoming' | 'transfer'
+  const effectiveCategory = data.category ?? oldTransaction.category
   if (effectiveType === 'incoming') {
+    const existingSubtype =
+      oldTransaction.transaction_type === 'incoming' ? oldTransaction.incoming_subtype : null
+    updateData.incoming_subtype = normalizeIncomingSubtype(data.incoming_subtype ?? existingSubtype, effectiveCategory)
     updateData.spending_amount = null
     updateData.to_account_type_id = null
   } else if (effectiveType === 'transfer') {
+    updateData.incoming_subtype = null
     if (data.to_account_type_id != null) updateData.to_account_type_id = data.to_account_type_id
     updateData.spending_amount = null
   } else {
+    updateData.incoming_subtype = null
     updateData.to_account_type_id = null
     if (data.spending_amount !== undefined) updateData.spending_amount = data.spending_amount
   }

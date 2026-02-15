@@ -16,8 +16,7 @@ import { getTransactionsInRange } from "@/lib/transactions"
 import { getCategories } from "@/lib/categories"
 import { Transaction } from "@/lib/types"
 import { Category } from "@/lib/categories"
-import { findCategoryByValue } from "@/lib/utils"
-import { cn } from "@/lib/utils"
+import { cn, findCategoryByValue, isIncomeForReporting } from "@/lib/utils"
 import { X } from "lucide-react"
 
 const INCOME_COLORS = [
@@ -184,7 +183,7 @@ export default function IncomePage() {
 
   const incomingTransactions = useMemo(
     () =>
-      transactions.filter((t) => t.transaction_type === "incoming"),
+      transactions.filter((t) => isIncomeForReporting(t)),
     [transactions]
   )
 
@@ -484,7 +483,7 @@ export default function IncomePage() {
             <p className="text-sm text-muted-foreground mt-1">
               {selectedCategory
                 ? `In selected date range`
-                : `Latest ${RECENT_TRANSACTIONS_LIMIT} incoming transactions`}
+                : `Latest ${RECENT_TRANSACTIONS_LIMIT} income transactions`}
             </p>
           </div>
           <span className="rounded-full bg-muted px-3 py-1 text-sm font-medium">

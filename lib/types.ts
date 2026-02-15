@@ -12,6 +12,7 @@ export interface Transaction {
   id?: string
   user_id?: string
   transaction_type: "outgoing" | "incoming" | "transfer"
+  incoming_subtype?: "income" | "reimbursement" | null
   amount: number
   merchant: string
   date: Date

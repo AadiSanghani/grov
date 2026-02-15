@@ -5,7 +5,7 @@ import { format } from "date-fns"
 import { ChevronRight } from "lucide-react"
 
 import { DashboardCard } from "@/components/dashboard-card"
-import { cn, findCategoryByValue, getSpendingAmount } from "@/lib/utils"
+import { cn, findCategoryByValue, getSpendingAmount, isReimbursementTransaction } from "@/lib/utils"
 import type { Transaction } from "@/lib/types"
 import type { Category } from "@/lib/categories"
 import type { Account } from "@/lib/accounts"
@@ -75,6 +75,7 @@ export function RecentTransactionsCard({
         <ul className="space-y-1">
           {transactions.map((transaction) => {
             const isTransfer = transaction.transaction_type === "transfer"
+            const isReimbursement = isReimbursementTransaction(transaction)
             const categoryInfo = findCategoryByValue(categories, transaction.category)
             const transferLabel =
               isTransfer && transaction.to_account_type_id
@@ -97,6 +98,11 @@ export function RecentTransactionsCard({
                         ? transferLabel ?? transaction.merchant
                         : transaction.merchant}
                     </p>
+                    {isReimbursement && (
+                      <span className="mt-0.5 inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                        Reimbursement
+                      </span>
+                    )}
                     <div className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
                       {!isTransfer && categoryInfo && (
                         <>

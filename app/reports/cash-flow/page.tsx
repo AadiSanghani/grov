@@ -6,7 +6,7 @@ import { useReportsContext } from "../context"
 import { getTransactionsInRange } from "@/lib/transactions"
 import { Transaction } from "@/lib/types"
 import { MermaidSankey, type AccountMap, type DeductionsMap } from "@/components/mermaid-sankey"
-import { getSpendingAmount } from "@/lib/utils"
+import { getSpendingAmount, isIncomeForReporting } from "@/lib/utils"
 import { getAccounts } from "@/lib/accounts"
 import { getDeductionsForTransactions } from "@/lib/deductions"
 
@@ -80,6 +80,9 @@ export default function CashFlowPage() {
     let totalInvestmentContributions = 0
     transactions.forEach((t) => {
       if (t.transaction_type === "incoming") {
+        if (!isIncomeForReporting(t)) {
+          return
+        }
         const amount = Number(t.amount) || 0
         const account = t.account_type_id != null ? accountsMap[t.account_type_id] : undefined
         if (account?.accountType === "Investments") {

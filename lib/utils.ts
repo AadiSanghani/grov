@@ -3,6 +3,8 @@ import { twMerge } from "tailwind-merge"
 import { Category, CategoryGroup, CategoryItem } from "./categories"
 import { Transaction } from "./types"
 
+export const EXPENSE_REIMBURSEMENT_CATEGORY = "expense-reimbursement"
+
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
@@ -57,6 +59,36 @@ export function parseLocalDate(dateStr: string): Date {
 
   // Use noon UTC to keep the same calendar day when serialized across server/client time zones.
   return new Date(Date.UTC(year, month - 1, day, 12, 0, 0, 0))
+}
+
+export function getDefaultIncomingSubtypeForCategory(
+  category: string | null | undefined
+): "income" | "reimbursement" {
+  return category === EXPENSE_REIMBURSEMENT_CATEGORY ? "reimbursement" : "income"
+}
+
+export function normalizeIncomingSubtype(
+  incomingSubtype: string | null | undefined,
+  category: string | null | undefined
+): "income" | "reimbursement" {
+  if (incomingSubtype === "income" || incomingSubtype === "reimbursement") {
+    return incomingSubtype
+  }
+  return getDefaultIncomingSubtypeForCategory(category)
+}
+
+export function isIncomeForReporting(
+  transaction: Pick<Transaction, "transaction_type" | "incoming_subtype" | "category">
+): boolean {
+  if (transaction.transaction_type !== "incoming") return false
+  return normalizeIncomingSubtype(transaction.incoming_subtype, transaction.category) === "income"
+}
+
+export function isReimbursementTransaction(
+  transaction: Pick<Transaction, "transaction_type" | "incoming_subtype" | "category">
+): boolean {
+  if (transaction.transaction_type !== "incoming") return false
+  return normalizeIncomingSubtype(transaction.incoming_subtype, transaction.category) === "reimbursement"
 }
 
 /**

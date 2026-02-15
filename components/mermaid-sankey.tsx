@@ -3,7 +3,7 @@
 import { useLayoutEffect, useRef, useId } from "react"
 import mermaid from "mermaid"
 import { Transaction, PayrollDeduction } from "@/lib/types"
-import { getSpendingAmount } from "@/lib/utils"
+import { getSpendingAmount, isIncomeForReporting } from "@/lib/utils"
 
 /** Sanitize label for Mermaid sankey-beta (ASCII only; non-ASCII breaks the parser). */
 function sanitizeLabel(value: string): string {
@@ -44,6 +44,9 @@ function buildSankeyCsv(
 
   transactions.forEach((t) => {
     if (t.transaction_type === "incoming") {
+      if (!isIncomeForReporting(t)) {
+        return
+      }
       const netAmount = Number(t.amount) || 0
       const account = t.account_type_id != null ? accountsMap?.[t.account_type_id] : undefined
       const isInvestment = account?.accountType === "Investments"
