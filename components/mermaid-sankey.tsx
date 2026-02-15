@@ -99,44 +99,45 @@ function buildSankeyCsv(
   const totalIncomeLabel = "Total Income"
   const investmentContribLabel = "Investment Contributions"
   const savingsLabel = "Savings"
+  const shortfallLabel = "Cash Drawdown"
+  const sortByAmountDesc = (a: [string, number], b: [string, number]) => {
+    if (b[1] !== a[1]) return b[1] - a[1]
+    return a[0].localeCompare(b[0])
+  }
 
   // Income sources (gross) → Total Income
-  Object.entries(incomeBySource).forEach(([sourceLabel, amount]) => {
+  Object.entries(incomeBySource).sort(sortByAmountDesc).forEach(([sourceLabel, amount]) => {
     if (amount > 0) {
       lines.push(`${escapeCsvValue(sourceLabel)}, ${escapeCsvValue(totalIncomeLabel)}, ${amount}`)
     }
   })
 
-  // Total Income → expense categories
-  Object.entries(expenseByCategory).forEach(([category, amount]) => {
-    if (amount > 0) {
-      lines.push(`${escapeCsvValue(totalIncomeLabel)}, ${escapeCsvValue(category)}, ${amount}`)
-    }
-  })
-
-  // Total Income → asset transfers
-  Object.entries(assetTransferByDestination).forEach(([label, amount]) => {
-    if (amount > 0) {
-      lines.push(`${escapeCsvValue(totalIncomeLabel)}, ${escapeCsvValue(label)}, ${amount}`)
-    }
-  })
-
-  // Total Income → deductions (taxes, CPP, etc.)
-  Object.entries(deductionByLabel).forEach(([label, amount]) => {
-    if (amount > 0) {
-      lines.push(`${escapeCsvValue(totalIncomeLabel)}, ${escapeCsvValue(label)}, ${amount}`)
-    }
-  })
-
-  // Savings residual: gross income - expenses - transfers - deductions
-  const savings = totalIncome - totalExpenses - totalAssetTransfers - totalDeductions
-  if (savings > 0) {
-    lines.push(`${escapeCsvValue(totalIncomeLabel)}, ${escapeCsvValue(savingsLabel)}, ${savings}`)
+  // Residual balance: gross income - expenses - transfers - deductions
+  // If negative, show an explicit balancing inflow to avoid implying income covered all outflows.
+  const residual = totalIncome - totalExpenses - totalAssetTransfers - totalDeductions
+  if (residual < 0) {
+    lines.push(`${escapeCsvValue(shortfallLabel)}, ${escapeCsvValue(totalIncomeLabel)}, ${Math.abs(residual)}`)
   }
+
+  // Unified outflows from Total Income, sorted high → low for stable top-to-bottom ordering.
+  const outflows: Array<[string, number]> = [
+    ...Object.entries(expenseByCategory),
+    ...Object.entries(assetTransferByDestination),
+    ...Object.entries(deductionByLabel),
+  ]
+  if (residual > 0) {
+    outflows.push([savingsLabel, residual])
+  }
+  outflows
+    .filter(([, amount]) => amount > 0)
+    .sort(sortByAmountDesc)
+    .forEach(([label, amount]) => {
+      lines.push(`${escapeCsvValue(totalIncomeLabel)}, ${escapeCsvValue(label)}, ${amount}`)
+    })
 
   // Investment contributions as a separate flow (not part of Total Income)
   if (totalInvestmentContributions > 0) {
-    Object.entries(investmentContribByDest).forEach(([label, amount]) => {
+    Object.entries(investmentContribByDest).sort(sortByAmountDesc).forEach(([label, amount]) => {
       if (amount > 0) {
         lines.push(`${escapeCsvValue(investmentContribLabel)}, ${escapeCsvValue(label)}, ${amount}`)
       }
