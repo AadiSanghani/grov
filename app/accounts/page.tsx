@@ -170,6 +170,18 @@ export default function Accounts() {
     });
   }, [netWorthData, isMonthOnlyTimeline]);
 
+  const yDomain = useMemo<[number, number]>(() => {
+    if (chartData.length === 0) return [0, 0];
+
+    const values = chartData.map((point) => point['Net Worth']);
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    const span = max - min;
+    const padding = span === 0 ? Math.max(Math.abs(max) * 0.05, 100) : Math.max(span * 0.12, 100);
+
+    return [min - padding, max + padding];
+  }, [chartData]);
+
   // Calculate current net worth from accounts
   const currentNetWorth = useMemo(() => {
     const totalAssets = accounts
@@ -265,6 +277,7 @@ export default function Accounts() {
                 <CartesianGrid strokeDasharray="2 2" horizontal={true} vertical={false} />
                 <XAxis dataKey="name" tick={{ fontSize: 12 }} />
                 <YAxis
+                  domain={yDomain}
                   tickFormatter={(value) => {
                     if (value < 0) return `($${Math.abs(value).toLocaleString('en-US', { maximumFractionDigits: 0 })})`;
                     return `$${value.toLocaleString('en-US', { maximumFractionDigits: 0 })}`;
@@ -275,7 +288,26 @@ export default function Accounts() {
                   formatter={(value: number) => formatCurrency(value)}
                   labelStyle={{ color: 'var(--foreground)' }}
                 />
-                <Area type="monotone" dataKey="Net Worth" stroke={netWorthChartColor} fill={netWorthChartColor} fillOpacity={0.3} strokeWidth={2} />
+                <Area
+                  type="monotone"
+                  dataKey="Net Worth"
+                  stroke={netWorthChartColor}
+                  fill={netWorthChartColor}
+                  fillOpacity={0.3}
+                  strokeWidth={2}
+                  dot={{
+                    r: 3,
+                    stroke: netWorthChartColor,
+                    strokeWidth: 2,
+                    fill: 'var(--background)',
+                  }}
+                  activeDot={{
+                    r: 5,
+                    stroke: netWorthChartColor,
+                    strokeWidth: 2,
+                    fill: 'var(--background)',
+                  }}
+                />
                 </AreaChart>
             </ResponsiveContainer>
             )}

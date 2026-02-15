@@ -70,6 +70,17 @@ export function NetWorthCard({ rangeKey, data, loading }: NetWorthCardProps) {
       })),
     [data.points],
   )
+  const yDomain = useMemo<[number, number]>(() => {
+    if (chartData.length === 0) return [0, 0]
+
+    const values = chartData.map((point) => point.value)
+    const min = Math.min(...values)
+    const max = Math.max(...values)
+    const span = max - min
+    const padding = span === 0 ? Math.max(Math.abs(max) * 0.05, 100) : Math.max(span * 0.12, 100)
+
+    return [min - padding, max + padding]
+  }, [chartData])
 
   const isLoading = loading || isPending
   const chartColor =
@@ -120,6 +131,7 @@ export function NetWorthCard({ rangeKey, data, loading }: NetWorthCardProps) {
               <CartesianGrid strokeDasharray="3 3" vertical={false} />
               <XAxis dataKey="name" tick={{ fontSize: 12 }} />
               <YAxis
+                domain={yDomain}
                 tickFormatter={(value) =>
                   `$${Number(value).toLocaleString("en-US", {
                     maximumFractionDigits: 0,
@@ -139,7 +151,18 @@ export function NetWorthCard({ rangeKey, data, loading }: NetWorthCardProps) {
                 fill={chartColor}
                 fillOpacity={0.2}
                 strokeWidth={2}
-                dot={false}
+                dot={{
+                  r: 3,
+                  stroke: chartColor,
+                  strokeWidth: 2,
+                  fill: "var(--background)",
+                }}
+                activeDot={{
+                  r: 5,
+                  stroke: chartColor,
+                  strokeWidth: 2,
+                  fill: "var(--background)",
+                }}
                 isAnimationActive={false}
               />
             </AreaChart>
@@ -149,4 +172,3 @@ export function NetWorthCard({ rangeKey, data, loading }: NetWorthCardProps) {
     </DashboardCard>
   )
 }
-
