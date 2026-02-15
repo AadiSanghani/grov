@@ -16,6 +16,44 @@ import {
 } from './deductions'
 import { calculateBalanceDelta, normalizeIncomingSubtype, toDateOnlyString, parseLocalDate } from './utils'
 
+interface TransactionRow {
+  id?: string | number
+  user_id?: string
+  transaction_type: "outgoing" | "incoming" | "transfer"
+  incoming_subtype?: "income" | "reimbursement" | null
+  amount: number
+  merchant: string
+  date: string
+  account_type_id: string | number | null
+  category: string
+  notes?: string | null
+  spending_amount?: number | null
+  to_account_type_id?: string | number | null
+  created_at?: string | null
+  updated_at?: string | null
+}
+
+function mapTransactionForClient(transaction: TransactionRow): Transaction {
+  return {
+    id: transaction.id != null ? String(transaction.id) : undefined,
+    user_id: transaction.user_id,
+    transaction_type: transaction.transaction_type,
+    incoming_subtype: transaction.incoming_subtype ?? null,
+    amount: Number(transaction.amount),
+    merchant: transaction.merchant,
+    category: transaction.category,
+    notes: transaction.notes ?? undefined,
+    account_type_id:
+      transaction.account_type_id != null ? String(transaction.account_type_id) : null,
+    to_account_type_id:
+      transaction.to_account_type_id != null ? String(transaction.to_account_type_id) : undefined,
+    date: parseLocalDate(String(transaction.date)),
+    spending_amount: transaction.spending_amount ?? null,
+    created_at: transaction.created_at ? new Date(String(transaction.created_at)) : undefined,
+    updated_at: transaction.updated_at ? new Date(String(transaction.updated_at)) : undefined,
+  }
+}
+
 export async function getTransactions() {
   const supabase = createServerSupabaseClient()
   const { userId } = await auth()
@@ -32,14 +70,7 @@ export async function getTransactions() {
     
   if (error) throw error
   
-  return data?.map(transaction => ({
-    ...transaction,
-    account_type_id: transaction.account_type_id != null ? transaction.account_type_id.toString() : null,
-    to_account_type_id: transaction.to_account_type_id != null ? transaction.to_account_type_id.toString() : undefined,
-    date: parseLocalDate(transaction.date),
-    created_at: transaction.created_at ? new Date(transaction.created_at) : undefined,
-    updated_at: transaction.updated_at ? new Date(transaction.updated_at) : undefined,
-  })) as Transaction[]
+  return data?.map(mapTransactionForClient) as Transaction[]
 }
 
 export async function getTransactionsInRange(startDate: string, endDate: string) {
@@ -60,14 +91,7 @@ export async function getTransactionsInRange(startDate: string, endDate: string)
 
   if (error) throw error
 
-  return data?.map(transaction => ({
-    ...transaction,
-    account_type_id: transaction.account_type_id != null ? transaction.account_type_id.toString() : null,
-    to_account_type_id: transaction.to_account_type_id != null ? transaction.to_account_type_id.toString() : undefined,
-    date: parseLocalDate(transaction.date),
-    created_at: transaction.created_at ? new Date(transaction.created_at) : undefined,
-    updated_at: transaction.updated_at ? new Date(transaction.updated_at) : undefined,
-  })) as Transaction[]
+  return data?.map(mapTransactionForClient) as Transaction[]
 }
 
 export async function createTransaction(data: {
@@ -319,7 +343,7 @@ export async function updateTransaction(
     }
   }
   
-  const updateData: any = {}
+  const updateData: Record<string, unknown> = {}
   
   if (data.transaction_type) updateData.transaction_type = data.transaction_type
   if (data.amount !== undefined) updateData.amount = data.amount

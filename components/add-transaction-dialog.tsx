@@ -446,7 +446,9 @@ export function AddTransactionDialog({
                   ? "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground" 
                   : "hover:bg-muted hover:text-foreground"
               )}
-              onClick={() => setTransactionType("transfer")}
+              onClick={() => {
+                setTransactionType("transfer")
+              }}
             >
               <ArrowRightLeft className="w-4 h-4 mr-0.5" />
               TRANSFER
