@@ -472,17 +472,6 @@ export default function Transactions() {
         </aside>
       </div>
 
-      <div className="pointer-events-none fixed right-6 bottom-6 z-40">
-        <Button
-          type="button"
-          className="pointer-events-auto h-12 rounded-full px-5 shadow-lg"
-          onClick={() => openAddTransaction(undefined, "floating")}
-        >
-          <Plus className="mr-1 h-4 w-4" />
-          Add transaction
-        </Button>
-      </div>
-
       <AddTransactionDialog
         open={isAddTransactionOpen}
         onOpenChange={setIsAddTransactionOpen}
