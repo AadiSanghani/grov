@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button"
 import { PageLayout } from "@/components/page-layout"
 import { useState, useEffect, useMemo, useCallback } from "react"
 import { Plus } from "lucide-react"
+import { toast } from "sonner"
 import { AddTransactionDialog } from "@/components/add-transaction-dialog"
 import { EditTransactionDialog } from "@/components/edit-transaction-dialog"
 import { TransactionList } from "@/components/transaction-list"
@@ -11,7 +12,7 @@ import { TransactionFiltersPanel } from "@/components/transaction-filters"
 import { TransactionSummary } from "@/components/transaction-summary"
 import { Transaction, TransactionFilters } from "@/lib/types"
 import { getAccounts, type Account } from "@/lib/accounts"
-import { getTransactions } from "@/lib/transactions"
+import { duplicateTransaction, getTransactions } from "@/lib/transactions"
 import { getCategories, type Category } from "@/lib/categories"
 import { type TransactionFormData } from "@/components/add-transaction-dialog"
 import { toLocalDateString } from "@/lib/utils"
@@ -175,6 +176,18 @@ export default function Transactions() {
     setTransactions(prev => prev.filter(t => t.id !== id))
   }, [])
 
+  const handleDuplicateTransaction = useCallback(async (transaction: Transaction) => {
+    if (!transaction.id) return
+
+    try {
+      await duplicateTransaction(transaction.id, toLocalDateString(new Date()))
+      await refreshData()
+    } catch (error) {
+      console.error("Failed to duplicate transaction:", error)
+      toast.error("Failed to duplicate transaction. Please try again.")
+    }
+  }, [])
+
   if (loading) {
     return (
       <PageLayout
@@ -211,6 +224,7 @@ export default function Transactions() {
                   categories={categories}
                   accounts={accounts}
                   onTransactionClick={handleTransactionClick}
+                  onDuplicateTransaction={handleDuplicateTransaction}
                 />
               </div>
             </div>
