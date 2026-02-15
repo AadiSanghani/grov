@@ -164,10 +164,13 @@ export function SpendingCard({ rangeKey, data, loading }: SpendingCardProps) {
                 tick={{ fontSize: 12 }}
               />
               <Tooltip
-                formatter={(value: number, name: string) => [
-                  formatCurrency(value),
-                  name === "current" ? "This month" : comparisonLabel,
-                ]}
+                formatter={(value: number, _name: string, item: { dataKey?: string | number | ((obj: unknown) => unknown) }) => {
+                  const isCurrentSeries = item?.dataKey === "current"
+                  const seriesLabel = isCurrentSeries
+                    ? (data.current.label || "This month")
+                    : comparisonLabel
+                  return [formatCurrency(value), seriesLabel]
+                }}
                 labelStyle={{ color: "var(--foreground)" }}
               />
               {data.comparison && <Legend />}
@@ -203,4 +206,3 @@ export function SpendingCard({ rangeKey, data, loading }: SpendingCardProps) {
     </DashboardCard>
   )
 }
-
