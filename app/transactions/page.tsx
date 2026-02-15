@@ -28,6 +28,18 @@ import { categoryNameToValue, toLocalDateString } from "@/lib/utils"
 
 const REDESIGN_ENABLED = process.env.NEXT_PUBLIC_TRANSACTIONS_REDESIGN !== "0"
 
+function isEditableTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false
+  const tag = target.tagName.toLowerCase()
+  return (
+    target.isContentEditable ||
+    tag === "input" ||
+    tag === "textarea" ||
+    tag === "select" ||
+    Boolean(target.closest('[contenteditable="true"]'))
+  )
+}
+
 export default function Transactions() {
   const [isAddTransactionOpen, setIsAddTransactionOpen] = useState(false)
   const [isEditTransactionOpen, setIsEditTransactionOpen] = useState(false)
@@ -172,7 +184,7 @@ export default function Transactions() {
   }, [transactions, filters])
 
   const openAddTransaction = useCallback(
-    (date?: Date, source: "header" | "floating" | "day_group" = "header") => {
+    (date?: Date, source: "header" | "day_group" | "keyboard" = "header") => {
       const selectedDate = date ?? new Date()
       setQuickCreateDate(selectedDate)
       setIsAddTransactionOpen(true)
@@ -183,6 +195,22 @@ export default function Transactions() {
     },
     []
   )
+
+  useEffect(() => {
+    const handleGlobalShortcut = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || event.repeat) return
+      if (event.metaKey || event.ctrlKey || event.altKey) return
+      if (isEditableTarget(event.target)) return
+
+      if (event.key.toLowerCase() === "n") {
+        event.preventDefault()
+        openAddTransaction(undefined, "keyboard")
+      }
+    }
+
+    window.addEventListener("keydown", handleGlobalShortcut)
+    return () => window.removeEventListener("keydown", handleGlobalShortcut)
+  }, [openAddTransaction])
 
   const handleTransactionClick = useCallback((transaction: Transaction) => {
     setSelectedTransaction(transaction)
@@ -279,6 +307,7 @@ export default function Transactions() {
     <Button onClick={() => openAddTransaction(undefined, "header")}>
       <Plus className="w-4 h-4" />
       Add transaction
+      <span className="ml-1 hidden text-[11px] opacity-80 sm:inline">(N)</span>
     </Button>
   )
 

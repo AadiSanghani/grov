@@ -34,7 +34,6 @@ import {
   toLocalDateString,
 } from "@/lib/utils"
 import { CalendarIcon, Check, ChevronsUpDown, MinusCircle, PlusCircle, ArrowRightLeft, Plus, Trash2, ChevronDown, ChevronUp } from "lucide-react"
-import { format } from "date-fns"
 import { type Account } from "@/lib/accounts"
 import { createTransaction } from "@/lib/transactions"
 import { type Category } from "@/lib/categories"
@@ -64,6 +63,77 @@ interface AddTransactionDialogProps {
   defaultDate?: Date
 }
 
+function addDays(baseDate: Date, days: number): Date {
+  const next = normalizeCalendarDate(baseDate)
+  next.setDate(next.getDate() + days)
+  return normalizeCalendarDate(next)
+}
+
+function formatDateForInput(date: Date): string {
+  const day = String(date.getDate()).padStart(2, "0")
+  const month = String(date.getMonth() + 1).padStart(2, "0")
+  const year = date.getFullYear()
+  return `${day}/${month}/${year}`
+}
+
+function parseShortcutDateInput(rawValue: string, fallbackDate: Date): Date | null {
+  const value = rawValue.trim().toLowerCase()
+  if (!value) return fallbackDate
+
+  if (value === "today" || value === "t") {
+    return normalizeCalendarDate(new Date())
+  }
+  if (value === "yesterday" || value === "y") {
+    return addDays(new Date(), -1)
+  }
+  if (value === "tomorrow") {
+    return addDays(new Date(), 1)
+  }
+
+  if (/^[+-]\d+$/.test(value)) {
+    return addDays(new Date(), Number(value))
+  }
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    const [yearStr, monthStr, dayStr] = value.split("-")
+    const year = Number(yearStr)
+    const month = Number(monthStr)
+    const day = Number(dayStr)
+    const candidate = new Date(year, month - 1, day)
+    if (
+      candidate.getFullYear() === year &&
+      candidate.getMonth() === month - 1 &&
+      candidate.getDate() === day
+    ) {
+      return normalizeCalendarDate(candidate)
+    }
+    return null
+  }
+
+  const dayFirstDateMatch = value.match(/^(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?$/)
+  if (dayFirstDateMatch) {
+    const day = Number(dayFirstDateMatch[1])
+    const month = Number(dayFirstDateMatch[2])
+    const yearInput = dayFirstDateMatch[3]
+    let year = yearInput ? Number(yearInput) : fallbackDate.getFullYear()
+
+    if (yearInput && yearInput.length === 2) {
+      year += 2000
+    }
+
+    const candidate = new Date(year, month - 1, day)
+    if (
+      candidate.getFullYear() === year &&
+      candidate.getMonth() === month - 1 &&
+      candidate.getDate() === day
+    ) {
+      return normalizeCalendarDate(candidate)
+    }
+  }
+
+  return null
+}
+
 export function AddTransactionDialog({
   open,
   onOpenChange,
@@ -83,6 +153,7 @@ export function AddTransactionDialog({
   const [merchant, setMerchant] = useState("")
   const [merchantOpen, setMerchantOpen] = useState(false)
   const [date, setDate] = useState<Date>(() => resolvedDefaultDate)
+  const [dateInput, setDateInput] = useState(() => formatDateForInput(resolvedDefaultDate))
   const [dateOpen, setDateOpen] = useState(false)
   const [accountTypeId, setAccountTypeId] = useState("")
   const [accountOpen, setAccountOpen] = useState(false)
@@ -107,6 +178,26 @@ export function AddTransactionDialog({
     [accounts]
   )
 
+  const applyDate = React.useCallback((nextDate: Date) => {
+    const normalized = normalizeCalendarDate(nextDate)
+    setDate(normalized)
+    setDateInput(formatDateForInput(normalized))
+  }, [])
+
+  const commitDateInput = React.useCallback((rawValue: string, silent = false): boolean => {
+    const parsed = parseShortcutDateInput(rawValue, date)
+    if (!parsed) {
+      setDateInput(formatDateForInput(date))
+      if (!silent) {
+        toast.error("Invalid date. Use DD/MM/YYYY, YYYY-MM-DD, today, yesterday, +1, or -7.")
+      }
+      return false
+    }
+
+    applyDate(parsed)
+    return true
+  }, [applyDate, date])
+
   const resetForm = () => {
     setTransactionType("outgoing")
     setAmount("")
@@ -114,7 +205,7 @@ export function AddTransactionDialog({
     setSpendingAmount("")
     setDisplaySpendingAmount("$")
     setMerchant("")
-    setDate(resolvedDefaultDate)
+    applyDate(resolvedDefaultDate)
     setAccountTypeId("")
     setToAccountTypeId("")
     setCategory("")
@@ -163,9 +254,9 @@ export function AddTransactionDialog({
 
   React.useEffect(() => {
     if (open) {
-      setDate(resolvedDefaultDate)
+      applyDate(resolvedDefaultDate)
     }
-  }, [open, resolvedDefaultDate])
+  }, [applyDate, open, resolvedDefaultDate])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -302,7 +393,16 @@ export function AddTransactionDialog({
           <DialogTitle>Add transaction</DialogTitle>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form
+          onSubmit={handleSubmit}
+          className="space-y-6"
+          onKeyDown={(event) => {
+            if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+              event.preventDefault()
+              event.currentTarget.requestSubmit()
+            }
+          }}
+        >
           {/* Transaction Type Toggle */}
           <div className="flex gap-2">
             <Button
@@ -605,33 +705,56 @@ export function AddTransactionDialog({
 
           {/* Date */}
           <div className="space-y-2">
-            <Label>Date</Label>
-            <Popover open={dateOpen} onOpenChange={setDateOpen}>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  className={cn(
-                    "w-full justify-start text-left font-normal",
-                    !date && "text-muted-foreground"
-                  )}
-                >
-                  <CalendarIcon className="mr-0.5 h-4 w-4" />
-                  {date ? format(date, "MMMM dd, yyyy") : <span>Pick a date</span>}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar
-                  mode="single"
-                  selected={date}
-                  onSelect={(newDate) => {
-                    if (newDate) {
-                      setDate(normalizeCalendarDate(newDate))
-                      setDateOpen(false)
-                    }
-                  }}
-                />
-              </PopoverContent>
-            </Popover>
+            <Label htmlFor="transaction-date-input">Date</Label>
+            <div className="flex gap-2">
+              <Input
+                id="transaction-date-input"
+                value={dateInput}
+                onChange={(event) => setDateInput(event.target.value)}
+                onBlur={() => {
+                  commitDateInput(dateInput, true)
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault()
+                    commitDateInput(dateInput)
+                  }
+                  if (event.key === "ArrowDown") {
+                    event.preventDefault()
+                    setDateOpen(true)
+                  }
+                }}
+                placeholder="DD/MM/YYYY, today, yesterday, +1, -7"
+              />
+              <Popover open={dateOpen} onOpenChange={setDateOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    className="shrink-0"
+                    aria-label="Open date picker"
+                  >
+                    <CalendarIcon className="h-4 w-4" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="end">
+                  <Calendar
+                    mode="single"
+                    selected={date}
+                    onSelect={(newDate) => {
+                      if (newDate) {
+                        applyDate(newDate)
+                        setDateOpen(false)
+                      }
+                    }}
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Quick input: today, yesterday, +1, -7.
+            </p>
           </div>
 
           {/* From account / Account */}
