@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { format } from "date-fns"
-import { Copy, EllipsisVertical, FileText, Plus } from "lucide-react"
+import { Copy, EllipsisVertical, FileText, Plus, Trash2 } from "lucide-react"
 
 import { Transaction } from "@/lib/types"
 import {
@@ -29,6 +29,7 @@ interface TransactionListProps {
   showNotesPreview?: boolean
   onTransactionClick: (transaction: Transaction) => void
   onDuplicateTransaction: (transaction: Transaction) => void
+  onDeleteTransaction?: (transaction: Transaction) => void
   onCreateForDate?: (date: Date) => void
 }
 
@@ -109,6 +110,7 @@ export const TransactionList = React.memo(function TransactionList({
   showNotesPreview = true,
   onTransactionClick,
   onDuplicateTransaction,
+  onDeleteTransaction,
   onCreateForDate,
 }: TransactionListProps) {
   const [activeMenuId, setActiveMenuId] = React.useState<string | undefined>(undefined)
@@ -310,6 +312,23 @@ export const TransactionList = React.memo(function TransactionList({
                           <Copy className="h-4 w-4" />
                           Duplicate
                         </button>
+                        {onDeleteTransaction && (
+                          <>
+                            <div className="my-1 h-px bg-border" />
+                            <button
+                              type="button"
+                              className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm text-destructive hover:bg-destructive/10"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setActiveMenuId(undefined)
+                                onDeleteTransaction(transaction)
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                              Delete
+                            </button>
+                          </>
+                        )}
                       </PopoverContent>
                     </Popover>
                   </div>

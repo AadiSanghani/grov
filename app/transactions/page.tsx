@@ -20,7 +20,7 @@ import { TransactionFiltersPanel } from "@/components/transaction-filters"
 import { TransactionSummary } from "@/components/transaction-summary"
 import { Transaction, TransactionFilters } from "@/lib/types"
 import { getAccounts, type Account } from "@/lib/accounts"
-import { duplicateTransaction, getTransactions } from "@/lib/transactions"
+import { deleteTransaction, duplicateTransaction, getTransactions } from "@/lib/transactions"
 import { getCategories, type Category } from "@/lib/categories"
 import { type TransactionFormData } from "@/components/add-transaction-dialog"
 import { trackEvent } from "@/lib/telemetry"
@@ -51,10 +51,6 @@ export default function Transactions() {
   const hasTrackedViewRef = useRef(false)
 
   useEffect(() => {
-    loadData()
-  }, [])
-
-  useEffect(() => {
     if (!loading && !hasTrackedViewRef.current) {
       hasTrackedViewRef.current = true
       trackEvent("transactions_view_loaded", {
@@ -63,7 +59,7 @@ export default function Transactions() {
     }
   }, [loading, transactions.length])
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       setLoading(true)
 
@@ -81,9 +77,13 @@ export default function Transactions() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
 
-  const refreshData = async () => {
+  useEffect(() => {
+    loadData()
+  }, [loadData])
+
+  const refreshData = useCallback(async () => {
     try {
       const [transactionsData, accountsData, categoriesData] = await Promise.all([
         getTransactions(),
@@ -97,7 +97,7 @@ export default function Transactions() {
     } catch (error) {
       console.error("Failed to refresh data:", error)
     }
-  }
+  }, [])
 
   const filteredTransactions = useMemo(() => {
     let filtered = [...transactions]
@@ -240,7 +240,26 @@ export default function Transactions() {
       console.error("Failed to duplicate transaction:", error)
       toast.error("Failed to duplicate transaction. Please try again.")
     }
-  }, [])
+  }, [refreshData])
+
+  const handleDeleteTransaction = useCallback(async (transaction: Transaction) => {
+    if (!transaction.id) return
+
+    const confirmed = window.confirm("Delete this transaction? This action cannot be undone.")
+    if (!confirmed) return
+
+    const transactionId = transaction.id
+    handleOptimisticDelete(transactionId)
+
+    try {
+      await deleteTransaction(transactionId)
+    } catch (error) {
+      console.error("Failed to delete transaction:", error)
+      toast.error("Failed to delete transaction. Please try again.")
+    } finally {
+      await refreshData()
+    }
+  }, [handleOptimisticDelete, refreshData])
 
   if (loading) {
     return (
@@ -281,6 +300,7 @@ export default function Transactions() {
                   accounts={accounts}
                   onTransactionClick={handleTransactionClick}
                   onDuplicateTransaction={handleDuplicateTransaction}
+                  onDeleteTransaction={handleDeleteTransaction}
                 />
               </div>
             </div>
@@ -325,7 +345,6 @@ export default function Transactions() {
           onOpenChange={setIsEditTransactionOpen}
           transaction={selectedTransaction}
           onTransactionUpdated={handleOptimisticUpdate}
-          onTransactionDeleted={handleOptimisticDelete}
           onAfterSave={refreshData}
           accounts={accounts}
           categories={categories}
@@ -397,6 +416,7 @@ export default function Transactions() {
                 showNotesPreview
                 onTransactionClick={handleTransactionClick}
                 onDuplicateTransaction={handleDuplicateTransaction}
+                onDeleteTransaction={handleDeleteTransaction}
                 onCreateForDate={(date) => openAddTransaction(date, "day_group")}
               />
             </div>
@@ -478,7 +498,6 @@ export default function Transactions() {
         onOpenChange={setIsEditTransactionOpen}
         transaction={selectedTransaction}
         onTransactionUpdated={handleOptimisticUpdate}
-        onTransactionDeleted={handleOptimisticDelete}
         onAfterSave={refreshData}
         accounts={accounts}
         categories={categories}
