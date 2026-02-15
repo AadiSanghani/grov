@@ -24,7 +24,7 @@ import { deleteTransaction, duplicateTransaction, getTransactions } from "@/lib/
 import { getCategories, type Category } from "@/lib/categories"
 import { type TransactionFormData } from "@/components/add-transaction-dialog"
 import { trackEvent } from "@/lib/telemetry"
-import { toLocalDateString } from "@/lib/utils"
+import { categoryNameToValue, toLocalDateString } from "@/lib/utils"
 
 const REDESIGN_ENABLED = process.env.NEXT_PUBLIC_TRANSACTIONS_REDESIGN !== "0"
 
@@ -122,7 +122,10 @@ export default function Transactions() {
     }
 
     if (filters.categories.length > 0) {
-      filtered = filtered.filter((t) => filters.categories.includes(t.category))
+      filtered = filtered.filter((t) => {
+        const normalized = categoryNameToValue(t.category)
+        return filters.categories.includes(t.category) || filters.categories.includes(normalized)
+      })
     }
 
     if (filters.amountMin !== undefined) {

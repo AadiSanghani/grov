@@ -18,10 +18,18 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover"
 import { Calendar } from "@/components/ui/calendar"
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command"
 import { Account } from "@/lib/accounts"
 import { Category } from "@/lib/categories"
-import { CalendarIcon, RotateCcw } from "lucide-react"
-import { cn } from "@/lib/utils"
+import { CalendarIcon, Check, ChevronsUpDown, RotateCcw } from "lucide-react"
+import { categoryNameToValue, cn } from "@/lib/utils"
 
 interface TransactionFiltersProps {
   filters: TransactionFilters
@@ -44,6 +52,8 @@ export const TransactionFiltersPanel = React.memo(function TransactionFiltersPan
   accountTypes,
   categories,
 }: TransactionFiltersProps) {
+  const [categoryOpen, setCategoryOpen] = React.useState(false)
+
   const handleSortChange = (value: string) => {
     onFiltersChange({
       ...filters,
@@ -68,6 +78,10 @@ export const TransactionFiltersPanel = React.memo(function TransactionFiltersPan
     (filters.dateEnd ? 1 : 0) +
     (filters.account_types.length > 0 ? 1 : 0) +
     (filters.categories.length > 0 ? 1 : 0)
+  const selectedCategoryValue = filters.categories.length > 0 ? filters.categories[0] : "all"
+  const selectedCategory = categories.find(
+    (category) => categoryNameToValue(category.name) === selectedCategoryValue
+  )
 
   return (
     <div className="space-y-4 p-4">
@@ -204,27 +218,78 @@ export const TransactionFiltersPanel = React.memo(function TransactionFiltersPan
 
       <div className="space-y-1.5">
         <Label className="text-sm">Category</Label>
-        <Select
-          value={filters.categories.length > 0 ? filters.categories[0] : "all"}
-          onValueChange={(value) =>
-            onFiltersChange({
-              ...filters,
-              categories: value === "all" ? [] : [value],
-            })
-          }
-        >
-          <SelectTrigger className="h-9">
-            <SelectValue placeholder="All categories" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All categories</SelectItem>
-            {categories.map((category) => (
-              <SelectItem key={category.id} value={category.id?.toString() || ""}>
-                {category.emoji} {category.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <Popover open={categoryOpen} onOpenChange={setCategoryOpen}>
+          <PopoverTrigger asChild>
+            <Button
+              variant="outline"
+              role="combobox"
+              aria-expanded={categoryOpen}
+              className="h-9 w-full justify-between font-normal"
+            >
+              {selectedCategory ? (
+                <span className="truncate">
+                  {selectedCategory.emoji} {selectedCategory.name}
+                </span>
+              ) : (
+                "All categories"
+              )}
+              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-(--radix-popover-trigger-width) p-0" align="start">
+            <Command>
+              <CommandInput placeholder="Search categories..." />
+              <CommandList>
+                <CommandEmpty>No category found.</CommandEmpty>
+                <CommandGroup>
+                  <CommandItem
+                    value="all categories"
+                    onSelect={() => {
+                      onFiltersChange({
+                        ...filters,
+                        categories: [],
+                      })
+                      setCategoryOpen(false)
+                    }}
+                  >
+                    <Check
+                      className={cn(
+                        "mr-2 h-4 w-4",
+                        selectedCategoryValue === "all" ? "opacity-100" : "opacity-0"
+                      )}
+                    />
+                    All categories
+                  </CommandItem>
+                  {categories.map((category) => {
+                    const normalized = categoryNameToValue(category.name)
+                    return (
+                      <CommandItem
+                        key={category.id ?? category.name}
+                        value={`${category.name} ${category.emoji}`}
+                        onSelect={() => {
+                          onFiltersChange({
+                            ...filters,
+                            categories: [normalized],
+                          })
+                          setCategoryOpen(false)
+                        }}
+                      >
+                        <Check
+                          className={cn(
+                            "mr-2 h-4 w-4",
+                            selectedCategoryValue === normalized ? "opacity-100" : "opacity-0"
+                          )}
+                        />
+                        <span className="mr-2">{category.emoji}</span>
+                        <span className="truncate">{category.name}</span>
+                      </CommandItem>
+                    )
+                  })}
+                </CommandGroup>
+              </CommandList>
+            </Command>
+          </PopoverContent>
+        </Popover>
       </div>
     </div>
   )
