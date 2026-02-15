@@ -1,10 +1,9 @@
 "use client"
 
 import { createContext, useContext, useMemo, useState } from "react"
-import { format, subDays, subMonths, startOfMonth, startOfYear } from "date-fns"
+import { format, subMonths, startOfMonth, startOfYear } from "date-fns"
 
 export const TIMELINE_OPTIONS = [
-  { value: "last-30-days", label: "Last 30 Days" },
   { value: "month-to-date", label: "Month to Date" },
   { value: "last-6-months", label: "Last 6 Months" },
   { value: "year-to-date", label: "Year to Date" },
@@ -19,8 +18,6 @@ export function getReportsDateRange(timeline: string): { startDate: string; endD
   const endDate = format(tomorrow, "yyyy-MM-dd")
 
   switch (timeline) {
-    case "last-30-days":
-      return { startDate: format(subDays(today, 30), "yyyy-MM-dd"), endDate }
     case "month-to-date":
       return { startDate: format(startOfMonth(today), "yyyy-MM-dd"), endDate }
     case "last-6-months":
@@ -30,9 +27,9 @@ export function getReportsDateRange(timeline: string): { startDate: string; endD
     case "all-time":
       return { startDate: "2020-01-01", endDate }
     case "custom":
-      return { startDate: format(subDays(today, 30), "yyyy-MM-dd"), endDate }
+      return { startDate: format(startOfMonth(today), "yyyy-MM-dd"), endDate }
     default:
-      return { startDate: format(subDays(today, 30), "yyyy-MM-dd"), endDate }
+      return { startDate: format(startOfMonth(today), "yyyy-MM-dd"), endDate }
   }
 }
 
@@ -56,11 +53,11 @@ export function useReportsContext() {
   return ctx
 }
 
-const defaultRange = getReportsDateRange("last-30-days")
+const defaultRange = getReportsDateRange("month-to-date")
 
 export function ReportsProvider({
   children,
-  initialTimeline = "last-30-days",
+  initialTimeline = "month-to-date",
 }: {
   children: React.ReactNode
   initialTimeline?: string

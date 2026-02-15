@@ -21,10 +21,9 @@ import { getAccounts, deleteAccount } from '@/lib/accounts';
 import { toast } from 'sonner';
 import { getNetWorthHistory } from '@/lib/balances';
 import { NetWorthDataPoint } from '@/lib/types';
-import { format, subDays, subMonths, startOfMonth, startOfYear } from 'date-fns';
+import { format, subMonths, startOfMonth, startOfYear } from 'date-fns';
 
 const TIMELINE_OPTIONS = [
-  { value: "last-30-days", label: "Last 30 Days" },
   { value: "month-to-date", label: "Month to Date" },
   { value: "last-6-months", label: "Last 6 Months" },
   { value: "year-to-date", label: "Year to Date" },
@@ -85,8 +84,6 @@ function getDateRange(timeline: string): { startDate: string; endDate: string; g
   const endDate = format(tomorrow, 'yyyy-MM-dd');
   
   switch (timeline) {
-    case 'last-30-days':
-      return { startDate: format(subDays(today, 30), 'yyyy-MM-dd'), endDate, granularity: 'daily' };
     case 'month-to-date':
       return { startDate: format(startOfMonth(today), 'yyyy-MM-dd'), endDate, granularity: 'daily' };
     case 'last-6-months':
@@ -96,7 +93,7 @@ function getDateRange(timeline: string): { startDate: string; endDate: string; g
     case 'all-time':
       return { startDate: '2020-01-01', endDate, granularity: 'monthly' };
     default:
-      return { startDate: format(subDays(today, 30), 'yyyy-MM-dd'), endDate, granularity: 'daily' };
+      return { startDate: format(startOfMonth(today), 'yyyy-MM-dd'), endDate, granularity: 'daily' };
   }
 }
 
@@ -117,7 +114,7 @@ export default function Accounts() {
   const [accountToDelete, setAccountToDelete] = useState<Account | null>(null);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
-  const [netWorthTimeline, setNetWorthTimeline] = useState<string>("last-30-days");
+  const [netWorthTimeline, setNetWorthTimeline] = useState<string>("month-to-date");
   const [netWorthData, setNetWorthData] = useState<NetWorthDataPoint[]>([]);
   const [loadingNetWorth, setLoadingNetWorth] = useState(true);
 
