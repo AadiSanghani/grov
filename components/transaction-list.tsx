@@ -42,6 +42,7 @@ interface GroupedTransactions {
 
 const ROW_AMOUNT_COLUMN_WIDTH = "w-[10.5rem]"
 const ACTION_COLUMN_WIDTH = "w-10"
+const ROW_GRID_TEMPLATE = "md:grid-cols-[minmax(0,1.35fr)_minmax(0,0.85fr)_minmax(0,1fr)_10.5rem]"
 
 const densityClassMap: Record<Density, string> = {
   compact: "py-2",
@@ -156,6 +157,16 @@ export const TransactionList = React.memo(function TransactionList({
 
   return (
     <div className="space-y-5">
+      <div className="hidden items-center px-3 md:flex">
+        <div className={cn("grid flex-1 gap-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground", ROW_GRID_TEMPLATE)}>
+          <span>Merchant</span>
+          <span>Category</span>
+          <span>Notes</span>
+          <span className="text-right">Amount</span>
+        </div>
+        <span className={ACTION_COLUMN_WIDTH} />
+      </div>
+
       {groupedTransactions.map(({ isoDate, displayDate, transactions: dayTransactions, total }) => (
         <section key={isoDate} className="space-y-1.5">
           <header className="flex items-center justify-between rounded-lg bg-muted/40 px-3 py-2">
@@ -223,7 +234,7 @@ export const TransactionList = React.memo(function TransactionList({
                   <button
                     type="button"
                     onClick={() => onTransactionClick(transaction)}
-                    className="grid flex-1 grid-cols-1 gap-2 px-3 text-left md:grid-cols-[minmax(0,1.45fr)_minmax(0,1fr)_10.5rem] md:items-start"
+                    className={cn("grid flex-1 grid-cols-1 gap-2 px-3 text-left md:items-start", ROW_GRID_TEMPLATE)}
                   >
                     <div className="min-w-0">
                       <p className="truncate text-[15px] font-medium leading-6">
@@ -231,19 +242,20 @@ export const TransactionList = React.memo(function TransactionList({
                       </p>
 
                       <div className="flex min-h-5 flex-wrap items-center gap-1.5">
-                        {isReimbursement && (
-                          <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
-                            Reimbursement
-                          </span>
-                        )}
-                        <span className="truncate text-xs text-muted-foreground">
+                        <span className="min-w-0 truncate text-xs text-muted-foreground">
                           {accountName(accounts, transaction.account_type_id)}
                         </span>
+                        {isReimbursement && (
+                          <>
+                            <span className="text-xs text-muted-foreground/60 md:hidden">•</span>
+                            <span className="truncate text-xs text-muted-foreground md:hidden">Reimbursement</span>
+                          </>
+                        )}
                       </div>
 
                       {showNotesPreview && txNotes && (
                         <p
-                          className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground"
+                          className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground md:hidden"
                           title={txNotes}
                         >
                           <FileText className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
@@ -256,6 +268,8 @@ export const TransactionList = React.memo(function TransactionList({
                     <div className="hidden min-w-0 items-center gap-2 text-sm text-muted-foreground md:flex">
                       {isTransfer ? (
                         <span className="truncate">Transfer</span>
+                      ) : isReimbursement ? (
+                        <span className="truncate">Reimbursement</span>
                       ) : categoryInfo ? (
                         <>
                           <span className="shrink-0">{categoryInfo.emoji}</span>
@@ -263,6 +277,25 @@ export const TransactionList = React.memo(function TransactionList({
                         </>
                       ) : (
                         <span className="truncate">Uncategorized</span>
+                      )}
+                    </div>
+
+                    <div className="hidden min-w-0 md:block">
+                      {showNotesPreview ? (
+                        txNotes ? (
+                          <p
+                            className="flex items-center gap-1 text-sm text-muted-foreground"
+                            title={txNotes}
+                          >
+                            <FileText className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                            <span className="sr-only">Note</span>
+                            <span className="truncate">{txNotes}</span>
+                          </p>
+                        ) : (
+                          <span aria-hidden="true" />
+                        )
+                      ) : (
+                        <span aria-hidden="true" />
                       )}
                     </div>
 
