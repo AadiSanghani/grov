@@ -8,7 +8,6 @@ import { Transaction } from "@/lib/types"
 import {
   cn,
   findCategoryByValue,
-  getSpendingAmount,
   isReimbursementTransaction,
   toLocalDateString,
 } from "@/lib/utils"
@@ -75,7 +74,7 @@ function getSignedAmount(transaction: Transaction) {
   if (transaction.transaction_type === "outgoing") {
     return {
       sign: "-",
-      value: getSpendingAmount(transaction),
+      value: transaction.amount,
     }
   }
   if (transaction.transaction_type === "incoming") {
@@ -136,7 +135,7 @@ export const TransactionList = React.memo(function TransactionList({
       if (transaction.transaction_type === "incoming") {
         dateEntry.total += transaction.amount
       } else if (transaction.transaction_type === "outgoing") {
-        dateEntry.total -= getSpendingAmount(transaction)
+        dateEntry.total -= transaction.amount
       }
       // transfers do not impact daily net
 
