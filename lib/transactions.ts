@@ -217,6 +217,61 @@ export async function createTransaction(data: {
   return result
 }
 
+export async function duplicateTransaction(id: string, date?: Date | string) {
+  const supabase = createServerSupabaseClient()
+  const { userId } = await auth()
+
+  if (!userId) {
+    throw new Error('User not authenticated')
+  }
+
+  const { data: sourceTx, error } = await supabase
+    .from('transactions')
+    .select('*')
+    .eq('id', id)
+    .eq('user_id', userId)
+    .single()
+
+  if (error) {
+    console.error('Supabase error:', error)
+    throw error
+  }
+
+  if (sourceTx.account_type_id == null) {
+    throw new Error('Cannot duplicate an unassigned transaction')
+  }
+
+  let deductionsInput: { label: string; amount: number; target_account_id?: number | null }[] = []
+  if (sourceTx.transaction_type === 'incoming') {
+    try {
+      const sourceDeductions = await getDeductionsByTransactionId(id)
+      deductionsInput = sourceDeductions.map((d) => ({
+        label: d.label,
+        amount: d.amount,
+        target_account_id: d.target_account_id ?? null,
+      }))
+    } catch (dedError) {
+      console.error('Failed to fetch deductions for duplicate:', dedError)
+      throw dedError
+    }
+  }
+
+  const duplicateDate = date ? toDateOnlyString(date) : toDateOnlyString(new Date())
+
+  return createTransaction({
+    transaction_type: sourceTx.transaction_type as 'outgoing' | 'incoming' | 'transfer',
+    amount: sourceTx.amount,
+    merchant: sourceTx.merchant ?? 'Transaction Copy',
+    date: duplicateDate,
+    account_type_id: String(sourceTx.account_type_id),
+    category: sourceTx.category ?? '',
+    notes: sourceTx.notes ?? undefined,
+    spending_amount: sourceTx.spending_amount ?? null,
+    to_account_type_id: sourceTx.to_account_type_id != null ? String(sourceTx.to_account_type_id) : null,
+    deductions: deductionsInput.length > 0 ? deductionsInput : undefined,
+  })
+}
+
 export async function updateTransaction(
   id: string,
   data: Omit<Partial<Transaction>, 'date'> & {

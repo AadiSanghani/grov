@@ -3,16 +3,19 @@
 import * as React from "react"
 import { Transaction } from "@/lib/types"
 import { format } from "date-fns"
-import { ChevronRight } from "lucide-react"
+import { Copy, EllipsisVertical } from "lucide-react"
 import { cn, findCategoryByValue, getSpendingAmount } from "@/lib/utils"
 import { Category } from "@/lib/categories"
 import { type Account } from "@/lib/accounts"
+import { Button } from "@/components/ui/button"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 
 interface TransactionListProps {
   transactions: Transaction[]
   categories: Category[]
   accounts?: Account[]
   onTransactionClick: (transaction: Transaction) => void
+  onDuplicateTransaction: (transaction: Transaction) => void
 }
 
 interface GroupedTransactions {
@@ -22,7 +25,15 @@ interface GroupedTransactions {
   }
 }
 
-export const TransactionList = React.memo(function TransactionList({ transactions, categories, accounts = [], onTransactionClick }: TransactionListProps) {
+export const TransactionList = React.memo(function TransactionList({
+  transactions,
+  categories,
+  accounts = [],
+  onTransactionClick,
+  onDuplicateTransaction,
+}: TransactionListProps) {
+  const [activeMenuId, setActiveMenuId] = React.useState<string | undefined>(undefined)
+
   const accountName = (id: string | null | undefined) => {
     if (id == null || id === '') return 'Unassigned'
     const name = accounts.find((a) => a.id?.toString() === id)?.account_name
@@ -86,46 +97,83 @@ export const TransactionList = React.memo(function TransactionList({ transaction
                 : null
               
               return (
-                <button
+                <div
                   key={transaction.id}
-                  onClick={() => onTransactionClick(transaction)}
-                  className="w-full flex items-center justify-between px-4 py-3 hover:bg-muted/50 rounded-lg transition-colors text-left group"
+                  className="w-full flex items-center gap-1 rounded-lg hover:bg-muted/50 transition-colors group"
                 >
-                  <div className="flex items-center gap-4 flex-1 min-w-0">
-                    <div className="min-w-[180px]">
-                      <p className="font-medium truncate">
-                        {isTransfer ? (transferLabel ?? transaction.merchant) : transaction.merchant}
-                      </p>
-                    </div>
-
-                    {!isTransfer && categoryInfo && (
-                      <div className="flex items-center gap-2 min-w-[150px]">
-                        <span className="text-sm">{categoryInfo.emoji}</span>
-                        <span className="text-sm text-muted-foreground">{categoryInfo.label}</span>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <div className="text-right">
-                      <span className={cn(
-                        "font-semibold",
-                        transaction.transaction_type === "incoming" 
-                          ? "text-accent" 
-                          : "text-foreground"
-                      )}>
-                        {transaction.transaction_type === "incoming" ? "+" : ""}
-                        ${transaction.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </span>
-                      {transaction.transaction_type === "outgoing" && transaction.spending_amount != null && transaction.spending_amount !== transaction.amount && (
-                        <p className="text-xs text-muted-foreground">
-                          your share: ${transaction.spending_amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  <button
+                    onClick={() => onTransactionClick(transaction)}
+                    className="flex-1 flex items-center justify-between px-4 py-3 text-left"
+                  >
+                    <div className="flex items-center gap-4 flex-1 min-w-0">
+                      <div className="min-w-[180px]">
+                        <p className="font-medium truncate">
+                          {isTransfer ? (transferLabel ?? transaction.merchant) : transaction.merchant}
                         </p>
+                      </div>
+
+                      {!isTransfer && categoryInfo && (
+                        <div className="flex items-center gap-2 min-w-[150px]">
+                          <span className="text-sm">{categoryInfo.emoji}</span>
+                          <span className="text-sm text-muted-foreground">{categoryInfo.label}</span>
+                        </div>
                       )}
                     </div>
-                    <ChevronRight className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-                  </div>
-                </button>
+
+                    <div className="flex items-center gap-2">
+                      <div className="text-right">
+                        <span className={cn(
+                          "font-semibold",
+                          transaction.transaction_type === "incoming"
+                            ? "text-accent"
+                            : "text-foreground"
+                        )}>
+                          {transaction.transaction_type === "incoming" ? "+" : ""}
+                          ${transaction.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </span>
+                        {transaction.transaction_type === "outgoing" && transaction.spending_amount != null && transaction.spending_amount !== transaction.amount && (
+                          <p className="text-xs text-muted-foreground">
+                            your share: ${transaction.spending_amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </button>
+
+                  <Popover
+                    open={activeMenuId === transaction.id}
+                    onOpenChange={(isOpen) => {
+                      setActiveMenuId(isOpen ? transaction.id : undefined)
+                    }}
+                  >
+                    <PopoverTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="mr-2 h-8 w-8 shrink-0 text-muted-foreground hover:text-foreground"
+                        onClick={(e) => e.stopPropagation()}
+                        aria-label="Transaction actions"
+                      >
+                        <EllipsisVertical className="h-4 w-4" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent align="end" className="w-40 p-1">
+                      <button
+                        type="button"
+                        className="w-full rounded-sm px-2 py-1.5 text-left text-sm hover:bg-muted flex items-center gap-2"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setActiveMenuId(undefined)
+                          onDuplicateTransaction(transaction)
+                        }}
+                      >
+                        <Copy className="h-4 w-4" />
+                        Duplicate
+                      </button>
+                    </PopoverContent>
+                  </Popover>
+                </div>
               )
             })}
           </div>
