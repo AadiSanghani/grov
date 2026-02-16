@@ -103,7 +103,7 @@ export default function CashFlowPage() {
   if (loading) {
     return (
       <div className="p-6">
-        <p className="text-muted-foreground">Loading...</p>
+        <p className="text-muted-foreground">Loading…</p>
       </div>
     )
   }

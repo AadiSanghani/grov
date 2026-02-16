@@ -105,7 +105,7 @@ export const TransactionFiltersPanel = React.memo(function TransactionFiltersPan
       <div className="space-y-1.5">
         <Label className="text-sm">Search</Label>
         <Input
-          placeholder="Search merchant, category, or notes..."
+          placeholder="Search merchant, category, or notes…"
           value={filters.search}
           onChange={(e) => {
             onFiltersChange({
@@ -238,7 +238,7 @@ export const TransactionFiltersPanel = React.memo(function TransactionFiltersPan
           </PopoverTrigger>
           <PopoverContent className="w-(--radix-popover-trigger-width) p-0" align="start">
             <Command>
-              <CommandInput placeholder="Search categories..." />
+              <CommandInput placeholder="Search categories…" />
               <CommandList>
                 <CommandEmpty>No category found.</CommandEmpty>
                 <CommandGroup>

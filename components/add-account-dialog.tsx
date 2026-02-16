@@ -190,6 +190,7 @@ export function AddAccountDialog({ open, onOpenChange, setAccounts }: AddAccount
                 size="icon"
                 className="absolute left-0 top-0 h-8 w-8"
                 onClick={handleBack}
+                aria-label="Back"
               >
                 <ArrowLeft className="h-5 w-5" />
               </Button>

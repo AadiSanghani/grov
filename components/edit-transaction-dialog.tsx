@@ -33,7 +33,7 @@ import {
   normalizeCalendarDate,
   toLocalDateString,
 } from "@/lib/utils"
-import { CalendarIcon, Check, ChevronsUpDown, MinusCircle, PlusCircle, Trash2, ArrowRightLeft, Plus, ChevronDown, ChevronUp } from "lucide-react"
+import { CalendarIcon, Check, ChevronsUpDown, MinusCircle, PlusCircle, Trash2, ArrowRightLeft, Plus, ChevronDown, ChevronUp, Loader2 } from "lucide-react"
 import { format } from "date-fns"
 import { type Account } from "@/lib/accounts"
 import { Transaction } from "@/lib/types"
@@ -79,6 +79,8 @@ export function EditTransactionDialog({
   const [displaySpendingAmount, setDisplaySpendingAmount] = useState("$")
   const [deductionsOpen, setDeductionsOpen] = useState(false)
   const [deductions, setDeductions] = useState<{ label: string; amount: string; displayAmount: string; targetAccountId: string }[]>([])
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({})
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   const { merchants, addMerchant } = useDataContext()
   const merchantNames = useMemo(() => merchants.map((m) => m.name), [merchants])
@@ -133,6 +135,7 @@ export function EditTransactionDialog({
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (open && transaction) {
+      setFormErrors({})
       setTransactionType(transaction.transaction_type)
       setAmount(transaction.amount.toString())
       setDisplayAmount(`$${transaction.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`)
@@ -181,48 +184,51 @@ export function EditTransactionDialog({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+    setFormErrors({})
+
     if (!transaction?.id) return
-    
-    // Validate amount is a number
+
     const numAmount = parseFloat(amount)
     if (isNaN(numAmount) || numAmount <= 0) {
-      alert("Please enter a valid amount")
+      setFormErrors((prev) => ({ ...prev, amount: "Please enter a valid amount." }))
       return
     }
 
     if (transactionType === "transfer") {
       if (!accountTypeId || !toAccountTypeId) {
-        alert("Please select both From and To accounts")
+        setFormErrors((prev) => ({ ...prev, account: "Please select both From and To accounts." }))
         return
       }
       if (accountTypeId === toAccountTypeId) {
-        alert("From and To accounts must be different")
+        setFormErrors((prev) => ({ ...prev, toAccount: "From and To accounts must be different." }))
         return
       }
+    } else if ((transactionType === "outgoing" || transactionType === "incoming") && !accountTypeId) {
+      setFormErrors((prev) => ({ ...prev, account: "Please select an account." }))
+      return
     }
 
     let parsedSpendingAmount: number | null = null
     if (transactionType === "outgoing" && spendingAmount !== "") {
       const num = parseFloat(spendingAmount)
       if (isNaN(num) || num < 0 || num > numAmount) {
-        alert("My share must be between $0 and the total amount")
+        setFormErrors((prev) => ({ ...prev, spendingAmount: "My share must be between $0 and the total amount." }))
         return
       }
       parsedSpendingAmount = num
     }
 
-    // Parse deductions for incoming transactions
     const parsedDeductions: { label: string; amount: number; target_account_id?: number | null }[] = []
     if (transactionType === "incoming" && deductions.length > 0) {
-      for (const d of deductions) {
+      for (let i = 0; i < deductions.length; i++) {
+        const d = deductions[i]
         const dedAmount = parseFloat(d.amount)
         if (!d.label.trim()) {
-          alert("Please enter a label for all deductions")
+          setFormErrors((prev) => ({ ...prev, [`deductionLabel-${i}`]: "Enter a label for this deduction." }))
           return
         }
         if (isNaN(dedAmount) || dedAmount <= 0) {
-          alert("Please enter a valid amount for all deductions")
+          setFormErrors((prev) => ({ ...prev, [`deductionAmount-${i}`]: "Enter a valid amount." }))
           return
         }
         parsedDeductions.push({
@@ -256,10 +262,6 @@ export function EditTransactionDialog({
     }
     updateData.deductions = parsedDeductions
 
-    // Close dialog immediately for snappy UX
-    onOpenChange(false)
-
-
     onTransactionUpdated(transactionId, updateData)
 
     const serverUpdateData: Parameters<typeof updateTransaction>[1] = {
@@ -272,20 +274,23 @@ export function EditTransactionDialog({
       merchantValue.length > 0 &&
       !merchantNames.some((m) => m.toLowerCase() === merchantValue.toLowerCase())
 
+    setIsSubmitting(true)
     try {
       if (shouldPersistMerchant) {
         await addMerchant(merchantValue)
       }
       await updateTransaction(transactionId, serverUpdateData)
+      onOpenChange(false)
+      onAfterSave?.()
     } catch (error) {
       console.error("Failed to update transaction:", error)
-      toast.error("Failed to update transaction. Please try again. Error: " + error, {
+      toast.error("Failed to update transaction. Please try again.", {
         duration: 5000,
         position: "top-right",
       })
+    } finally {
+      setIsSubmitting(false)
     }
-
-    onAfterSave?.()
   }
 
   const filteredMerchants = useMemo(
@@ -312,7 +317,7 @@ export function EditTransactionDialog({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-[600px] max-h-[90vh] overflow-y-auto shadow-2xl">
+        <DialogContent className="max-w-[600px] max-h-[90vh] overflow-y-auto overscroll-contain shadow-2xl">
           <DialogHeader>
             <DialogTitle>Edit transaction</DialogTitle>
           </DialogHeader>
@@ -411,11 +416,13 @@ export function EditTransactionDialog({
                   setDisplayAmount(formatted)
                 }}
                 className="text-lg"
+                aria-invalid={!!formErrors.amount}
               />
+              {formErrors.amount ? <p className="text-sm text-destructive">{formErrors.amount}</p> : null}
             </div>
 
             {/* My Share (outgoing only) */}
-            {transactionType === "outgoing" && (
+            {transactionType === "outgoing" ? (
               <div className="space-y-2">
                 <Label htmlFor="spending-amount">My share</Label>
                 <Input
@@ -451,14 +458,15 @@ export function EditTransactionDialog({
                     setDisplaySpendingAmount(formatted)
                   }}
                 />
+                {formErrors.spendingAmount ? <p className="text-sm text-destructive">{formErrors.spendingAmount}</p> : null}
                 <p className="text-xs text-muted-foreground">
                   Optional &mdash; leave blank to count the full amount as spending
                 </p>
               </div>
-            )}
+            ) : null}
 
             {/* Payroll Deductions (incoming only) */}
-            {transactionType === "incoming" && (
+            {transactionType === "incoming" ? (
               <div className="space-y-3">
                 <button
                   type="button"
@@ -470,11 +478,11 @@ export function EditTransactionDialog({
                 >
                   {deductionsOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                   Payroll Deductions
-                  {deductions.length > 0 && (
+                  {deductions.length > 0 ? (
                     <span className="text-xs bg-muted rounded-full px-2 py-0.5">
                       {deductions.length}
                     </span>
-                  )}
+                  ) : null}
                 </button>
 
                 {deductionsOpen && (
@@ -489,7 +497,9 @@ export function EditTransactionDialog({
                               placeholder="e.g. RRSP, Income Tax, CPP, EI"
                               value={ded.label}
                               onChange={(e) => updateDeduction(index, "label", e.target.value)}
+                              aria-invalid={!!formErrors[`deductionLabel-${index}`]}
                             />
+                            {formErrors[`deductionLabel-${index}`] ? <p className="text-xs text-destructive">{formErrors[`deductionLabel-${index}`]}</p> : null}
                           </div>
                           <div className="w-[140px] space-y-1">
                             <Label className="text-xs">Amount</Label>
@@ -497,7 +507,9 @@ export function EditTransactionDialog({
                               placeholder="$0.00"
                               value={ded.displayAmount}
                               onChange={(e) => updateDeduction(index, "amount", e.target.value)}
+                              aria-invalid={!!formErrors[`deductionAmount-${index}`]}
                             />
+                            {formErrors[`deductionAmount-${index}`] ? <p className="text-xs text-destructive">{formErrors[`deductionAmount-${index}`]}</p> : null}
                           </div>
                           <Button
                             type="button"
@@ -505,6 +517,7 @@ export function EditTransactionDialog({
                             size="icon"
                             className="mt-5 shrink-0"
                             onClick={() => removeDeductionRow(index)}
+                            aria-label="Remove deduction"
                           >
                             <Trash2 className="h-4 w-4 text-muted-foreground" />
                           </Button>
@@ -538,7 +551,7 @@ export function EditTransactionDialog({
                       Add deduction
                     </Button>
 
-                    {deductions.length > 0 && parseFloat(amount) > 0 && (
+                    {deductions.length > 0 && Number.isFinite(parseFloat(amount)) && parseFloat(amount) > 0 ? (
                       <div className="text-sm text-muted-foreground border-t pt-3 space-y-1">
                         <div className="flex justify-between">
                           <span>Deposit (net)</span>
@@ -553,11 +566,11 @@ export function EditTransactionDialog({
                           <span>${grossIncome.toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
                         </div>
                       </div>
-                    )}
+                    ) : null}
                   </div>
                 )}
               </div>
-            )}
+            ) : null}
 
             {/* Merchant */}
             <div className="space-y-2">
@@ -570,14 +583,14 @@ export function EditTransactionDialog({
                     aria-expanded={merchantOpen}
                     className="w-full justify-between font-normal"
                   >
-                    {merchant || "Search merchants..."}
+                    {merchant || "Search merchants…"}
                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-(--radix-popover-trigger-width) p-0" align="start">
                   <Command>
                     <CommandInput
-                      placeholder="Search merchants..."
+                      placeholder="Search merchants…"
                       value={merchant}
                       onValueChange={setMerchant}
                     />
@@ -618,6 +631,7 @@ export function EditTransactionDialog({
                   </Command>
                 </PopoverContent>
               </Popover>
+              {formErrors.account ? <p className="text-sm text-destructive">{formErrors.account}</p> : null}
             </div>
 
             {/* Date */}
@@ -665,14 +679,14 @@ export function EditTransactionDialog({
                     {selectedAccount ? (
                       selectedAccount.account_name
                     ) : (
-                      transactionType === "transfer" ? "Select from account..." : "Select account..."
+                      transactionType === "transfer" ? "Select from account…" : "Select account…"
                     )}
                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-(--radix-popover-trigger-width) p-0" align="start">
                   <Command>
-                    <CommandInput placeholder="Search accounts..." />
+                    <CommandInput placeholder="Search accounts…" />
                     <CommandList>
                       <CommandEmpty>
                         {accounts.length === 0 ? "No accounts found." : "No account found."}
@@ -704,7 +718,7 @@ export function EditTransactionDialog({
             </div>
 
             {/* To account (transfer only) */}
-            {transactionType === "transfer" && (
+            {transactionType === "transfer" ? (
               <div className="space-y-2">
                 <Label>To account</Label>
                 <Popover open={toAccountOpen} onOpenChange={setToAccountOpen}>
@@ -715,19 +729,19 @@ export function EditTransactionDialog({
                       aria-expanded={toAccountOpen}
                       className="w-full justify-between font-normal"
                     >
-                      {accounts.find((a) => a.id?.toString() === toAccountTypeId)?.account_name ?? "Select to account..."}
+                      {accounts.find((a) => a.id?.toString() === toAccountTypeId)?.account_name ?? "Select to account…"}
                       <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-(--radix-popover-trigger-width) p-0" align="start">
                     <Command>
-                      <CommandInput placeholder="Search accounts..." />
-                      <CommandList>
-                        <CommandEmpty>No account found.</CommandEmpty>
-                        <CommandGroup>
-                          {accounts
-                            .filter((account) => account.id?.toString() !== accountTypeId)
-                            .map((account) => (
+<CommandInput placeholder="Search accounts…" />
+                    <CommandList>
+                      <CommandEmpty>No account found.</CommandEmpty>
+                      <CommandGroup>
+                        {accounts
+                          .filter((account) => account.id?.toString() !== accountTypeId)
+                          .map((account) => (
                               <CommandItem
                                 key={account.id}
                                 value={account.account_name}
@@ -750,10 +764,11 @@ export function EditTransactionDialog({
                     </Command>
                   </PopoverContent>
                 </Popover>
+                {formErrors.toAccount ? <p className="text-sm text-destructive">{formErrors.toAccount}</p> : null}
               </div>
-            )}
+            ) : null}
 
-            {transactionType !== "transfer" && (
+            {transactionType !== "transfer" ? (
             <div className="space-y-2">
               <Label htmlFor="category">Category</Label>
               <Popover open={categoryOpen} onOpenChange={setCategoryOpen}>
@@ -770,14 +785,14 @@ export function EditTransactionDialog({
                         <span>{selectedCategory.label}</span>
                       </div>
                     ) : (
-                      "Search categories..."
+                      "Search categories…"
                     )}
                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-(--radix-popover-trigger-width) p-0 max-h-[800px]" side="right" align="start">
                   <Command>
-                    <CommandInput placeholder="Search categories..." />
+                    <CommandInput placeholder="Search categories…" />
                     <CommandList className="max-h-[750px]">
                       <CommandEmpty>No category found.</CommandEmpty>
                       {formattedCategories.map((group) => (
@@ -808,14 +823,14 @@ export function EditTransactionDialog({
                 </PopoverContent>
               </Popover>
             </div>
-            )}
+            ) : null}
 
             {/* Notes */}
             <div className="space-y-2">
               <Label htmlFor="notes">Notes</Label>
               <Input
                 id="notes"
-                placeholder="Add a note..."
+                placeholder="Add a note…"
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
               />
@@ -823,8 +838,15 @@ export function EditTransactionDialog({
 
             {/* Action Buttons */}
             <div className="flex justify-end">
-              <Button type="submit">
-                Update transaction
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Saving…
+                  </>
+                ) : (
+                  "Update transaction"
+                )}
               </Button>
             </div>
           </form>

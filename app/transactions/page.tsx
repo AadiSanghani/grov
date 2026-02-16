@@ -298,7 +298,7 @@ export default function Transactions() {
         title="Transactions"
         description="View, filter, and manage all your transactions."
       >
-        <p className="text-muted-foreground">Loading transactions...</p>
+        <p className="text-muted-foreground">Loading transactions…</p>
       </PageLayout>
     )
   }

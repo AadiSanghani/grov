@@ -43,7 +43,7 @@ export function RecentTransactionsCard({
         }
       >
         <div className="flex items-center justify-center py-8 text-xs text-muted-foreground">
-          Loading...
+          Loading…
         </div>
       </DashboardCard>
     )

@@ -157,8 +157,8 @@ export default function TripDetailPage() {
 
   if (loading) {
     return (
-      <PageLayout title="Trip" description="Loading trip details...">
-        <p className="text-sm text-muted-foreground">Loading...</p>
+      <PageLayout title="Trip" description="Loading trip details…">
+        <p className="text-sm text-muted-foreground">Loading…</p>
       </PageLayout>
     )
   }
@@ -426,7 +426,7 @@ export default function TripDetailPage() {
             </p>
 
             <Input
-              placeholder="Search merchant or date..."
+              placeholder="Search merchant or date…"
               value={associationSearch}
               onChange={(e) => setAssociationSearch(e.target.value)}
             />

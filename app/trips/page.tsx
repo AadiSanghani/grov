@@ -103,7 +103,7 @@ export default function TripsPage() {
       </div>
 
       {loading ? (
-        <p className="text-sm text-muted-foreground">Loading trips...</p>
+        <p className="text-sm text-muted-foreground">Loading trips…</p>
       ) : trips.length === 0 ? (
         <Card>
           <CardContent className="py-12 text-center">

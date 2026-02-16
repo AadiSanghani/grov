@@ -140,7 +140,7 @@ export function SpendingCard({ rangeKey, data, loading }: SpendingCardProps) {
       <div className="h-[300px]">
         {isLoading ? (
           <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
-            Loading spending data...
+            Loading spending data…
           </div>
         ) : chartData.length === 0 ? (
           <div className="flex h-full items-center justify-center text-xs text-muted-foreground">

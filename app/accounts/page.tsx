@@ -257,7 +257,7 @@ export default function Accounts() {
             <div className="w-full h-[300px]">
             {loadingNetWorth ? (
               <div className="flex items-center justify-center h-full">
-                <p className="text-muted-foreground">Loading net worth history...</p>
+                <p className="text-muted-foreground">Loading net worth history…</p>
               </div>
             ) : chartData.length === 0 ? (
               <div className="flex items-center justify-center h-full">

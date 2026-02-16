@@ -241,7 +241,7 @@ export function EditAccountDialog({ open, onOpenChange, account, setAccounts }: 
             Cancel
           </Button>
           <Button onClick={handleSave} className="px-6 bg-primary text-primary-foreground hover:bg-primary/90" disabled={saving}>
-            {saving ? 'Saving...' : 'Save'}
+            {saving ? 'Saving…' : 'Save'}
           </Button>
         </div>
       </DialogContent>

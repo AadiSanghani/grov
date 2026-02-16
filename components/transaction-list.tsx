@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { useState } from "react"
 import { format } from "date-fns"
 import { Copy, EllipsisVertical, FileText, Plus, Trash2 } from "lucide-react"
 
@@ -16,6 +17,14 @@ import { Category } from "@/lib/categories"
 import { type Account } from "@/lib/accounts"
 import { Button } from "@/components/ui/button"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 
 type Density = "compact" | "balanced" | "comfortable"
 type AmountColorMode = "semantic-minimal" | "strict-semantic" | "monochrome"
@@ -115,6 +124,7 @@ export const TransactionList = React.memo(function TransactionList({
   onCreateForDate,
 }: TransactionListProps) {
   const [activeMenuId, setActiveMenuId] = React.useState<string | undefined>(undefined)
+  const [transactionToDelete, setTransactionToDelete] = useState<Transaction | null>(null)
 
   const groupedTransactions = React.useMemo<GroupedTransactions[]>(() => {
     const grouped = new Map<string, GroupedTransactions>()
@@ -156,6 +166,7 @@ export const TransactionList = React.memo(function TransactionList({
   }
 
   return (
+    <>
     <div className="space-y-5">
       <div className="hidden items-center px-3 md:flex">
         <div className={cn("grid flex-1 gap-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground", ROW_GRID_TEMPLATE)}>
@@ -354,7 +365,7 @@ export const TransactionList = React.memo(function TransactionList({
                               onClick={(e) => {
                                 e.stopPropagation()
                                 setActiveMenuId(undefined)
-                                onDeleteTransaction(transaction)
+                                setTransactionToDelete(transaction)
                               }}
                             >
                               <Trash2 className="h-4 w-4" />
@@ -372,5 +383,33 @@ export const TransactionList = React.memo(function TransactionList({
         </section>
       ))}
     </div>
+
+    <Dialog open={!!transactionToDelete} onOpenChange={(open) => !open && setTransactionToDelete(null)}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Delete transaction?</DialogTitle>
+          <DialogDescription>
+            This action cannot be undone. The transaction will be permanently removed.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setTransactionToDelete(null)}>
+            Cancel
+          </Button>
+          <Button
+            variant="destructive"
+            onClick={() => {
+              if (transactionToDelete && onDeleteTransaction) {
+                onDeleteTransaction(transactionToDelete)
+                setTransactionToDelete(null)
+              }
+            }}
+          >
+            Delete
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+    </>
   )
 })
