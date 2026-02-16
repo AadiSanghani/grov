@@ -276,9 +276,6 @@ export default function Transactions() {
   const handleDeleteTransaction = useCallback(async (transaction: Transaction) => {
     if (!transaction.id) return
 
-    const confirmed = window.confirm("Delete this transaction? This action cannot be undone.")
-    if (!confirmed) return
-
     const transactionId = transaction.id
     handleOptimisticDelete(transactionId)
 

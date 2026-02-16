@@ -220,8 +220,6 @@ export default function TripDetailPage() {
                 className="w-full justify-start text-destructive hover:text-destructive"
                 onClick={async () => {
                   setActionsOpen(false)
-                  const confirmed = window.confirm("Delete this trip? Linked transactions will be unassigned.")
-                  if (!confirmed) return
                   try {
                     await deleteTrip(tripId)
                     toast.success("Trip deleted")
