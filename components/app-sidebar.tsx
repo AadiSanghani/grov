@@ -45,8 +45,8 @@ const items = [
         icon: MapPinned,
     },
     {
-        title: "Investment",
-        url: "/investment",
+        title: "Investments",
+        url: "/investments/holdings",
         icon: ChartArea,
     },
   ]
