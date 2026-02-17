@@ -35,10 +35,12 @@ interface InvestmentTransactionRow {
   securities?: {
     ticker: string
     name: string | null
+    asset_type: string
     quote_currency: string
   } | {
     ticker: string
     name: string | null
+    asset_type: string
     quote_currency: string
   }[] | null
   investment_accounts?: {
@@ -200,6 +202,8 @@ function mapTransactionRow(row: InvestmentTransactionRow): InvestmentTransaction
     updated_at: row.updated_at,
     ticker: security?.ticker,
     security_name: security?.name ?? null,
+    security_asset_type: security?.asset_type ?? 'stock',
+    security_quote_currency: security?.quote_currency ?? row.currency,
     account_name: account?.name,
     account_base_currency: account?.base_currency,
   }
@@ -291,6 +295,7 @@ export async function getInvestmentTransactions(input?: {
       securities (
         ticker,
         name,
+        asset_type,
         quote_currency
       ),
       investment_accounts (
@@ -408,6 +413,7 @@ export async function createInvestmentTransaction(input: {
       securities (
         ticker,
         name,
+        asset_type,
         quote_currency
       ),
       investment_accounts (
