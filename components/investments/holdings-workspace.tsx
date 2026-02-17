@@ -20,6 +20,13 @@ import { createInvestmentTransaction, getInvestmentTransactions } from "@/lib/in
 
 const TRANSACTION_TYPE_OPTIONS: InvestmentTransactionType[] = ["BUY", "SELL", "DIVIDEND", "FEE"]
 
+function getLocalDateString(date: Date = new Date()) {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, "0")
+  const day = String(date.getDate()).padStart(2, "0")
+  return `${year}-${month}-${day}`
+}
+
 function formatCurrency(amount: number, currency: string) {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
@@ -39,11 +46,10 @@ export function HoldingsWorkspace() {
   const [txAccountId, setTxAccountId] = React.useState("")
   const [txTicker, setTxTicker] = React.useState("")
   const [txType, setTxType] = React.useState<InvestmentTransactionType>("BUY")
-  const [txDate, setTxDate] = React.useState(() => new Date().toISOString().slice(0, 10))
+  const [txDate, setTxDate] = React.useState(() => getLocalDateString())
   const [txQuantity, setTxQuantity] = React.useState("1")
   const [txPrice, setTxPrice] = React.useState("")
   const [txCurrency, setTxCurrency] = React.useState("USD")
-  const [txFxRateToBase, setTxFxRateToBase] = React.useState("")
   const [txFees, setTxFees] = React.useState("0")
   const [txNotes, setTxNotes] = React.useState("")
 
@@ -79,19 +85,15 @@ export function HoldingsWorkspace() {
   }, [accounts, txAccountId])
 
   const isTrade = txType === "BUY" || txType === "SELL"
-  const selectedAccount = React.useMemo(
-    () => accounts.find((account) => account.id === txAccountId) ?? null,
-    [accounts, txAccountId],
-  )
+  const todayLocalDate = React.useMemo(() => getLocalDateString(), [])
 
   const resetTxForm = () => {
     setTxTicker("")
     setTxType("BUY")
-    setTxDate(new Date().toISOString().slice(0, 10))
+    setTxDate(getLocalDateString())
     setTxQuantity("1")
     setTxPrice("")
     setTxCurrency("USD")
-    setTxFxRateToBase("")
     setTxFees("0")
     setTxNotes("")
   }
@@ -111,12 +113,14 @@ export function HoldingsWorkspace() {
       toast.error("Ticker is required")
       return
     }
+    if (txDate > todayLocalDate) {
+      toast.error("Trade date cannot be in the future")
+      return
+    }
 
     const quantity = isTrade ? Number(txQuantity) : 0
     const price = Number(txPrice)
     const fees = Number(txFees || 0)
-    const fxRateToBase =
-      txFxRateToBase.trim() === "" ? null : Number(txFxRateToBase)
 
     if (isTrade && quantity <= 0) {
       toast.error("Quantity must be greater than zero")
@@ -128,10 +132,6 @@ export function HoldingsWorkspace() {
     }
     if (!Number.isFinite(fees) || fees < 0) {
       toast.error("Fees cannot be negative")
-      return
-    }
-    if (fxRateToBase != null && (!Number.isFinite(fxRateToBase) || fxRateToBase <= 0)) {
-      toast.error("FX rate must be greater than zero")
       return
     }
 
@@ -147,7 +147,6 @@ export function HoldingsWorkspace() {
         price,
         currency: normalizedTxCurrency,
         fees,
-        fx_rate_to_base: fxRateToBase,
         notes: txNotes || null,
       })
       toast.success("Transaction saved")
@@ -251,7 +250,7 @@ export function HoldingsWorkspace() {
           <DialogHeader>
             <DialogTitle>Add investment transaction</DialogTitle>
             <DialogDescription>
-              Supports BUY, SELL, DIVIDEND, and FEE. Provide FX rate when trade currency differs from account base.
+              Supports BUY, SELL, DIVIDEND, and FEE.
             </DialogDescription>
           </DialogHeader>
           <form className="space-y-4" onSubmit={handleCreateTransaction}>
@@ -304,6 +303,7 @@ export function HoldingsWorkspace() {
                   id="investment-tx-date"
                   type="date"
                   value={txDate}
+                  max={todayLocalDate}
                   onChange={(e) => setTxDate(e.target.value)}
                 />
               </div>
@@ -345,23 +345,7 @@ export function HoldingsWorkspace() {
               </div>
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-3">
-              <div className="space-y-2">
-                <Label htmlFor="investment-tx-fx-rate">FX rate to base (optional)</Label>
-                <Input
-                  id="investment-tx-fx-rate"
-                  type="number"
-                  min={0}
-                  step="0.00000001"
-                  value={txFxRateToBase}
-                  onChange={(e) => setTxFxRateToBase(e.target.value)}
-                  placeholder={
-                    selectedAccount
-                      ? `${txCurrency.toUpperCase()} -> ${selectedAccount.base_currency.toUpperCase()}`
-                      : "e.g. 1.37"
-                  }
-                />
-              </div>
+            <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="investment-tx-fees">Fees</Label>
                 <Input

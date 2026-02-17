@@ -2,7 +2,6 @@
 
 import { auth } from '@clerk/nextjs/server'
 import { createServerSupabaseClient } from '@/ssr/client'
-import { getFxRate } from './fx'
 import type {
   InvestmentTransaction,
   InvestmentTransactionType,
@@ -113,7 +112,7 @@ function convertToBaseCurrency(input: {
     return input.amountInTradeCurrency * Number(input.fxRateToBase)
   }
 
-  // Fallback when FX is not supplied yet. Chunk 3 will backfill this with fx module lookup.
+  // Temporary fallback without FX conversion.
   return input.amountInTradeCurrency
 }
 
@@ -338,14 +337,13 @@ export async function createInvestmentTransaction(input: {
 
   const { data: account, error: accountError } = await supabase
     .from('investment_accounts')
-    .select('id, linked_account_type_id, base_currency')
+    .select('id, linked_account_type_id')
     .eq('id', input.account_id)
     .eq('user_id', resolvedUserId)
     .maybeSingle()
 
   if (accountError) throw accountError
   if (!account) throw new Error('Investment account not found')
-  const accountRow = account as LinkedAccountRow
 
   const transactionType = input.type
   const isTradeType = transactionType === 'BUY' || transactionType === 'SELL'
@@ -353,8 +351,7 @@ export async function createInvestmentTransaction(input: {
   const price = Number(input.price)
   const fees = Number(input.fees ?? 0)
   const currency = input.currency.trim().toUpperCase()
-  const baseCurrency = accountRow.base_currency.trim().toUpperCase()
-  let fxRateToBase =
+  const fxRateToBase =
     input.fx_rate_to_base == null ? null : Number(input.fx_rate_to_base)
 
   if (isTradeType && quantity <= 0) {
@@ -369,13 +366,8 @@ export async function createInvestmentTransaction(input: {
   if (fees < 0) {
     throw new Error('Fees cannot be negative')
   }
-  if (currency !== baseCurrency && (fxRateToBase == null || fxRateToBase <= 0)) {
-    fxRateToBase = await getFxRate(currency, baseCurrency, input.trade_date)
-  }
-  if (currency !== baseCurrency && (fxRateToBase == null || !Number.isFinite(fxRateToBase) || fxRateToBase <= 0)) {
-    throw new Error(
-      `FX conversion failed for ${currency}->${baseCurrency}. Provide fx_rate_to_base manually and retry.`,
-    )
+  if (fxRateToBase != null && (!Number.isFinite(fxRateToBase) || fxRateToBase <= 0)) {
+    throw new Error('fx_rate_to_base must be greater than zero when provided')
   }
 
   const security = await ensureSecurity({

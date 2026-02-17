@@ -3,7 +3,6 @@
 import { getHistorical, getQuote } from './yahoo'
 
 const FX_MEMORY_TTL_MS = 24 * 60 * 60 * 1000
-const LOOKBACK_DAYS_FOR_HISTORICAL = 14
 
 interface FxMemoryEntry {
   rate: number
@@ -16,8 +15,15 @@ function normalizeCurrency(input: string) {
   return input.trim().toUpperCase()
 }
 
+function localDateString(date: Date) {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
 function dateOnly(input: string | Date) {
-  if (input instanceof Date) return input.toISOString().slice(0, 10)
+  if (input instanceof Date) return localDateString(input)
   return input.slice(0, 10)
 }
 
@@ -41,6 +47,32 @@ function pickLatestPointOnOrBeforeDate(
   return null
 }
 
+async function getNearestPriorHistoricalRate(
+  ticker: string,
+  targetDate: string,
+): Promise<number | null> {
+  const lookbackWindows = [7, 30, 90, 365]
+
+  for (const lookbackDays of lookbackWindows) {
+    try {
+      const startDate = addDays(targetDate, -lookbackDays)
+      const endDateInclusive = addDays(targetDate, 1)
+      const history = await getHistorical(ticker, { startDate, endDate: endDateInclusive })
+      const match = pickLatestPointOnOrBeforeDate(history.points, targetDate)
+      if (match && match.close > 0) {
+        return match.close
+      }
+    } catch (error) {
+      console.warn(
+        `Historical FX lookup failed for ${ticker} in ${lookbackDays}d window:`,
+        error,
+      )
+    }
+  }
+
+  return null
+}
+
 async function fetchFxFromYahoo(
   base: string,
   quote: string,
@@ -48,26 +80,13 @@ async function fetchFxFromYahoo(
 ): Promise<number> {
   const directTicker = `${base}${quote}=X`
   const inverseTicker = `${quote}${base}=X`
-  const startDate = addDays(targetDate, -LOOKBACK_DAYS_FOR_HISTORICAL)
 
-  try {
-    const directHistory = await getHistorical(directTicker, { startDate, endDate: targetDate })
-    const match = pickLatestPointOnOrBeforeDate(directHistory.points, targetDate)
-    if (match && match.close > 0) {
-      return match.close
-    }
-  } catch (error) {
-    console.warn(`Direct FX historical fetch failed for ${directTicker}:`, error)
-  }
+  const directHistoricalRate = await getNearestPriorHistoricalRate(directTicker, targetDate)
+  if (directHistoricalRate != null) return directHistoricalRate
 
-  try {
-    const inverseHistory = await getHistorical(inverseTicker, { startDate, endDate: targetDate })
-    const match = pickLatestPointOnOrBeforeDate(inverseHistory.points, targetDate)
-    if (match && match.close > 0) {
-      return 1 / match.close
-    }
-  } catch (error) {
-    console.warn(`Inverse FX historical fetch failed for ${inverseTicker}:`, error)
+  const inverseHistoricalRate = await getNearestPriorHistoricalRate(inverseTicker, targetDate)
+  if (inverseHistoricalRate != null && inverseHistoricalRate > 0) {
+    return 1 / inverseHistoricalRate
   }
 
   try {
@@ -98,7 +117,9 @@ export async function getFxRate(
 ): Promise<number> {
   const base = normalizeCurrency(fromCurrency)
   const quote = normalizeCurrency(toCurrency)
-  const targetDate = dateOnly(date ?? new Date())
+  const requestedDate = dateOnly(date ?? new Date())
+  const todayDate = localDateString(new Date())
+  const targetDate = requestedDate > todayDate ? todayDate : requestedDate
 
   if (!base || !quote) {
     throw new Error('Both fromCurrency and toCurrency are required')
@@ -123,4 +144,3 @@ export async function getFxRate(
 
   return fetchedRate
 }
-

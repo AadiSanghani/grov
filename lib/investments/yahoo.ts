@@ -18,6 +18,9 @@ const historyMemoryCache = new Map<string, HistoryCacheEntry>()
 
 interface YahooQuoteResponse {
   regularMarketPrice?: number | null
+  regularMarketPreviousClose?: number | null
+  bid?: number | null
+  ask?: number | null
   currency?: string | null
   regularMarketTime?: Date | number | null
 }
@@ -117,7 +120,15 @@ export async function getQuote(ticker: string): Promise<QuoteResult> {
   try {
     const yahoo = await loadYahooFinanceClient()
     const quote = await yahoo.quote(normalizedTicker)
-    const price = Number(quote?.regularMarketPrice)
+    const priceCandidates = [
+      quote?.regularMarketPrice,
+      quote?.regularMarketPreviousClose,
+      quote?.bid,
+      quote?.ask,
+    ]
+      .map((value) => (value == null ? NaN : Number(value)))
+      .filter((value) => Number.isFinite(value) && value > 0)
+    const price = priceCandidates[0] ?? NaN
     const currency = String(quote?.currency ?? 'USD').toUpperCase()
     const marketTime =
       quote?.regularMarketTime instanceof Date
@@ -220,4 +231,3 @@ export async function getHistorical(
     )
   }
 }
-
