@@ -25,19 +25,27 @@ interface YahooQuoteResponse {
   regularMarketTime?: Date | number | null
 }
 
-interface YahooHistoricalRow {
-  date?: string | Date
+interface YahooChartQuoteRow {
+  date?: Date
   close?: number | null
-  adjClose?: number | null
-  currency?: string | null
+  adjclose?: number | null
+  open?: number | null
+  high?: number | null
+  low?: number | null
+  volume?: number | null
+}
+
+interface YahooChartResult {
+  quotes: YahooChartQuoteRow[]
+  meta?: { currency?: string }
 }
 
 interface YahooFinanceClient {
   quote: (ticker: string, options?: Record<string, unknown>) => Promise<YahooQuoteResponse>
-  historical: (
+  chart: (
     ticker: string,
-    options: { period1: string; period2: string; interval: '1d' },
-  ) => Promise<YahooHistoricalRow[]>
+    options: { period1: string; period2: string; interval?: '1d' | '1wk' | '1mo' },
+  ) => Promise<YahooChartResult>
 }
 
 export interface QuoteResult {
@@ -101,20 +109,22 @@ function historyMemoryKey(ticker: string, startDate: string, endDate: string) {
   return `hist:${normalizeTicker(ticker)}:${startDate}:${endDate}`
 }
 
-async function loadYahooFinanceClient() {
+async function loadYahooFinanceClient(): Promise<YahooFinanceClient> {
   try {
     const loadDynamicImport = new Function('m', 'return import(m)') as (
       moduleName: string,
     ) => Promise<unknown>
     const mod = await loadDynamicImport('yahoo-finance2')
-    const maybeDefault = (mod as { default?: unknown }).default ?? mod
-    if (!maybeDefault || (typeof maybeDefault !== 'object' && typeof maybeDefault !== 'function')) {
-      throw new Error('Invalid yahoo-finance2 module export')
+    const YahooFinanceClass = (mod as { default?: unknown }).default ?? mod
+    if (typeof YahooFinanceClass !== 'function') {
+      throw new Error('Invalid yahoo-finance2 module export (expected constructor)')
     }
 
-    const client = maybeDefault as YahooFinanceClient
-    if (typeof client.quote !== 'function' || typeof client.historical !== 'function') {
-      throw new Error('yahoo-finance2 client missing quote/historical methods')
+    const client = new (YahooFinanceClass as new (opts?: { suppressNotices?: string[] }) => YahooFinanceClient)({
+      suppressNotices: ['yahooSurvey'],
+    })
+    if (typeof client.quote !== 'function' || typeof client.chart !== 'function') {
+      throw new Error('yahoo-finance2 client missing quote/chart methods')
     }
 
     return client
@@ -234,28 +244,31 @@ export async function getHistorical(
 
   try {
     const yahoo = await loadYahooFinanceClient()
-    const rows = await yahoo.historical(normalizedTicker, {
+    const result = await yahoo.chart(normalizedTicker, {
       period1: startDate,
       period2: endDate,
       interval: '1d',
     })
 
-    const points: HistoricalPoint[] = (rows ?? [])
+    const currency = String(result.meta?.currency ?? 'USD').toUpperCase()
+    const quotes = result.quotes ?? []
+
+    const points: HistoricalPoint[] = quotes
       .map((row) => {
-        const rawClose = row.close ?? row.adjClose
+        const rawClose = row.close ?? row.adjclose
         const close = rawClose == null ? NaN : Number(rawClose)
         const date = row.date ? toDateString(row.date) : ''
         return {
           date,
           close,
-          currency: String(row.currency ?? 'USD').toUpperCase(),
+          currency,
         }
       })
       .filter((point) => point.date && Number.isFinite(point.close) && point.close > 0)
       .sort((a, b) => a.date.localeCompare(b.date))
 
     if (points.length === 0) {
-      throw new Error(`Yahoo historical response for ${normalizedTicker} had no valid rows`)
+      throw new Error(`Yahoo chart response for ${normalizedTicker} had no valid quotes`)
     }
 
     const liveHistory: HistoricalResult = {
