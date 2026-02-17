@@ -136,15 +136,6 @@ export function HoldingsWorkspace() {
     }
 
     const normalizedTxCurrency = txCurrency.trim().toUpperCase()
-    if (
-      selectedAccount &&
-      normalizedTxCurrency !== selectedAccount.base_currency.toUpperCase() &&
-      fxRateToBase == null
-    ) {
-      toast.error("FX rate is required when transaction currency differs from account base currency")
-      return
-    }
-
     setSubmittingTx(true)
     try {
       await createInvestmentTransaction({

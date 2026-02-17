@@ -2,6 +2,7 @@
 
 import { auth } from '@clerk/nextjs/server'
 import { createServerSupabaseClient } from '@/ssr/client'
+import { getFxRate } from './fx'
 import type {
   InvestmentTransaction,
   InvestmentTransactionType,
@@ -353,7 +354,7 @@ export async function createInvestmentTransaction(input: {
   const fees = Number(input.fees ?? 0)
   const currency = input.currency.trim().toUpperCase()
   const baseCurrency = accountRow.base_currency.trim().toUpperCase()
-  const fxRateToBase =
+  let fxRateToBase =
     input.fx_rate_to_base == null ? null : Number(input.fx_rate_to_base)
 
   if (isTradeType && quantity <= 0) {
@@ -369,7 +370,12 @@ export async function createInvestmentTransaction(input: {
     throw new Error('Fees cannot be negative')
   }
   if (currency !== baseCurrency && (fxRateToBase == null || fxRateToBase <= 0)) {
-    throw new Error('FX rate to base is required when transaction currency differs from account base currency')
+    fxRateToBase = await getFxRate(currency, baseCurrency, input.trade_date)
+  }
+  if (currency !== baseCurrency && (fxRateToBase == null || !Number.isFinite(fxRateToBase) || fxRateToBase <= 0)) {
+    throw new Error(
+      `FX conversion failed for ${currency}->${baseCurrency}. Provide fx_rate_to_base manually and retry.`,
+    )
   }
 
   const security = await ensureSecurity({
