@@ -1,0 +1,2 @@
+ALTER TABLE investment_accounts
+DROP CONSTRAINT IF EXISTS investment_accounts_user_id_name_key;
