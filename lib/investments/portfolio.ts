@@ -1,16 +1,29 @@
 'use server'
 
-import { compareAsc, isWithinInterval, parseISO } from 'date-fns'
+import {
+  addDays,
+  compareAsc,
+  eachDayOfInterval,
+  format,
+  isWithinInterval,
+  parseISO,
+  startOfYear,
+  subMonths,
+  subWeeks,
+  subYears,
+} from 'date-fns'
 import { getInvestmentAccounts } from './accounts'
 import { getInvestmentTransactions } from './transactions'
 import { getFxRate } from './fx'
-import { getQuote } from './yahoo'
+import { getHistorical, getQuote } from './yahoo'
 import type {
   AccountStatusRow,
   AllocationSlice,
   HoldingsSnapshotRow,
   InvestmentAccount,
+  InvestmentRangeKey,
   InvestmentTransaction,
+  PortfolioPerformancePoint,
   RealizedGainRow,
 } from './types'
 
@@ -43,6 +56,20 @@ interface PortfolioComputation {
   allocationByCurrency: AllocationSlice[]
   allocationByAccount: AllocationSlice[]
   accountStatus: AccountStatusRow[]
+}
+
+interface PerformanceFilters {
+  accountId?: string
+  range?: InvestmentRangeKey
+}
+
+interface PortfolioPerformanceResult {
+  range: InvestmentRangeKey
+  points: PortfolioPerformancePoint[]
+  start_value_base: number
+  end_value_base: number
+  total_return_pct: number
+  data_state: 'live' | 'fallback' | 'empty'
 }
 
 function round2(value: number) {
@@ -107,6 +134,33 @@ function isInDateRange(dateStr: string, startDate?: string, endDate?: string) {
   return isWithinInterval(date, { start, end })
 }
 
+function getTodayLocalDateString() {
+  const now = new Date()
+  return format(now, 'yyyy-MM-dd')
+}
+
+function getRangeStartDate(endDate: string, range: InvestmentRangeKey) {
+  const end = parseISO(endDate)
+  switch (range) {
+    case '1W':
+      return format(subWeeks(end, 1), 'yyyy-MM-dd')
+    case '1M':
+      return format(subMonths(end, 1), 'yyyy-MM-dd')
+    case '3M':
+      return format(subMonths(end, 3), 'yyyy-MM-dd')
+    case '6M':
+      return format(subMonths(end, 6), 'yyyy-MM-dd')
+    case 'YTD':
+      return format(startOfYear(end), 'yyyy-MM-dd')
+    case '1Y':
+      return format(subYears(end, 1), 'yyyy-MM-dd')
+    case '5Y':
+      return format(subYears(end, 5), 'yyyy-MM-dd')
+    default:
+      return format(subMonths(end, 3), 'yyyy-MM-dd')
+  }
+}
+
 async function getQuoteMap(tickers: string[]) {
   const unique = Array.from(new Set(tickers.map((t) => t.trim().toUpperCase()).filter(Boolean)))
   const entries = await Promise.all(
@@ -143,6 +197,191 @@ function filterTransactions(transactions: InvestmentTransaction[], filters: Port
     if (filters.ticker && tx.ticker?.toUpperCase() !== filters.ticker.toUpperCase()) return false
     return true
   })
+}
+
+export async function computePortfolioPerformanceSeries(
+  filters: PerformanceFilters = {},
+): Promise<PortfolioPerformanceResult> {
+  const range = filters.range ?? '3M'
+  const endDate = getTodayLocalDateString()
+  const startDate = getRangeStartDate(endDate, range)
+
+  const [accounts, transactionsRaw] = await Promise.all([
+    getInvestmentAccounts(),
+    getInvestmentTransactions(),
+  ])
+
+  const txs = filterTransactions(transactionsRaw, { accountId: filters.accountId })
+  if (txs.length === 0) {
+    return {
+      range,
+      points: [],
+      start_value_base: 0,
+      end_value_base: 0,
+      total_return_pct: 0,
+      data_state: 'empty',
+    }
+  }
+
+  const ordered = sortTransactionsAscending(txs)
+  const accountById = new Map(accounts.map((account) => [account.id, account]))
+  const portfolioBaseCurrency = normalizeCurrency(
+    accountById.get(ordered[0].account_id)?.base_currency ?? ordered[0].account_base_currency ?? 'CAD',
+  )
+
+  const txByDate = new Map<string, InvestmentTransaction[]>()
+  for (const tx of ordered) {
+    if (!txByDate.has(tx.trade_date)) txByDate.set(tx.trade_date, [])
+    txByDate.get(tx.trade_date)!.push(tx)
+  }
+
+  const dates = eachDayOfInterval({
+    start: parseISO(startDate),
+    end: parseISO(endDate),
+  }).map((d) => format(d, 'yyyy-MM-dd'))
+
+  const tickers = Array.from(new Set(ordered.map((tx) => tx.ticker?.toUpperCase()).filter(Boolean) as string[]))
+
+  const historyStartDate = format(addDays(parseISO(startDate), -7), 'yyyy-MM-dd')
+  const historyEndDate = format(addDays(parseISO(endDate), 1), 'yyyy-MM-dd')
+  const historyEntries = await Promise.all(
+    tickers.map(async (ticker) => {
+      try {
+        const history = await getHistorical(ticker, {
+          startDate: historyStartDate,
+          endDate: historyEndDate,
+        })
+        return [
+          ticker,
+          history.points
+            .map((point) => ({ date: point.date, close: point.close }))
+            .sort((a, b) => a.date.localeCompare(b.date)),
+        ] as const
+      } catch {
+        return [ticker, []] as const
+      }
+    }),
+  )
+
+  const historyByTicker = new Map<string, { date: string; close: number }[]>(historyEntries)
+  const hasHistoricalData = historyEntries.some(([, points]) => points.length > 0)
+
+  const tickerCursor = new Map<string, { idx: number; lastClose: number | null }>()
+  for (const ticker of tickers) {
+    tickerCursor.set(ticker, { idx: 0, lastClose: null })
+  }
+
+  const fxByCurrencyPair = new Map<string, number>()
+  let usedFallback = false
+
+  async function getBaseFx(quoteCurrency: string) {
+    const from = normalizeCurrency(quoteCurrency)
+    if (from === portfolioBaseCurrency) return 1
+    const key = `${from}:${portfolioBaseCurrency}`
+    if (fxByCurrencyPair.has(key)) return fxByCurrencyPair.get(key)!
+    try {
+      const fx = await getFxRate(from, portfolioBaseCurrency, endDate)
+      fxByCurrencyPair.set(key, fx)
+      return fx
+    } catch {
+      usedFallback = true
+      fxByCurrencyPair.set(key, 1)
+      return 1
+    }
+  }
+
+  const positions = new Map<
+    string,
+    {
+      security_id: string
+      ticker: string
+      quote_currency: string
+      quantity: number
+      last_trade_price_quote: number
+    }
+  >()
+
+  const points: PortfolioPerformancePoint[] = []
+
+  for (const date of dates) {
+    const dayTxs = txByDate.get(date) ?? []
+    for (const tx of dayTxs) {
+      const key = makePositionKey(tx.account_id, tx.security_id)
+      const current = positions.get(key) ?? {
+        security_id: tx.security_id,
+        ticker: tx.ticker?.toUpperCase() ?? 'UNKNOWN',
+        quote_currency: normalizeCurrency(tx.security_quote_currency ?? tx.currency),
+        quantity: 0,
+        last_trade_price_quote: tx.price,
+      }
+
+      if (tx.type === 'BUY') {
+        current.quantity += tx.quantity
+        current.last_trade_price_quote = tx.price
+      } else if (tx.type === 'SELL') {
+        current.quantity = Math.max(0, current.quantity - tx.quantity)
+        current.last_trade_price_quote = tx.price
+      } else if (tx.type === 'DIVIDEND' || tx.type === 'FEE') {
+        current.last_trade_price_quote = current.last_trade_price_quote || tx.price
+      }
+      positions.set(key, current)
+    }
+
+    for (const ticker of tickers) {
+      const series = historyByTicker.get(ticker) ?? []
+      const cursor = tickerCursor.get(ticker)
+      if (!cursor) continue
+      while (cursor.idx < series.length && series[cursor.idx].date <= date) {
+        cursor.lastClose = series[cursor.idx].close
+        cursor.idx += 1
+      }
+    }
+
+    let dayValueBase = 0
+    for (const position of positions.values()) {
+      if (position.quantity <= 0) continue
+      const cursor = tickerCursor.get(position.ticker)
+      const priceQuote = cursor?.lastClose ?? position.last_trade_price_quote
+      if (!Number.isFinite(priceQuote) || priceQuote <= 0) continue
+      if (cursor?.lastClose == null) usedFallback = true
+      const fx = await getBaseFx(position.quote_currency)
+      dayValueBase += position.quantity * priceQuote * fx
+    }
+
+    points.push({
+      date,
+      value_base: round2(dayValueBase),
+      return_pct: 0,
+    })
+  }
+
+  if (points.length === 0) {
+    return {
+      range,
+      points: [],
+      start_value_base: 0,
+      end_value_base: 0,
+      total_return_pct: 0,
+      data_state: 'empty',
+    }
+  }
+
+  const firstNonZero = points.find((point) => point.value_base > 0)
+  const startValue = firstNonZero?.value_base ?? points[0].value_base
+  for (const point of points) {
+    point.return_pct = startValue > 0 ? round2(((point.value_base - startValue) / startValue) * 100) : 0
+  }
+  const endValue = points[points.length - 1].value_base
+  const totalReturnPct = startValue > 0 ? round2(((endValue - startValue) / startValue) * 100) : 0
+
+  return {
+    range,
+    points,
+    start_value_base: round2(startValue),
+    end_value_base: round2(endValue),
+    total_return_pct: totalReturnPct,
+    data_state: hasHistoricalData && !usedFallback ? 'live' : 'fallback',
+  }
 }
 
 export async function computePortfolio(filters: PortfolioFilters = {}): Promise<PortfolioComputation> {
@@ -379,4 +618,3 @@ export async function computePortfolio(filters: PortfolioFilters = {}): Promise<
     accountStatus: accountStatus.sort((a, b) => b.market_value_base - a.market_value_base),
   }
 }
-

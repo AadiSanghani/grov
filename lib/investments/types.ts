@@ -1,4 +1,5 @@
 export type InvestmentTransactionType = "BUY" | "SELL" | "DIVIDEND" | "FEE"
+export type InvestmentRangeKey = "1W" | "1M" | "3M" | "6M" | "YTD" | "1Y" | "5Y"
 
 export interface InvestmentAccount {
   id: string
@@ -90,4 +91,10 @@ export interface AccountStatusRow {
   realized_pl_all_time_base: number
   realized_pl_in_range_base: number
   total_return_pct: number
+}
+
+export interface PortfolioPerformancePoint {
+  date: string
+  value_base: number
+  return_pct: number
 }

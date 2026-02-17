@@ -46,7 +46,7 @@ export interface QuoteResult {
   currency: string
   asOf: string
   stale: boolean
-  source: 'live' | 'memory'
+  source: 'live' | 'memory' | 'historical'
 }
 
 export interface HistoricalPoint {
@@ -71,6 +71,26 @@ function toDateString(input: string | Date) {
     return input.toISOString().slice(0, 10)
   }
   return input.slice(0, 10)
+}
+
+function localDateString(date: Date) {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+function addDays(date: string, days: number) {
+  const d = new Date(`${date}T12:00:00.000Z`)
+  d.setUTCDate(d.getUTCDate() + days)
+  return d.toISOString().slice(0, 10)
+}
+
+function pickLatestPointOnOrBeforeDate(points: HistoricalPoint[], targetDate: string) {
+  for (let i = points.length - 1; i >= 0; i -= 1) {
+    if (points[i].date <= targetDate) return points[i]
+  }
+  return null
 }
 
 function quoteMemoryKey(ticker: string) {
@@ -156,12 +176,40 @@ export async function getQuote(ticker: string): Promise<QuoteResult> {
     })
 
     return liveQuote
-  } catch (error) {
-    throw new Error(
-      `Live quote unavailable for ${normalizedTicker}. ${
-        error instanceof Error ? error.message : 'Unknown provider error'
-      }`,
-    )
+  } catch (liveError) {
+    try {
+      const today = localDateString(new Date())
+      const history = await getHistorical(normalizedTicker, {
+        startDate: addDays(today, -30),
+        endDate: addDays(today, 1),
+      })
+      const latestPoint = pickLatestPointOnOrBeforeDate(history.points, today)
+      if (!latestPoint) {
+        throw new Error(`No historical point found on or before ${today}`)
+      }
+
+      const fallbackQuote: QuoteResult = {
+        ticker: normalizedTicker,
+        price: latestPoint.close,
+        currency: latestPoint.currency,
+        asOf: `${latestPoint.date}T00:00:00.000Z`,
+        stale: true,
+        source: 'historical',
+      }
+
+      quoteMemoryCache.set(memoryKey, {
+        value: fallbackQuote,
+        expiresAt: Date.now() + QUOTE_TTL_MS,
+      })
+
+      return fallbackQuote
+    } catch (historyError) {
+      const liveMessage = liveError instanceof Error ? liveError.message : 'Unknown provider error'
+      const historyMessage = historyError instanceof Error ? historyError.message : 'Unknown historical error'
+      throw new Error(
+        `Live quote unavailable for ${normalizedTicker}. ${liveMessage}. Historical fallback also failed: ${historyMessage}`,
+      )
+    }
   }
 }
 

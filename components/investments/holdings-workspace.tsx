@@ -3,6 +3,15 @@
 import * as React from "react"
 import { toast } from "sonner"
 import { Plus } from "lucide-react"
+import {
+  CartesianGrid,
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -12,11 +21,12 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import type {
   InvestmentAccount,
+  InvestmentRangeKey,
   InvestmentTransaction,
   InvestmentTransactionType,
 } from "@/lib/investments/types"
 import { getInvestmentAccounts } from "@/lib/investments/accounts"
-import { computePortfolio } from "@/lib/investments/portfolio"
+import { computePortfolio, computePortfolioPerformanceSeries } from "@/lib/investments/portfolio"
 import { createInvestmentTransaction, getInvestmentTransactions } from "@/lib/investments/transactions"
 
 const TRANSACTION_TYPE_OPTIONS: InvestmentTransactionType[] = ["BUY", "SELL", "DIVIDEND", "FEE"]
@@ -25,9 +35,25 @@ const GROUP_BY_OPTIONS = [
   { value: "account", label: "Group by account" },
   { value: "currency", label: "Group by currency" },
 ] as const
+const RANGE_OPTIONS: { value: InvestmentRangeKey; label: string }[] = [
+  { value: "1W", label: "1W" },
+  { value: "1M", label: "1M" },
+  { value: "3M", label: "3M" },
+  { value: "6M", label: "6M" },
+  { value: "YTD", label: "YTD" },
+  { value: "1Y", label: "1Y" },
+  { value: "5Y", label: "5Y" },
+]
+const SHORT_DATE_FORMATTER = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" })
+const LONG_DATE_FORMATTER = new Intl.DateTimeFormat("en-US", {
+  year: "numeric",
+  month: "short",
+  day: "numeric",
+})
 
 type GroupByValue = (typeof GROUP_BY_OPTIONS)[number]["value"]
 type PortfolioData = Awaited<ReturnType<typeof computePortfolio>>
+type PortfolioPerformanceData = Awaited<ReturnType<typeof computePortfolioPerformanceSeries>>
 
 function getLocalDateString(date: Date = new Date()) {
   const year = date.getFullYear()
@@ -49,15 +75,34 @@ function formatPercent(value: number) {
   return `${value.toFixed(2)}%`
 }
 
+function formatDateLabel(dateStr: string, formatter: Intl.DateTimeFormat) {
+  const parsed = new Date(`${dateStr}T12:00:00`)
+  if (Number.isNaN(parsed.getTime())) return dateStr
+  return formatter.format(parsed)
+}
+
+function formatCompactCurrency(amount: number, currency: string) {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency,
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+    notation: "compact",
+    compactDisplay: "short",
+  }).format(amount)
+}
+
 export function HoldingsWorkspace() {
   const [loading, setLoading] = React.useState(true)
   const [accounts, setAccounts] = React.useState<InvestmentAccount[]>([])
   const [transactions, setTransactions] = React.useState<InvestmentTransaction[]>([])
   const [portfolio, setPortfolio] = React.useState<PortfolioData | null>(null)
+  const [performance, setPerformance] = React.useState<PortfolioPerformanceData | null>(null)
 
   const [addTxOpen, setAddTxOpen] = React.useState(false)
   const [accountFilter, setAccountFilter] = React.useState("all")
   const [groupBy, setGroupBy] = React.useState<GroupByValue>("asset_type")
+  const [range, setRange] = React.useState<InvestmentRangeKey>("3M")
 
   const [txAccountId, setTxAccountId] = React.useState("")
   const [txTicker, setTxTicker] = React.useState("")
@@ -74,29 +119,59 @@ export function HoldingsWorkspace() {
   const loadData = React.useCallback(async () => {
     setLoading(true)
     try {
-      const [accountsData, txData] = await Promise.all([
+      const [accountsResult, txResult, portfolioResult, performanceResult] = await Promise.allSettled([
         getInvestmentAccounts(),
         getInvestmentTransactions({
           limit: 25,
           accountId: accountFilter === "all" ? undefined : accountFilter,
         }),
+        computePortfolio({
+          accountId: accountFilter === "all" ? undefined : accountFilter,
+        }),
+        computePortfolioPerformanceSeries({
+          accountId: accountFilter === "all" ? undefined : accountFilter,
+          range,
+        }),
       ])
-      const portfolioData = await computePortfolio({
-        accountId: accountFilter === "all" ? undefined : accountFilter,
-      })
-      setAccounts(accountsData)
-      setTransactions(txData)
-      setPortfolio(portfolioData)
+
+      if (
+        accountsResult.status !== "fulfilled" ||
+        txResult.status !== "fulfilled" ||
+        portfolioResult.status !== "fulfilled"
+      ) {
+        const error =
+          accountsResult.status === "rejected"
+            ? accountsResult.reason
+            : txResult.status === "rejected"
+              ? txResult.reason
+              : portfolioResult.status === "rejected"
+                ? portfolioResult.reason
+                : new Error("Unknown load error")
+        throw error
+      }
+
+      setAccounts(accountsResult.value)
+      setTransactions(txResult.value)
+      setPortfolio(portfolioResult.value)
+
+      if (performanceResult.status === "fulfilled") {
+        setPerformance(performanceResult.value)
+      } else {
+        console.error("Failed to load investments performance:", performanceResult.reason)
+        toast.error("Performance chart data unavailable")
+        setPerformance(null)
+      }
     } catch (error) {
       console.error("Failed to load investments data:", error)
       toast.error("Failed to load investments data")
       setAccounts([])
       setTransactions([])
       setPortfolio(null)
+      setPerformance(null)
     } finally {
       setLoading(false)
     }
-  }, [accountFilter])
+  }, [accountFilter, range])
 
   React.useEffect(() => {
     void loadData()
@@ -113,7 +188,25 @@ export function HoldingsWorkspace() {
   const holdings = React.useMemo(() => portfolio?.holdings ?? [], [portfolio])
   const accountStatus = React.useMemo(() => portfolio?.accountStatus ?? [], [portfolio])
   const realizedRows = React.useMemo(() => portfolio?.realizedRows ?? [], [portfolio])
+  const displayBaseCurrency = React.useMemo(
+    () => holdings[0]?.base_currency ?? accountStatus[0]?.base_currency ?? "CAD",
+    [accountStatus, holdings],
+  )
+  const performancePoints = React.useMemo(() => performance?.points ?? [], [performance])
   const fallbackCount = holdings.filter((holding) => holding.price_source === "fallback").length
+  const rangeLabel = React.useMemo(
+    () => RANGE_OPTIONS.find((option) => option.value === range)?.label ?? range,
+    [range],
+  )
+  const performanceDomain = React.useMemo<[number, number]>(() => {
+    if (performancePoints.length === 0) return [0, 0]
+    const values = performancePoints.map((point) => point.value_base)
+    const min = Math.min(...values)
+    const max = Math.max(...values)
+    const span = max - min
+    const padding = span === 0 ? Math.max(Math.abs(max) * 0.06, 50) : Math.max(span * 0.15, 50)
+    return [min - padding, max + padding]
+  }, [performancePoints])
 
   const summary = React.useMemo(() => {
     const totalMarketValue = holdings.reduce((sum, holding) => sum + holding.market_value_base, 0)
@@ -135,6 +228,7 @@ export function HoldingsWorkspace() {
       totalReturnPct,
     }
   }, [holdings, realizedRows])
+  const rangeReturnPct = performance?.total_return_pct ?? 0
 
   const groupedHoldings = React.useMemo(() => {
     const groups = new Map<string, typeof holdings>()
@@ -282,7 +376,21 @@ export function HoldingsWorkspace() {
           <CardHeader className="pb-2">
             <CardTitle className="text-sm text-muted-foreground">Your Portfolio</CardTitle>
           </CardHeader>
-          <CardContent className="text-2xl font-semibold">{formatCurrency(summary.totalMarketValue, "CAD")}</CardContent>
+          <CardContent className="text-2xl font-semibold">
+            {formatCurrency(summary.totalMarketValue, displayBaseCurrency)}
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm text-muted-foreground">Return ({rangeLabel})</CardTitle>
+          </CardHeader>
+          <CardContent
+            className={`text-2xl font-semibold ${
+              rangeReturnPct >= 0 ? "text-positive" : "text-negative"
+            }`}
+          >
+            {formatPercent(rangeReturnPct)}
+          </CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2">
@@ -293,7 +401,7 @@ export function HoldingsWorkspace() {
               summary.totalUnrealized >= 0 ? "text-positive" : "text-negative"
             }`}
           >
-            {formatCurrency(summary.totalUnrealized, "CAD")}
+            {formatCurrency(summary.totalUnrealized, displayBaseCurrency)}
           </CardContent>
         </Card>
         <Card>
@@ -305,22 +413,90 @@ export function HoldingsWorkspace() {
               summary.totalRealized >= 0 ? "text-positive" : "text-negative"
             }`}
           >
-            {formatCurrency(summary.totalRealized, "CAD")}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-muted-foreground">Total Return %</CardTitle>
-          </CardHeader>
-          <CardContent
-            className={`text-2xl font-semibold ${
-              summary.totalReturnPct >= 0 ? "text-positive" : "text-negative"
-            }`}
-          >
-            {formatPercent(summary.totalReturnPct)}
+            {formatCurrency(summary.totalRealized, displayBaseCurrency)}
           </CardContent>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader className="space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <CardTitle>Performance</CardTitle>
+            <div className="inline-flex items-center rounded-md border bg-muted/40 p-1">
+              {RANGE_OPTIONS.map((option) => (
+                <Button
+                  key={option.value}
+                  size="sm"
+                  variant={range === option.value ? "default" : "ghost"}
+                  className="h-7 px-2.5"
+                  disabled={loading}
+                  onClick={() => setRange(option.value)}
+                >
+                  {option.label}
+                </Button>
+              ))}
+            </div>
+          </div>
+          {performance?.data_state === "fallback" && (
+            <div className="rounded-md border border-amber-400/50 bg-amber-100/20 px-3 py-2 text-xs text-muted-foreground">
+              Performance is partially using fallback prices due to unavailable live data.
+            </div>
+          )}
+        </CardHeader>
+        <CardContent>
+          {loading ? (
+            <div className="flex h-[320px] items-center justify-center text-sm text-muted-foreground">
+              Loading performance…
+            </div>
+          ) : performancePoints.length === 0 ? (
+            <div className="flex h-[320px] items-center justify-center text-sm text-muted-foreground">
+              No holdings history yet. Add transactions to populate your performance trend.
+            </div>
+          ) : (
+            <div className="h-[320px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={performancePoints} margin={{ top: 8, right: 16, left: 0, bottom: 8 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                  <XAxis
+                    dataKey="date"
+                    minTickGap={32}
+                    tick={{ fontSize: 12 }}
+                    tickFormatter={(value) => formatDateLabel(String(value), SHORT_DATE_FORMATTER)}
+                  />
+                  <YAxis
+                    domain={performanceDomain}
+                    tick={{ fontSize: 12 }}
+                    tickFormatter={(value) => formatCompactCurrency(Number(value), displayBaseCurrency)}
+                  />
+                  <Tooltip
+                    formatter={(value: number, _name, payload) => {
+                      const point = payload?.payload as { return_pct?: number } | undefined
+                      const valueLabel = formatCurrency(Number(value), displayBaseCurrency)
+                      const returnLabel =
+                        point && typeof point.return_pct === "number"
+                          ? ` (${formatPercent(point.return_pct)})`
+                          : ""
+                      return `${valueLabel}${returnLabel}`
+                    }}
+                    labelFormatter={(label) => formatDateLabel(String(label), LONG_DATE_FORMATTER)}
+                    labelStyle={{ color: "var(--foreground)" }}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="value_base"
+                    name="Portfolio"
+                    stroke="var(--primary)"
+                    strokeWidth={2}
+                    dot={false}
+                    activeDot={{ r: 4, fill: "var(--primary)" }}
+                    isAnimationActive={false}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>
@@ -360,7 +536,7 @@ export function HoldingsWorkspace() {
                       <React.Fragment key={group.label}>
                         <tr className="bg-muted/40">
                           <td colSpan={7} className="py-2 pr-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                            {group.label} · {formatCurrency(groupMarket, "CAD")}
+                            {group.label} · {formatCurrency(groupMarket, displayBaseCurrency)}
                           </td>
                         </tr>
                         {group.rows.map((holding) => (
@@ -390,10 +566,10 @@ export function HoldingsWorkspace() {
                     <td className="py-2 pr-3 font-semibold">Total</td>
                     <td className="py-2 pr-3" />
                     <td className="py-2 pr-3" />
-                    <td className="py-2 pr-3 font-semibold">{formatCurrency(summary.totalCostBasis, "CAD")}</td>
-                    <td className="py-2 pr-3 font-semibold">{formatCurrency(summary.totalMarketValue, "CAD")}</td>
+                    <td className="py-2 pr-3 font-semibold">{formatCurrency(summary.totalCostBasis, displayBaseCurrency)}</td>
+                    <td className="py-2 pr-3 font-semibold">{formatCurrency(summary.totalMarketValue, displayBaseCurrency)}</td>
                     <td className={`py-2 pr-3 font-semibold ${summary.totalUnrealized >= 0 ? "text-positive" : "text-negative"}`}>
-                      {formatCurrency(summary.totalUnrealized, "CAD")}
+                      {formatCurrency(summary.totalUnrealized, displayBaseCurrency)}
                     </td>
                     <td className={`py-2 pr-3 font-semibold ${summary.totalReturnPct >= 0 ? "text-positive" : "text-negative"}`}>
                       {formatPercent(summary.totalReturnPct)}
