@@ -16,9 +16,18 @@ import type {
   InvestmentTransactionType,
 } from "@/lib/investments/types"
 import { getInvestmentAccounts } from "@/lib/investments/accounts"
+import { computePortfolio } from "@/lib/investments/portfolio"
 import { createInvestmentTransaction, getInvestmentTransactions } from "@/lib/investments/transactions"
 
 const TRANSACTION_TYPE_OPTIONS: InvestmentTransactionType[] = ["BUY", "SELL", "DIVIDEND", "FEE"]
+const GROUP_BY_OPTIONS = [
+  { value: "asset_type", label: "Group by type" },
+  { value: "account", label: "Group by account" },
+  { value: "currency", label: "Group by currency" },
+] as const
+
+type GroupByValue = (typeof GROUP_BY_OPTIONS)[number]["value"]
+type PortfolioData = Awaited<ReturnType<typeof computePortfolio>>
 
 function getLocalDateString(date: Date = new Date()) {
   const year = date.getFullYear()
@@ -36,12 +45,19 @@ function formatCurrency(amount: number, currency: string) {
   }).format(amount)
 }
 
+function formatPercent(value: number) {
+  return `${value.toFixed(2)}%`
+}
+
 export function HoldingsWorkspace() {
   const [loading, setLoading] = React.useState(true)
   const [accounts, setAccounts] = React.useState<InvestmentAccount[]>([])
   const [transactions, setTransactions] = React.useState<InvestmentTransaction[]>([])
+  const [portfolio, setPortfolio] = React.useState<PortfolioData | null>(null)
 
   const [addTxOpen, setAddTxOpen] = React.useState(false)
+  const [accountFilter, setAccountFilter] = React.useState("all")
+  const [groupBy, setGroupBy] = React.useState<GroupByValue>("asset_type")
 
   const [txAccountId, setTxAccountId] = React.useState("")
   const [txTicker, setTxTicker] = React.useState("")
@@ -60,19 +76,27 @@ export function HoldingsWorkspace() {
     try {
       const [accountsData, txData] = await Promise.all([
         getInvestmentAccounts(),
-        getInvestmentTransactions({ limit: 100 }),
+        getInvestmentTransactions({
+          limit: 25,
+          accountId: accountFilter === "all" ? undefined : accountFilter,
+        }),
       ])
+      const portfolioData = await computePortfolio({
+        accountId: accountFilter === "all" ? undefined : accountFilter,
+      })
       setAccounts(accountsData)
       setTransactions(txData)
+      setPortfolio(portfolioData)
     } catch (error) {
       console.error("Failed to load investments data:", error)
       toast.error("Failed to load investments data")
       setAccounts([])
       setTransactions([])
+      setPortfolio(null)
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [accountFilter])
 
   React.useEffect(() => {
     void loadData()
@@ -86,6 +110,56 @@ export function HoldingsWorkspace() {
 
   const isTrade = txType === "BUY" || txType === "SELL"
   const todayLocalDate = React.useMemo(() => getLocalDateString(), [])
+  const holdings = React.useMemo(() => portfolio?.holdings ?? [], [portfolio])
+  const accountStatus = React.useMemo(() => portfolio?.accountStatus ?? [], [portfolio])
+  const realizedRows = React.useMemo(() => portfolio?.realizedRows ?? [], [portfolio])
+  const fallbackCount = holdings.filter((holding) => holding.price_source === "fallback").length
+
+  const summary = React.useMemo(() => {
+    const totalMarketValue = holdings.reduce((sum, holding) => sum + holding.market_value_base, 0)
+    const totalCostBasis = holdings.reduce((sum, holding) => sum + holding.cost_basis_base, 0)
+    const totalUnrealized = holdings.reduce((sum, holding) => sum + holding.unrealized_pl_base, 0)
+    const totalRealized = realizedRows.reduce(
+      (sum, row) => sum + row.realized_pl_base,
+      0,
+    )
+    const totalReturnPct = totalCostBasis > 0
+      ? ((totalUnrealized + totalRealized) / totalCostBasis) * 100
+      : 0
+
+    return {
+      totalMarketValue,
+      totalCostBasis,
+      totalUnrealized,
+      totalRealized,
+      totalReturnPct,
+    }
+  }, [holdings, realizedRows])
+
+  const groupedHoldings = React.useMemo(() => {
+    const groups = new Map<string, typeof holdings>()
+    for (const holding of holdings) {
+      const key =
+        groupBy === "asset_type"
+          ? holding.asset_type
+          : groupBy === "account"
+            ? holding.account_name
+            : holding.quote_currency
+      const current = groups.get(key) ?? []
+      current.push(holding)
+      groups.set(key, current)
+    }
+    return Array.from(groups.entries())
+      .map(([label, rows]) => ({
+        label,
+        rows: rows.sort((a, b) => b.market_value_base - a.market_value_base),
+      }))
+      .sort(
+        (a, b) =>
+          b.rows.reduce((sum, row) => sum + row.market_value_base, 0) -
+          a.rows.reduce((sum, row) => sum + row.market_value_base, 0),
+      )
+  }, [groupBy, holdings])
 
   const resetTxForm = () => {
     setTxTicker("")
@@ -171,6 +245,31 @@ export function HoldingsWorkspace() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Select value={accountFilter} onValueChange={setAccountFilter}>
+            <SelectTrigger className="h-9 w-[220px] px-3 text-sm">
+              <SelectValue placeholder="All accounts" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All accounts</SelectItem>
+              {accounts.map((account) => (
+                <SelectItem key={account.id} value={account.id}>
+                  {account.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={groupBy} onValueChange={(value) => setGroupBy(value as GroupByValue)}>
+            <SelectTrigger className="h-9 w-[180px] px-3 text-sm">
+              <SelectValue placeholder="Group by type" />
+            </SelectTrigger>
+            <SelectContent>
+              {GROUP_BY_OPTIONS.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <Button onClick={() => setAddTxOpen(true)} disabled={accounts.length === 0}>
             <Plus className="h-4 w-4" />
             Add transaction
@@ -178,28 +277,181 @@ export function HoldingsWorkspace() {
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-4">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-muted-foreground">Investment Accounts</CardTitle>
+            <CardTitle className="text-sm text-muted-foreground">Your Portfolio</CardTitle>
           </CardHeader>
-          <CardContent className="text-2xl font-semibold">{accounts.length}</CardContent>
+          <CardContent className="text-2xl font-semibold">{formatCurrency(summary.totalMarketValue, "CAD")}</CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-muted-foreground">Transactions</CardTitle>
+            <CardTitle className="text-sm text-muted-foreground">Unrealized P/L</CardTitle>
           </CardHeader>
-          <CardContent className="text-2xl font-semibold">{transactions.length}</CardContent>
+          <CardContent
+            className={`text-2xl font-semibold ${
+              summary.totalUnrealized >= 0 ? "text-positive" : "text-negative"
+            }`}
+          >
+            {formatCurrency(summary.totalUnrealized, "CAD")}
+          </CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-muted-foreground">Last Activity</CardTitle>
+            <CardTitle className="text-sm text-muted-foreground">Realized P/L</CardTitle>
           </CardHeader>
-          <CardContent className="text-lg font-semibold">
-            {transactions[0]?.trade_date ?? "No transactions"}
+          <CardContent
+            className={`text-2xl font-semibold ${
+              summary.totalRealized >= 0 ? "text-positive" : "text-negative"
+            }`}
+          >
+            {formatCurrency(summary.totalRealized, "CAD")}
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm text-muted-foreground">Total Return %</CardTitle>
+          </CardHeader>
+          <CardContent
+            className={`text-2xl font-semibold ${
+              summary.totalReturnPct >= 0 ? "text-positive" : "text-negative"
+            }`}
+          >
+            {formatPercent(summary.totalReturnPct)}
           </CardContent>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Holdings</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {loading ? (
+            <p className="text-sm text-muted-foreground">Loading investments…</p>
+          ) : holdings.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              No holdings yet. Add buy transactions to see your portfolio here.
+            </p>
+          ) : (
+            <div className="space-y-3">
+              {fallbackCount > 0 && (
+                <div className="rounded-md border border-amber-400/50 bg-amber-100/20 px-3 py-2 text-xs text-muted-foreground">
+                  {fallbackCount} holding(s) are using fallback market values due to unavailable live data.
+                </div>
+              )}
+              <div className="overflow-x-auto">
+              <table className="w-full min-w-[980px] text-sm">
+                <thead>
+                  <tr className="border-b text-left text-muted-foreground">
+                    <th className="py-2 pr-3 font-medium">Security</th>
+                    <th className="py-2 pr-3 font-medium">Price</th>
+                    <th className="py-2 pr-3 font-medium">Quantity</th>
+                    <th className="py-2 pr-3 font-medium">Avg Cost (Base)</th>
+                    <th className="py-2 pr-3 font-medium">Market Value (Base)</th>
+                    <th className="py-2 pr-3 font-medium">Unrealized P/L (Base)</th>
+                    <th className="py-2 pr-3 font-medium">% Return</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {groupedHoldings.map((group) => {
+                    const groupMarket = group.rows.reduce((sum, row) => sum + row.market_value_base, 0)
+                    return (
+                      <React.Fragment key={group.label}>
+                        <tr className="bg-muted/40">
+                          <td colSpan={7} className="py-2 pr-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                            {group.label} · {formatCurrency(groupMarket, "CAD")}
+                          </td>
+                        </tr>
+                        {group.rows.map((holding) => (
+                          <tr key={`${holding.account_id}-${holding.security_id}`} className="border-b last:border-0">
+                            <td className="py-2 pr-3">
+                              <div className="font-medium">{holding.ticker}</div>
+                              <div className="text-xs text-muted-foreground">{holding.security_name ?? "Unknown security"}</div>
+                            </td>
+                            <td className="py-2 pr-3">
+                              {formatCurrency(holding.current_price_quote, holding.quote_currency)}
+                            </td>
+                            <td className="py-2 pr-3">{holding.quantity.toLocaleString("en-US")}</td>
+                            <td className="py-2 pr-3">{formatCurrency(holding.avg_cost_base, holding.base_currency)}</td>
+                            <td className="py-2 pr-3">{formatCurrency(holding.market_value_base, holding.base_currency)}</td>
+                            <td className={`py-2 pr-3 ${holding.unrealized_pl_base >= 0 ? "text-positive" : "text-negative"}`}>
+                              {formatCurrency(holding.unrealized_pl_base, holding.base_currency)}
+                            </td>
+                            <td className={`py-2 pr-3 ${holding.return_pct >= 0 ? "text-positive" : "text-negative"}`}>
+                              {formatPercent(holding.return_pct)}
+                            </td>
+                          </tr>
+                        ))}
+                      </React.Fragment>
+                    )
+                  })}
+                  <tr className="bg-muted/30">
+                    <td className="py-2 pr-3 font-semibold">Total</td>
+                    <td className="py-2 pr-3" />
+                    <td className="py-2 pr-3" />
+                    <td className="py-2 pr-3 font-semibold">{formatCurrency(summary.totalCostBasis, "CAD")}</td>
+                    <td className="py-2 pr-3 font-semibold">{formatCurrency(summary.totalMarketValue, "CAD")}</td>
+                    <td className={`py-2 pr-3 font-semibold ${summary.totalUnrealized >= 0 ? "text-positive" : "text-negative"}`}>
+                      {formatCurrency(summary.totalUnrealized, "CAD")}
+                    </td>
+                    <td className={`py-2 pr-3 font-semibold ${summary.totalReturnPct >= 0 ? "text-positive" : "text-negative"}`}>
+                      {formatPercent(summary.totalReturnPct)}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Account Status</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {loading ? (
+            <p className="text-sm text-muted-foreground">Loading account status…</p>
+          ) : accountStatus.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No account status yet.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[980px] text-sm">
+                <thead>
+                  <tr className="border-b text-left text-muted-foreground">
+                    <th className="py-2 pr-3 font-medium">Account</th>
+                    <th className="py-2 pr-3 font-medium">Market Value</th>
+                    <th className="py-2 pr-3 font-medium">Cost Basis</th>
+                    <th className="py-2 pr-3 font-medium">Unrealized P/L</th>
+                    <th className="py-2 pr-3 font-medium">Realized P/L (All-Time)</th>
+                    <th className="py-2 pr-3 font-medium">Return %</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {accountStatus.map((row) => (
+                    <tr key={row.account_id} className="border-b last:border-0">
+                      <td className="py-2 pr-3 font-medium">{row.account_name}</td>
+                      <td className="py-2 pr-3">{formatCurrency(row.market_value_base, row.base_currency)}</td>
+                      <td className="py-2 pr-3">{formatCurrency(row.cost_basis_base, row.base_currency)}</td>
+                      <td className={`py-2 pr-3 ${row.unrealized_pl_base >= 0 ? "text-positive" : "text-negative"}`}>
+                        {formatCurrency(row.unrealized_pl_base, row.base_currency)}
+                      </td>
+                      <td className={`py-2 pr-3 ${row.realized_pl_all_time_base >= 0 ? "text-positive" : "text-negative"}`}>
+                        {formatCurrency(row.realized_pl_all_time_base, row.base_currency)}
+                      </td>
+                      <td className={`py-2 pr-3 ${row.total_return_pct >= 0 ? "text-positive" : "text-negative"}`}>
+                        {formatPercent(row.total_return_pct)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>
@@ -207,11 +459,9 @@ export function HoldingsWorkspace() {
         </CardHeader>
         <CardContent>
           {loading ? (
-            <p className="text-sm text-muted-foreground">Loading investments…</p>
+            <p className="text-sm text-muted-foreground">Loading transactions…</p>
           ) : transactions.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              No investment transactions yet. Add your first transaction.
-            </p>
+            <p className="text-sm text-muted-foreground">No transactions for the selected account.</p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full min-w-[840px] text-sm">
