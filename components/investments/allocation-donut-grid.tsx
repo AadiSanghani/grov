@@ -172,7 +172,7 @@ function DonutChartCard({ title, currency, rows }: DonutChartCardProps) {
             <ResponsiveContainer width="100%" height="100%">
               <PieChart margin={{ top: 10, right: 70, bottom: 10, left: 70 }}>
                 <Pie
-                  data={rows}
+                  data={rows as unknown as Record<string, unknown>[]}
                   dataKey="value_base"
                   nameKey="label"
                   cx="50%"
@@ -194,7 +194,7 @@ function DonutChartCard({ title, currency, rows }: DonutChartCardProps) {
                   ))}
                 </Pie>
                 <Pie
-                  data={rows}
+                  data={rows as unknown as Record<string, unknown>[]}
                   dataKey="value_base"
                   nameKey="label"
                   cx="50%"
