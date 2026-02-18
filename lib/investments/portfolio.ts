@@ -245,7 +245,7 @@ export async function computePortfolioPerformanceSeries(
   const historyStartDate = format(addDays(parseISO(startDate), -7), 'yyyy-MM-dd')
   const historyEndDate = format(addDays(parseISO(endDate), 1), 'yyyy-MM-dd')
   const historyEntries = await Promise.all(
-    tickers.map(async (ticker) => {
+    tickers.map(async (ticker): Promise<[string, { date: string; close: number }[]]> => {
       try {
         const history = await getHistorical(ticker, {
           startDate: historyStartDate,
@@ -256,9 +256,9 @@ export async function computePortfolioPerformanceSeries(
           history.points
             .map((point) => ({ date: point.date, close: point.close }))
             .sort((a, b) => a.date.localeCompare(b.date)),
-        ] as const
+        ]
       } catch {
-        return [ticker, []] as const
+        return [ticker, []]
       }
     }),
   )
