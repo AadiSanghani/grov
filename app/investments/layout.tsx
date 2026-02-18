@@ -8,6 +8,7 @@ const TABS = [
   { label: "Holdings", href: "/investments/holdings" },
   { label: "Allocation", href: "/investments/allocation" },
   { label: "Realized", href: "/investments/realized" },
+  { label: "Transactions", href: "/investments/transactions" },
 ] as const
 
 export default function InvestmentsLayout({
@@ -24,7 +25,7 @@ export default function InvestmentsLayout({
           <div>
             <h1 className="text-xl font-semibold tracking-tight">Investments</h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              Track portfolio performance, allocations, and realized gains.
+              Track holdings, allocations, realized gains, and transactions.
             </p>
           </div>
           <nav className="flex items-center gap-1 rounded-lg bg-muted/40 p-1">

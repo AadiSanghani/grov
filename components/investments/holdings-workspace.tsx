@@ -41,12 +41,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import type {
   InvestmentAccount,
   InvestmentRangeKey,
-  InvestmentTransaction,
   InvestmentTransactionType,
 } from "@/lib/investments/types"
 import { getInvestmentAccounts } from "@/lib/investments/accounts"
 import { computePortfolio, computePortfolioPerformanceSeries } from "@/lib/investments/portfolio"
-import { createInvestmentTransaction, getInvestmentTransactions } from "@/lib/investments/transactions"
+import { createInvestmentTransaction } from "@/lib/investments/transactions"
 import { cn, normalizeCalendarDate } from "@/lib/utils"
 
 const TRANSACTION_TYPE_OPTIONS: InvestmentTransactionType[] = ["BUY", "SELL", "DIVIDEND", "FEE"]
@@ -163,7 +162,6 @@ function parseDateOnlyString(dateStr: string) {
 export function HoldingsWorkspace() {
   const [loading, setLoading] = React.useState(true)
   const [accounts, setAccounts] = React.useState<InvestmentAccount[]>([])
-  const [transactions, setTransactions] = React.useState<InvestmentTransaction[]>([])
   const [portfolio, setPortfolio] = React.useState<PortfolioData | null>(null)
   const [performance, setPerformance] = React.useState<PortfolioPerformanceData | null>(null)
 
@@ -191,12 +189,8 @@ export function HoldingsWorkspace() {
   const loadData = React.useCallback(async () => {
     setLoading(true)
     try {
-      const [accountsResult, txResult, portfolioResult, performanceResult] = await Promise.allSettled([
+      const [accountsResult, portfolioResult, performanceResult] = await Promise.allSettled([
         getInvestmentAccounts(),
-        getInvestmentTransactions({
-          limit: 25,
-          accountId: accountFilter === "all" ? undefined : accountFilter,
-        }),
         computePortfolio({
           accountId: accountFilter === "all" ? undefined : accountFilter,
         }),
@@ -208,22 +202,18 @@ export function HoldingsWorkspace() {
 
       if (
         accountsResult.status !== "fulfilled" ||
-        txResult.status !== "fulfilled" ||
         portfolioResult.status !== "fulfilled"
       ) {
         const error =
           accountsResult.status === "rejected"
             ? accountsResult.reason
-            : txResult.status === "rejected"
-              ? txResult.reason
-              : portfolioResult.status === "rejected"
-                ? portfolioResult.reason
-                : new Error("Unknown load error")
+            : portfolioResult.status === "rejected"
+              ? portfolioResult.reason
+              : new Error("Unknown load error")
         throw error
       }
 
       setAccounts(accountsResult.value)
-      setTransactions(txResult.value)
       setPortfolio(portfolioResult.value)
 
       if (performanceResult.status === "fulfilled") {
@@ -237,7 +227,6 @@ export function HoldingsWorkspace() {
       console.error("Failed to load investments data:", error)
       toast.error("Failed to load investments data")
       setAccounts([])
-      setTransactions([])
       setPortfolio(null)
       setPerformance(null)
     } finally {
@@ -662,94 +651,6 @@ export function HoldingsWorkspace() {
                 </tbody>
               </table>
               </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Account Status</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <p className="text-sm text-muted-foreground">Loading account status…</p>
-          ) : accountStatus.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No account status yet.</p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[980px] text-sm">
-                <thead>
-                  <tr className="border-b text-left text-muted-foreground">
-                    <th className="py-2 pr-3 font-medium">Account</th>
-                    <th className="py-2 pr-3 font-medium">Market Value</th>
-                    <th className="py-2 pr-3 font-medium">Cost Basis</th>
-                    <th className="py-2 pr-3 font-medium">Unrealized P/L</th>
-                    <th className="py-2 pr-3 font-medium">Realized P/L (All-Time)</th>
-                    <th className="py-2 pr-3 font-medium">Return %</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {accountStatus.map((row) => (
-                    <tr key={row.account_id} className="border-b last:border-0">
-                      <td className="py-2 pr-3 font-medium">{row.account_name}</td>
-                      <td className="py-2 pr-3">{formatCurrency(row.market_value_base, row.base_currency)}</td>
-                      <td className="py-2 pr-3">{formatCurrency(row.cost_basis_base, row.base_currency)}</td>
-                      <td className={`py-2 pr-3 ${row.unrealized_pl_base >= 0 ? "text-positive" : "text-negative"}`}>
-                        {formatCurrency(row.unrealized_pl_base, row.base_currency)}
-                      </td>
-                      <td className={`py-2 pr-3 ${row.realized_pl_all_time_base >= 0 ? "text-positive" : "text-negative"}`}>
-                        {formatCurrency(row.realized_pl_all_time_base, row.base_currency)}
-                      </td>
-                      <td className={`py-2 pr-3 ${row.total_return_pct >= 0 ? "text-positive" : "text-negative"}`}>
-                        {formatPercent(row.total_return_pct)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Recent Investment Transactions</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <p className="text-sm text-muted-foreground">Loading transactions…</p>
-          ) : transactions.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No transactions for the selected account.</p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[840px] text-sm">
-                <thead>
-                  <tr className="border-b text-left text-muted-foreground">
-                    <th className="py-2 pr-3 font-medium">Date</th>
-                    <th className="py-2 pr-3 font-medium">Account</th>
-                    <th className="py-2 pr-3 font-medium">Ticker</th>
-                    <th className="py-2 pr-3 font-medium">Type</th>
-                    <th className="py-2 pr-3 font-medium">Quantity</th>
-                    <th className="py-2 pr-3 font-medium">Price/Amount</th>
-                    <th className="py-2 pr-3 font-medium">Fees</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {transactions.map((tx) => (
-                    <tr key={tx.id} className="border-b last:border-0">
-                      <td className="py-2 pr-3">{tx.trade_date}</td>
-                      <td className="py-2 pr-3">{tx.account_name ?? "-"}</td>
-                      <td className="py-2 pr-3 font-medium">{tx.ticker ?? "-"}</td>
-                      <td className="py-2 pr-3">{tx.type}</td>
-                      <td className="py-2 pr-3">{tx.quantity.toLocaleString("en-US")}</td>
-                      <td className="py-2 pr-3">{formatCurrency(tx.price, tx.currency)}</td>
-                      <td className="py-2 pr-3">{formatCurrency(tx.fees, tx.currency)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
             </div>
           )}
         </CardContent>

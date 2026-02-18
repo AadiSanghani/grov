@@ -26,10 +26,10 @@ function inRange(dateStr: string, startDate?: string, endDate?: string) {
   return isWithinInterval(date, { start, end })
 }
 
-function formatCurrency(amount: number) {
+function formatCurrency(amount: number, currency = "CAD") {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
-    currency: "CAD",
+    currency,
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(amount)
@@ -56,6 +56,7 @@ export default async function RealizedPage({ searchParams }: RealizedPageProps) 
   const filteredRows = portfolio.realizedRows.filter((row) =>
     inRange(row.trade_date, startDate || undefined, endDate || undefined),
   )
+  const accountStatus = portfolio.accountStatus
   const totals = filteredRows.reduce(
     (acc, row) => {
       acc.proceeds += row.proceeds_base
@@ -144,6 +145,50 @@ export default async function RealizedPage({ searchParams }: RealizedPageProps) 
           </CardContent>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Account Status</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {accountStatus.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No account status yet.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[980px] text-sm">
+                <thead>
+                  <tr className="border-b text-left text-muted-foreground">
+                    <th className="py-2 pr-3 font-medium">Account</th>
+                    <th className="py-2 pr-3 font-medium">Market Value</th>
+                    <th className="py-2 pr-3 font-medium">Cost Basis</th>
+                    <th className="py-2 pr-3 font-medium">Unrealized P/L</th>
+                    <th className="py-2 pr-3 font-medium">Realized P/L (All-Time)</th>
+                    <th className="py-2 pr-3 font-medium">Return %</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {accountStatus.map((row) => (
+                    <tr key={row.account_id} className="border-b last:border-0">
+                      <td className="py-2 pr-3 font-medium">{row.account_name}</td>
+                      <td className="py-2 pr-3">{formatCurrency(row.market_value_base, row.base_currency)}</td>
+                      <td className="py-2 pr-3">{formatCurrency(row.cost_basis_base, row.base_currency)}</td>
+                      <td className={`py-2 pr-3 ${row.unrealized_pl_base >= 0 ? "text-positive" : "text-negative"}`}>
+                        {formatCurrency(row.unrealized_pl_base, row.base_currency)}
+                      </td>
+                      <td className={`py-2 pr-3 ${row.realized_pl_all_time_base >= 0 ? "text-positive" : "text-negative"}`}>
+                        {formatCurrency(row.realized_pl_all_time_base, row.base_currency)}
+                      </td>
+                      <td className={`py-2 pr-3 ${row.total_return_pct >= 0 ? "text-positive" : "text-negative"}`}>
+                        {row.total_return_pct.toFixed(2)}%
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>
