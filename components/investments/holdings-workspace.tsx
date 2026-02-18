@@ -616,7 +616,7 @@ export function HoldingsWorkspace() {
                           <tr key={`${holding.account_id}-${holding.security_id}`} className="border-b last:border-0">
                             <td className="py-2 pr-3">
                               <div className="font-medium">{holding.ticker}</div>
-                              <div className="text-xs text-muted-foreground">{holding.security_name ?? "Unknown security"}</div>
+                              <div className="text-xs text-muted-foreground">{holding.security_name ?? holding.ticker}</div>
                             </td>
                             <td className="py-2 pr-3">
                               {formatCurrency(holding.current_price_quote, holding.quote_currency)}

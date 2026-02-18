@@ -522,7 +522,7 @@ export async function computePortfolio(filters: PortfolioFilters = {}): Promise<
       base_currency: position.base_currency,
       security_id: position.security_id,
       ticker: position.ticker,
-      security_name: position.security_name,
+      security_name: quote?.name ?? position.security_name,
       asset_type: position.asset_type,
       quote_currency: position.quote_currency,
       quantity: round2(position.quantity),

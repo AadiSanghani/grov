@@ -23,6 +23,8 @@ interface YahooQuoteResponse {
   ask?: number | null
   currency?: string | null
   regularMarketTime?: Date | number | null
+  longName?: string | null
+  shortName?: string | null
 }
 
 interface YahooChartQuoteRow {
@@ -55,6 +57,8 @@ export interface QuoteResult {
   asOf: string
   stale: boolean
   source: 'live' | 'memory' | 'historical'
+  /** Security display name from Yahoo (longName or shortName), when available */
+  name?: string | null
 }
 
 export interface HistoricalPoint {
@@ -171,6 +175,9 @@ export async function getQuote(ticker: string): Promise<QuoteResult> {
       throw new Error(`Yahoo quote for ${normalizedTicker} did not include a valid market price`)
     }
 
+    const q = quote as YahooQuoteResponse
+    const securityName = (q.longName ?? q.shortName ?? '').trim() || null
+
     const liveQuote: QuoteResult = {
       ticker: normalizedTicker,
       price,
@@ -178,6 +185,7 @@ export async function getQuote(ticker: string): Promise<QuoteResult> {
       asOf: marketTime,
       stale: false,
       source: 'live',
+      name: securityName ?? undefined,
     }
 
     quoteMemoryCache.set(memoryKey, {
@@ -205,6 +213,7 @@ export async function getQuote(ticker: string): Promise<QuoteResult> {
         asOf: `${latestPoint.date}T00:00:00.000Z`,
         stale: true,
         source: 'historical',
+        name: undefined,
       }
 
       quoteMemoryCache.set(memoryKey, {
