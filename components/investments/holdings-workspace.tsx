@@ -59,11 +59,6 @@ const TX_TYPE_META: Record<
   DIVIDEND: { label: "DIVIDEND", icon: PlusCircle },
   FEE: { label: "FEE", icon: ReceiptText },
 }
-const GROUP_BY_OPTIONS = [
-  { value: "asset_type", label: "Group by type" },
-  { value: "account", label: "Group by account" },
-  { value: "currency", label: "Group by currency" },
-] as const
 const RANGE_OPTIONS: { value: InvestmentRangeKey; label: string }[] = [
   { value: "1W", label: "1W" },
   { value: "1M", label: "1M" },
@@ -80,7 +75,6 @@ const LONG_DATE_FORMATTER = new Intl.DateTimeFormat("en-US", {
   day: "numeric",
 })
 
-type GroupByValue = (typeof GROUP_BY_OPTIONS)[number]["value"]
 type PortfolioData = Awaited<ReturnType<typeof computePortfolio>>
 type PortfolioPerformanceData = Awaited<ReturnType<typeof computePortfolioPerformanceSeries>>
 
@@ -167,7 +161,6 @@ export function HoldingsWorkspace() {
 
   const [addTxOpen, setAddTxOpen] = React.useState(false)
   const [accountFilter, setAccountFilter] = React.useState("all")
-  const [groupBy, setGroupBy] = React.useState<GroupByValue>("asset_type")
   const [range, setRange] = React.useState<InvestmentRangeKey>("3M")
 
   const [txAccountId, setTxAccountId] = React.useState("")
@@ -299,12 +292,7 @@ export function HoldingsWorkspace() {
   const groupedHoldings = React.useMemo(() => {
     const groups = new Map<string, typeof holdings>()
     for (const holding of holdings) {
-      const key =
-        groupBy === "asset_type"
-          ? holding.asset_type
-          : groupBy === "account"
-            ? holding.account_name
-            : holding.quote_currency
+      const key = holding.asset_type
       const current = groups.get(key) ?? []
       current.push(holding)
       groups.set(key, current)
@@ -319,7 +307,7 @@ export function HoldingsWorkspace() {
           b.rows.reduce((sum, row) => sum + row.market_value_base, 0) -
           a.rows.reduce((sum, row) => sum + row.market_value_base, 0),
       )
-  }, [groupBy, holdings])
+  }, [holdings])
 
   const applyTxDate = React.useCallback((nextDate: Date) => {
     const normalized = normalizeCalendarDate(nextDate)
@@ -404,46 +392,6 @@ export function HoldingsWorkspace() {
 
   return (
     <div className="space-y-6 p-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-lg font-semibold tracking-tight">Holdings</h2>
-          <p className="text-sm text-muted-foreground">
-            Investment accounts are auto-detected from Accounts where type is Investments.
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Select value={accountFilter} onValueChange={setAccountFilter}>
-            <SelectTrigger className="h-9 w-[220px] px-3 text-sm">
-              <SelectValue placeholder="All accounts" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All accounts</SelectItem>
-              {accounts.map((account) => (
-                <SelectItem key={account.id} value={account.id}>
-                  {account.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={groupBy} onValueChange={(value) => setGroupBy(value as GroupByValue)}>
-            <SelectTrigger className="h-9 w-[180px] px-3 text-sm">
-              <SelectValue placeholder="Group by type" />
-            </SelectTrigger>
-            <SelectContent>
-              {GROUP_BY_OPTIONS.map((option) => (
-                <SelectItem key={option.value} value={option.value}>
-                  {option.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Button onClick={() => setAddTxOpen(true)} disabled={accounts.length === 0}>
-            <Plus className="h-4 w-4" />
-            Add transaction
-          </Button>
-        </div>
-      </div>
-
       <div className="grid gap-4 md:grid-cols-4">
         <Card>
           <CardHeader className="pb-2">
@@ -573,7 +521,28 @@ export function HoldingsWorkspace() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Holdings</CardTitle>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <CardTitle>Holdings</CardTitle>
+            <div className="flex flex-wrap items-center gap-2">
+              <Select value={accountFilter} onValueChange={setAccountFilter}>
+                <SelectTrigger className="h-9 w-[220px] px-3 text-sm">
+                  <SelectValue placeholder="All accounts" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All accounts</SelectItem>
+                  {accounts.map((account) => (
+                    <SelectItem key={account.id} value={account.id}>
+                      {account.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button onClick={() => setAddTxOpen(true)} disabled={accounts.length === 0}>
+                <Plus className="h-4 w-4" />
+                Add transaction
+              </Button>
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           {loading ? (
