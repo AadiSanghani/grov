@@ -2,7 +2,16 @@
 
 import * as React from "react"
 import { toast } from "sonner"
-import { Plus } from "lucide-react"
+import {
+  CalendarIcon,
+  Check,
+  ChevronsUpDown,
+  Loader2,
+  MinusCircle,
+  Plus,
+  PlusCircle,
+  ReceiptText,
+} from "lucide-react"
 import {
   CartesianGrid,
   Line,
@@ -15,9 +24,19 @@ import {
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Calendar } from "@/components/ui/calendar"
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import type {
   InvestmentAccount,
@@ -28,8 +47,19 @@ import type {
 import { getInvestmentAccounts } from "@/lib/investments/accounts"
 import { computePortfolio, computePortfolioPerformanceSeries } from "@/lib/investments/portfolio"
 import { createInvestmentTransaction, getInvestmentTransactions } from "@/lib/investments/transactions"
+import { cn, normalizeCalendarDate } from "@/lib/utils"
 
 const TRANSACTION_TYPE_OPTIONS: InvestmentTransactionType[] = ["BUY", "SELL", "DIVIDEND", "FEE"]
+const TRANSACTION_CURRENCY_OPTIONS = ["CAD", "USD"] as const
+const TX_TYPE_META: Record<
+  InvestmentTransactionType,
+  { label: string; icon: React.ComponentType<{ className?: string }> }
+> = {
+  BUY: { label: "BUY", icon: PlusCircle },
+  SELL: { label: "SELL", icon: MinusCircle },
+  DIVIDEND: { label: "DIVIDEND", icon: PlusCircle },
+  FEE: { label: "FEE", icon: ReceiptText },
+}
 const GROUP_BY_OPTIONS = [
   { value: "asset_type", label: "Group by type" },
   { value: "account", label: "Group by account" },
@@ -92,6 +122,44 @@ function formatCompactCurrency(amount: number, currency: string) {
   }).format(amount)
 }
 
+function parseCurrencyInput(rawValue: string) {
+  let value = rawValue.replace(/[^0-9.]/g, "")
+
+  if (value === "") {
+    return { value: "", display: "$" }
+  }
+
+  const parts = value.split(".")
+  if (parts.length > 2) {
+    value = `${parts[0]}.${parts.slice(1).join("")}`
+  }
+
+  const [integerPart = "", decimalPartRaw] = value.split(".")
+  const decimalPart = decimalPartRaw?.slice(0, 2)
+  const formattedInteger = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, ",")
+  const normalized = decimalPart != null ? `${integerPart}.${decimalPart}` : integerPart
+  const display = decimalPart != null ? `$${formattedInteger}.${decimalPart}` : `$${formattedInteger}`
+
+  return { value: normalized, display }
+}
+
+function parseDateOnlyString(dateStr: string) {
+  const [yearStr, monthStr, dayStr] = dateStr.split("-")
+  const year = Number(yearStr)
+  const month = Number(monthStr)
+  const day = Number(dayStr)
+  if (!year || !month || !day) return null
+  const candidate = new Date(year, month - 1, day)
+  if (
+    candidate.getFullYear() !== year ||
+    candidate.getMonth() !== month - 1 ||
+    candidate.getDate() !== day
+  ) {
+    return null
+  }
+  return candidate
+}
+
 export function HoldingsWorkspace() {
   const [loading, setLoading] = React.useState(true)
   const [accounts, setAccounts] = React.useState<InvestmentAccount[]>([])
@@ -108,11 +176,15 @@ export function HoldingsWorkspace() {
   const [txTicker, setTxTicker] = React.useState("")
   const [txType, setTxType] = React.useState<InvestmentTransactionType>("BUY")
   const [txDate, setTxDate] = React.useState(() => getLocalDateString())
+  const [txDateOpen, setTxDateOpen] = React.useState(false)
   const [txQuantity, setTxQuantity] = React.useState("1")
   const [txPrice, setTxPrice] = React.useState("")
+  const [txPriceDisplay, setTxPriceDisplay] = React.useState("$")
   const [txCurrency, setTxCurrency] = React.useState("USD")
   const [txFees, setTxFees] = React.useState("0")
+  const [txFeesDisplay, setTxFeesDisplay] = React.useState("$0")
   const [txNotes, setTxNotes] = React.useState("")
+  const [txAccountOpen, setTxAccountOpen] = React.useState(false)
 
   const [submittingTx, setSubmittingTx] = React.useState(false)
 
@@ -185,6 +257,11 @@ export function HoldingsWorkspace() {
 
   const isTrade = txType === "BUY" || txType === "SELL"
   const todayLocalDate = React.useMemo(() => getLocalDateString(), [])
+  const selectedTxAccount = React.useMemo(
+    () => accounts.find((account) => account.id === txAccountId) ?? null,
+    [accounts, txAccountId],
+  )
+  const txDateValue = React.useMemo(() => parseDateOnlyString(txDate), [txDate])
   const holdings = React.useMemo(() => portfolio?.holdings ?? [], [portfolio])
   const accountStatus = React.useMemo(() => portfolio?.accountStatus ?? [], [portfolio])
   const realizedRows = React.useMemo(() => portfolio?.realizedRows ?? [], [portfolio])
@@ -255,14 +332,21 @@ export function HoldingsWorkspace() {
       )
   }, [groupBy, holdings])
 
+  const applyTxDate = React.useCallback((nextDate: Date) => {
+    const normalized = normalizeCalendarDate(nextDate)
+    setTxDate(getLocalDateString(normalized))
+  }, [])
+
   const resetTxForm = () => {
     setTxTicker("")
     setTxType("BUY")
     setTxDate(getLocalDateString())
     setTxQuantity("1")
     setTxPrice("")
+    setTxPriceDisplay("$")
     setTxCurrency("USD")
     setTxFees("0")
+    setTxFeesDisplay("$0")
     setTxNotes("")
   }
 
@@ -672,45 +756,89 @@ export function HoldingsWorkspace() {
       </Card>
 
       <Dialog open={addTxOpen} onOpenChange={setAddTxOpen}>
-        <DialogContent className="max-w-[620px]">
+        <DialogContent className="max-w-[600px] max-h-[90vh] overflow-y-auto overscroll-contain shadow-2xl">
           <DialogHeader>
-            <DialogTitle>Add investment transaction</DialogTitle>
-            <DialogDescription>
-              Supports BUY, SELL, DIVIDEND, and FEE.
-            </DialogDescription>
+            <DialogTitle>Add transaction</DialogTitle>
           </DialogHeader>
-          <form className="space-y-4" onSubmit={handleCreateTransaction}>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="investment-tx-account">Account</Label>
-                <Select value={txAccountId} onValueChange={setTxAccountId}>
-                  <SelectTrigger id="investment-tx-account" className="h-9 px-3 text-sm">
-                    <SelectValue placeholder="Select account" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {accounts.map((account) => (
-                      <SelectItem key={account.id} value={account.id}>
-                        {account.name} ({account.base_currency})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="investment-tx-type">Type</Label>
-                <Select value={txType} onValueChange={(value) => setTxType(value as InvestmentTransactionType)}>
-                  <SelectTrigger id="investment-tx-type" className="h-9 px-3 text-sm">
-                    <SelectValue placeholder="Select type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {TRANSACTION_TYPE_OPTIONS.map((option) => (
-                      <SelectItem key={option} value={option}>
-                        {option}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+          <form
+            className="space-y-6"
+            onSubmit={handleCreateTransaction}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+                event.preventDefault()
+                event.currentTarget.requestSubmit()
+              }
+            }}
+          >
+            <div className="flex gap-2">
+              {TRANSACTION_TYPE_OPTIONS.map((option) => {
+                const Icon = TX_TYPE_META[option].icon
+                return (
+                  <Button
+                    key={option}
+                    type="button"
+                    variant={txType === option ? "default" : "outline"}
+                    className={cn(
+                      "flex-1",
+                      txType === option
+                        ? "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground"
+                        : "hover:bg-muted hover:text-foreground",
+                    )}
+                    onClick={() => setTxType(option)}
+                  >
+                    <Icon className="h-4 w-4 mr-1" />
+                    {TX_TYPE_META[option].label}
+                  </Button>
+                )
+              })}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="investment-tx-account">Account</Label>
+              <Popover open={txAccountOpen} onOpenChange={setTxAccountOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    id="investment-tx-account"
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={txAccountOpen}
+                    className="w-full justify-between font-normal"
+                  >
+                    {selectedTxAccount
+                      ? `${selectedTxAccount.name} (${selectedTxAccount.base_currency})`
+                      : "Select account…"}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-(--radix-popover-trigger-width) p-0" align="start">
+                  <Command>
+                    <CommandInput placeholder="Search accounts…" />
+                    <CommandList>
+                      <CommandEmpty>No account found.</CommandEmpty>
+                      <CommandGroup>
+                        {accounts.map((account) => (
+                          <CommandItem
+                            key={account.id}
+                            value={`${account.name} ${account.base_currency}`}
+                            onSelect={() => {
+                              setTxAccountId(account.id)
+                              setTxAccountOpen(false)
+                            }}
+                          >
+                            <Check
+                              className={cn(
+                                "mr-2 h-4 w-4",
+                                txAccountId === account.id ? "opacity-100" : "opacity-0",
+                              )}
+                            />
+                            {account.name} ({account.base_currency})
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
@@ -725,50 +853,72 @@ export function HoldingsWorkspace() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="investment-tx-date">Trade date</Label>
-                <Input
-                  id="investment-tx-date"
-                  type="date"
-                  value={txDate}
-                  max={todayLocalDate}
-                  onChange={(e) => setTxDate(e.target.value)}
-                />
+                <div className="flex gap-2">
+                  <Input
+                    id="investment-tx-date"
+                    type="date"
+                    value={txDate}
+                    max={todayLocalDate}
+                    onChange={(e) => setTxDate(e.target.value)}
+                  />
+                  <Popover open={txDateOpen} onOpenChange={setTxDateOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        className="shrink-0"
+                        aria-label="Open trade date picker"
+                      >
+                        <CalendarIcon className="h-4 w-4" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="end">
+                      <Calendar
+                        mode="single"
+                        selected={txDateValue ?? undefined}
+                        onSelect={(newDate) => {
+                          if (newDate) {
+                            applyTxDate(newDate)
+                            setTxDateOpen(false)
+                          }
+                        }}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
               </div>
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-3">
+            {isTrade && (
               <div className="space-y-2">
-                <Label htmlFor="investment-tx-quantity">{isTrade ? "Quantity" : "Quantity (auto 0)"}</Label>
+                <Label htmlFor="investment-tx-quantity">Quantity</Label>
                 <Input
                   id="investment-tx-quantity"
                   type="number"
                   min={0}
                   step="0.00000001"
-                  value={isTrade ? txQuantity : "0"}
+                  value={txQuantity}
                   onChange={(e) => setTxQuantity(e.target.value)}
-                  disabled={!isTrade}
+                  placeholder="0.00"
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="investment-tx-price">{isTrade ? "Price" : "Amount"}</Label>
-                <Input
-                  id="investment-tx-price"
-                  type="number"
-                  min={0}
-                  step="0.00000001"
-                  value={txPrice}
-                  onChange={(e) => setTxPrice(e.target.value)}
-                  placeholder={isTrade ? "0.00" : "Amount"}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="investment-tx-currency">Currency</Label>
-                <Input
-                  id="investment-tx-currency"
-                  value={txCurrency}
-                  onChange={(e) => setTxCurrency(e.target.value.toUpperCase())}
-                  placeholder="USD"
-                />
-              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label htmlFor="investment-tx-price">{isTrade ? "Price" : "Amount"}</Label>
+              <Input
+                id="investment-tx-price"
+                type="text"
+                value={txPriceDisplay}
+                onChange={(e) => {
+                  const parsed = parseCurrencyInput(e.target.value)
+                  setTxPrice(parsed.value)
+                  setTxPriceDisplay(parsed.display)
+                }}
+                placeholder="$0.00"
+                className="text-lg"
+              />
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
@@ -776,32 +926,55 @@ export function HoldingsWorkspace() {
                 <Label htmlFor="investment-tx-fees">Fees</Label>
                 <Input
                   id="investment-tx-fees"
-                  type="number"
-                  min={0}
-                  step="0.00000001"
-                  value={txFees}
-                  onChange={(e) => setTxFees(e.target.value)}
+                  type="text"
+                  value={txFeesDisplay}
+                  onChange={(e) => {
+                    const parsed = parseCurrencyInput(e.target.value)
+                    setTxFees(parsed.value === "" ? "0" : parsed.value)
+                    setTxFeesDisplay(parsed.value === "" ? "$0" : parsed.display)
+                  }}
+                  placeholder="$0.00"
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="investment-tx-notes">Notes (optional)</Label>
-                <Input
-                  id="investment-tx-notes"
-                  value={txNotes}
-                  onChange={(e) => setTxNotes(e.target.value)}
-                  placeholder="Optional notes"
-                />
+                <Label htmlFor="investment-tx-currency">Currency</Label>
+                <Select value={txCurrency} onValueChange={setTxCurrency}>
+                  <SelectTrigger id="investment-tx-currency" className="h-9 px-3 text-sm">
+                    <SelectValue placeholder="Select currency" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {TRANSACTION_CURRENCY_OPTIONS.map((currency) => (
+                      <SelectItem key={currency} value={currency}>
+                        {currency}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setAddTxOpen(false)}>
-                Cancel
-              </Button>
+            <div className="space-y-2">
+              <Label htmlFor="investment-tx-notes">Notes</Label>
+              <Input
+                id="investment-tx-notes"
+                value={txNotes}
+                onChange={(e) => setTxNotes(e.target.value)}
+                placeholder="Add a note…"
+              />
+            </div>
+
+            <div className="flex justify-end">
               <Button type="submit" disabled={submittingTx}>
-                {submittingTx ? "Saving…" : "Save transaction"}
+                {submittingTx ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Adding…
+                  </>
+                ) : (
+                  "Add transaction"
+                )}
               </Button>
-            </DialogFooter>
+            </div>
           </form>
         </DialogContent>
       </Dialog>
