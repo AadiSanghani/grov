@@ -12,7 +12,7 @@ import { Sidebar,
     SidebarMenuItem, 
     useSidebar,
     } from "@/components/ui/sidebar"
-import { ChartArea, CreditCard, FileBarChart, Home, LayoutDashboard, MapPinned, PanelLeft } from "lucide-react"
+import { CreditCard, FileBarChart, Home, LayoutDashboard, MapPinned, PanelLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
@@ -43,11 +43,6 @@ const items = [
         title: "Trips",
         url: "/trips",
         icon: MapPinned,
-    },
-    {
-        title: "Investments",
-        url: "/investments/holdings",
-        icon: ChartArea,
     },
   ]
 
