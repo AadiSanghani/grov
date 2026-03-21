@@ -1,0 +1,28 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/investments-market-sync?slot=open",
+      "schedule": "40 13 * * 1-5"
+    },
+    {
+      "path": "/api/cron/investments-market-sync?slot=open",
+      "schedule": "40 14 * * 1-5"
+    },
+    {
+      "path": "/api/cron/investments-market-sync?slot=midday",
+      "schedule": "45 17 * * 1-5"
+    },
+    {
+      "path": "/api/cron/investments-market-sync?slot=midday",
+      "schedule": "45 18 * * 1-5"
+    },
+    {
+      "path": "/api/cron/investments-market-sync?slot=close",
+      "schedule": "10 20 * * 1-5"
+    },
+    {
+      "path": "/api/cron/investments-market-sync?slot=close",
+      "schedule": "10 21 * * 1-5"
+    }
+  ]
+}
