@@ -26,10 +26,10 @@ export type AccountMap = Record<string, { name: string; category: "asset" | "lia
 /** Map of transaction id -> PayrollDeduction[] */
 export type DeductionsMap = Record<string, PayrollDeduction[]>
 
-const TOP_INCOME_SOURCES = 8
-const TOP_OUTFLOWS = 14
+const TOP_INCOME_SOURCES = 12
+const TOP_OUTFLOWS = 20
 const MIN_SANKEY_HEIGHT = 700
-const MAX_SANKEY_HEIGHT = 1800
+const MAX_SANKEY_HEIGHT = 2200
 const NODE_HEIGHT_MULTIPLIER = 28
 const NODE_HEIGHT_BUFFER = 4
 
