@@ -172,45 +172,20 @@ export default function CashFlowPage() {
         </Card>
       </div>
 
-      {(summary.totalInvestmentContributions > 0 || sankeyData.excludedInternalTransfers.count > 0) && (
+      {summary.totalInvestmentContributions > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {summary.totalInvestmentContributions > 0 && (
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  Investment Contributions
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <span className="text-2xl font-semibold text-accent">
-                  {formatCurrency(summary.totalInvestmentContributions)}
-                </span>
-              </CardContent>
-            </Card>
-          )}
-          {sankeyData.excludedInternalTransfers.count > 0 && (
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  Internal Transfers
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-1">
-                <span className="text-2xl font-semibold">
-                  {formatCurrency(sankeyData.excludedInternalTransfers.totalAmount)}
-                </span>
-                <p className="text-xs text-muted-foreground">
-                  {sankeyData.excludedInternalTransfers.count} excluded cash-to-cash transfer
-                  {sankeyData.excludedInternalTransfers.count === 1 ? "" : "s"} in this period
-                </p>
-                {sankeyData.excludedInternalTransfers.topDestinations[0] && (
-                  <p className="text-xs text-muted-foreground">
-                    Top destination: {sankeyData.excludedInternalTransfers.topDestinations[0].destination}
-                  </p>
-                )}
-              </CardContent>
-            </Card>
-          )}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Investment Contributions
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <span className="text-2xl font-semibold text-accent">
+                {formatCurrency(summary.totalInvestmentContributions)}
+              </span>
+            </CardContent>
+          </Card>
         </div>
       )}
 
