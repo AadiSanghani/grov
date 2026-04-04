@@ -82,6 +82,13 @@ export interface NetWorthDataPoint {
   net_worth: number
 }
 
+export interface AccountGrowthDataPoint {
+  date: string
+  balance: number
+  growth_amount: number
+  growth_pct: number
+}
+
 export interface TransactionFilters {
   sortBy: "date" | "amount" | "merchant"
   sortOrder: "asc" | "desc"
