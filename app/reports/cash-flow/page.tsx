@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { useReportsContext } from "../context"
 import { getTransactionsInRange } from "@/lib/transactions"
 import { Transaction } from "@/lib/types"
-import { MermaidSankey, type AccountMap, type DeductionsMap } from "@/components/mermaid-sankey"
+import { MermaidSankey, buildSankeyData, type AccountMap, type DeductionsMap } from "@/components/mermaid-sankey"
 import { getSpendingAmount, isIncomeForReporting } from "@/lib/utils"
 import { getAccounts } from "@/lib/accounts"
 import { getDeductionsForTransactions } from "@/lib/deductions"
@@ -100,6 +100,11 @@ export default function CashFlowPage() {
     return { totalNetIncome, totalExpenses, netIncome, savingsRate, totalInvestmentContributions }
   }, [transactions, accountsMap])
 
+  const sankeyData = useMemo(
+    () => buildSankeyData(transactions, accountsMap, deductionsMap),
+    [transactions, accountsMap, deductionsMap]
+  )
+
   if (loading) {
     return (
       <div className="p-6">
@@ -183,15 +188,26 @@ export default function CashFlowPage() {
         </div>
       )}
 
-      <Card className="overflow-hidden">
+      <Card className="overflow-auto">
         <CardHeader>
           <CardTitle>Cash Flow</CardTitle>
           <p className="text-sm text-muted-foreground">
             Income and expenses by category for the selected period.
           </p>
+          {sankeyData.isGrouped && (
+            <p className="text-xs text-muted-foreground">
+              Showing top flows; smaller flows are grouped.
+            </p>
+          )}
         </CardHeader>
         <CardContent className="min-h-[70vh] w-full p-4">
-          <MermaidSankey transactions={transactions} accountsMap={accountsMap} deductionsMap={deductionsMap} className="h-full min-h-[65vh] w-full" />
+          <MermaidSankey
+            transactions={transactions}
+            accountsMap={accountsMap}
+            deductionsMap={deductionsMap}
+            buildResult={sankeyData}
+            className="h-full min-h-[65vh] w-full"
+          />
         </CardContent>
       </Card>
     </div>

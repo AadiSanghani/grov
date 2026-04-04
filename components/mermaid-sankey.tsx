@@ -1,6 +1,6 @@
 "use client"
 
-import { useLayoutEffect, useRef, useId } from "react"
+import { useLayoutEffect, useMemo, useRef, useId } from "react"
 import mermaid from "mermaid"
 import { Transaction, PayrollDeduction } from "@/lib/types"
 import { getSpendingAmount, isIncomeForReporting } from "@/lib/utils"
@@ -26,11 +26,67 @@ export type AccountMap = Record<string, { name: string; category: "asset" | "lia
 /** Map of transaction id -> PayrollDeduction[] */
 export type DeductionsMap = Record<string, PayrollDeduction[]>
 
-function buildSankeyCsv(
+const TOP_INCOME_SOURCES = 8
+const TOP_OUTFLOWS = 14
+const MIN_SANKEY_HEIGHT = 700
+const MAX_SANKEY_HEIGHT = 1800
+const NODE_HEIGHT_MULTIPLIER = 28
+const NODE_HEIGHT_BUFFER = 4
+
+type SankeyEntry = [string, number]
+
+export interface SankeyBuildResult {
+  csv: string
+  dynamicHeight: number
+  isGrouped: boolean
+}
+
+function normalizeAggregateLabel(value: string): string {
+  return (
+    value
+      .replace(/\s*-\s*/g, " - ")
+      .replace(/\s+/g, " ")
+      .trim() || "Unnamed"
+  )
+}
+
+function sortByAmountDesc(a: SankeyEntry, b: SankeyEntry) {
+  if (b[1] !== a[1]) return b[1] - a[1]
+  return a[0].localeCompare(b[0])
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value))
+}
+
+function groupTopEntries(
+  entries: SankeyEntry[],
+  limit: number,
+  otherLabel: string
+): { entries: SankeyEntry[]; grouped: boolean } {
+  const positive = entries.filter(([, amount]) => amount > 0).sort(sortByAmountDesc)
+  if (positive.length <= limit) {
+    return { entries: positive, grouped: false }
+  }
+
+  const kept = positive.slice(0, limit)
+  const otherTotal = positive.slice(limit).reduce((sum, [, amount]) => sum + amount, 0)
+  const groupedEntries = otherTotal > 0 ? [...kept, [otherLabel, otherTotal] as SankeyEntry] : kept
+
+  return { entries: groupedEntries.sort(sortByAmountDesc), grouped: true }
+}
+
+function accumulateAmount(map: Record<string, number>, label: string, amount: number): void {
+  if (amount <= 0) return
+  const normalizedLabel = normalizeAggregateLabel(label)
+  map[normalizedLabel] = (map[normalizedLabel] || 0) + amount
+}
+
+export function buildSankeyData(
   transactions: Transaction[],
   accountsMap?: AccountMap,
   deductionsMap?: DeductionsMap
-): string {
+): SankeyBuildResult {
   const incomeBySource: Record<string, number> = {}
   const expenseByCategory: Record<string, number> = {}
   const assetTransferByDestination: Record<string, number> = {}
@@ -54,7 +110,7 @@ function buildSankeyCsv(
       if (isInvestment && account) {
         // Investment contributions (e.g. direct RRSP/TFSA deposits) — separate flow
         const label = `To ${account.name}`
-        investmentContribByDest[label] = (investmentContribByDest[label] || 0) + netAmount
+        accumulateAmount(investmentContribByDest, label, netAmount)
         totalInvestmentContributions += netAmount
       } else {
         // Regular cash income — flows into Total Income
@@ -67,28 +123,28 @@ function buildSankeyCsv(
         const deductionSum = txDeductions.reduce((s, d) => s + (Number(d.amount) || 0), 0)
         const grossAmount = netAmount + deductionSum
 
-        incomeBySource[incomeLabel] = (incomeBySource[incomeLabel] || 0) + grossAmount
+        accumulateAmount(incomeBySource, incomeLabel, grossAmount)
         totalIncome += grossAmount
 
         // Accumulate deductions by label
         for (const d of txDeductions) {
           const dedLabel = d.label || "Deduction"
           const dedAmount = Number(d.amount) || 0
-          deductionByLabel[dedLabel] = (deductionByLabel[dedLabel] || 0) + dedAmount
+          accumulateAmount(deductionByLabel, dedLabel, dedAmount)
           totalDeductions += dedAmount
         }
       }
     } else if (t.transaction_type === "outgoing") {
       const category = t.category || "Expense"
       const amount = getSpendingAmount(t)
-      expenseByCategory[category] = (expenseByCategory[category] || 0) + amount
+      accumulateAmount(expenseByCategory, category, amount)
       totalExpenses += amount
     } else if (t.transaction_type === "transfer" && t.to_account_type_id && accountsMap) {
       const toAccount = accountsMap[t.to_account_type_id]
       if (toAccount?.category === "asset") {
         const label = `To ${toAccount.name}`
         const amount = Number(t.amount) || 0
-        assetTransferByDestination[label] = (assetTransferByDestination[label] || 0) + amount
+        accumulateAmount(assetTransferByDestination, label, amount)
         totalAssetTransfers += amount
       }
       // Transfers to liability (e.g. CC payments) are excluded from diagram
@@ -100,16 +156,18 @@ function buildSankeyCsv(
   const investmentContribLabel = "Investment Contributions"
   const savingsLabel = "Savings"
   const shortfallLabel = "Cash Drawdown"
-  const sortByAmountDesc = (a: [string, number], b: [string, number]) => {
-    if (b[1] !== a[1]) return b[1] - a[1]
-    return a[0].localeCompare(b[0])
-  }
+  const groupedIncomeSources = groupTopEntries(
+    Object.entries(incomeBySource),
+    TOP_INCOME_SOURCES,
+    "Other Income Sources"
+  )
+  const investmentDestinations = Object.entries(investmentContribByDest)
+    .filter(([, amount]) => amount > 0)
+    .sort(sortByAmountDesc)
 
   // Income sources (gross) → Total Income
-  Object.entries(incomeBySource).sort(sortByAmountDesc).forEach(([sourceLabel, amount]) => {
-    if (amount > 0) {
-      lines.push(`${escapeCsvValue(sourceLabel)}, ${escapeCsvValue(totalIncomeLabel)}, ${amount}`)
-    }
+  groupedIncomeSources.entries.forEach(([sourceLabel, amount]) => {
+    lines.push(`${escapeCsvValue(sourceLabel)}, ${escapeCsvValue(totalIncomeLabel)}, ${amount}`)
   })
 
   // Residual balance: gross income - expenses - transfers - deductions
@@ -128,42 +186,70 @@ function buildSankeyCsv(
   if (residual > 0) {
     outflows.push([savingsLabel, residual])
   }
-  outflows
-    .filter(([, amount]) => amount > 0)
-    .sort(sortByAmountDesc)
-    .forEach(([label, amount]) => {
-      lines.push(`${escapeCsvValue(totalIncomeLabel)}, ${escapeCsvValue(label)}, ${amount}`)
-    })
+  const groupedOutflows = groupTopEntries(outflows, TOP_OUTFLOWS, "Other Outflows")
+  groupedOutflows.entries.forEach(([label, amount]) => {
+    lines.push(`${escapeCsvValue(totalIncomeLabel)}, ${escapeCsvValue(label)}, ${amount}`)
+  })
 
   // Investment contributions as a separate flow (not part of Total Income)
   if (totalInvestmentContributions > 0) {
-    Object.entries(investmentContribByDest).sort(sortByAmountDesc).forEach(([label, amount]) => {
-      if (amount > 0) {
-        lines.push(`${escapeCsvValue(investmentContribLabel)}, ${escapeCsvValue(label)}, ${amount}`)
-      }
+    investmentDestinations.forEach(([label, amount]) => {
+      lines.push(`${escapeCsvValue(investmentContribLabel)}, ${escapeCsvValue(label)}, ${amount}`)
     })
   }
 
+  const leftNodes =
+    groupedIncomeSources.entries.length + (residual < 0 ? 1 : 0) + (totalInvestmentContributions > 0 ? 1 : 0)
+  const rightNodes = groupedOutflows.entries.length + investmentDestinations.length
+  const maxColumnNodes = Math.max(leftNodes, rightNodes)
+  const dynamicHeight = clamp(
+    (maxColumnNodes + NODE_HEIGHT_BUFFER) * NODE_HEIGHT_MULTIPLIER,
+    MIN_SANKEY_HEIGHT,
+    MAX_SANKEY_HEIGHT
+  )
+
+  const isGrouped = groupedIncomeSources.grouped || groupedOutflows.grouped
+
   if (lines.length === 0) {
-    return ""
+    return {
+      csv: "",
+      dynamicHeight: MIN_SANKEY_HEIGHT,
+      isGrouped,
+    }
   }
-  return `sankey-beta\n${lines.join("\n")}`
+
+  return {
+    csv: `sankey-beta\n${lines.join("\n")}`,
+    dynamicHeight,
+    isGrouped,
+  }
 }
 
 interface MermaidSankeyProps {
   transactions: Transaction[]
   accountsMap?: AccountMap
   deductionsMap?: DeductionsMap
+  buildResult?: SankeyBuildResult
   className?: string
 }
 
-export function MermaidSankey({ transactions, accountsMap, deductionsMap, className }: MermaidSankeyProps) {
+export function MermaidSankey({
+  transactions,
+  accountsMap,
+  deductionsMap,
+  buildResult,
+  className,
+}: MermaidSankeyProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const reactId = useId().replace(/:/g, "-")
   const renderCountRef = useRef(0)
+  const sankeyData = useMemo(
+    () => buildResult ?? buildSankeyData(transactions, accountsMap, deductionsMap),
+    [buildResult, transactions, accountsMap, deductionsMap]
+  )
 
   useLayoutEffect(() => {
-    const csv = buildSankeyCsv(transactions, accountsMap, deductionsMap)
+    const csv = sankeyData.csv
     if (!csv) return
 
     renderCountRef.current += 1
@@ -175,8 +261,9 @@ export function MermaidSankey({ transactions, accountsMap, deductionsMap, classN
       securityLevel: "loose",
       sankey: {
         width: 1400,
-        height: 700,
+        height: sankeyData.dynamicHeight,
         useMaxWidth: true,
+        showValues: true,
       },
     })
 
@@ -214,9 +301,9 @@ export function MermaidSankey({ transactions, accountsMap, deductionsMap, classN
       cancelled = true
       cancelAnimationFrame(rafId)
     }
-  }, [transactions, accountsMap, deductionsMap, reactId]);
+  }, [sankeyData, reactId]);
 
-  const csv = buildSankeyCsv(transactions, accountsMap, deductionsMap)
+  const csv = sankeyData.csv
   if (!csv) {
     return (
       <div className={className}>
@@ -229,7 +316,7 @@ export function MermaidSankey({ transactions, accountsMap, deductionsMap, classN
     <div
       ref={containerRef}
       className={className}
-      style={{ minHeight: "70vh", width: "100%" }}
+      style={{ minHeight: `${sankeyData.dynamicHeight}px`, width: "100%" }}
     />
   )
 }
