@@ -1,6 +1,6 @@
 "use client"
 import { useState, useEffect, useMemo } from 'react';
-import dynamic from 'next/dynamic';
+import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Button } from '@/components/ui/button';
@@ -15,6 +15,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { ChevronDown, ChevronRight, Pencil, Plus, Trash2 } from 'lucide-react';
 import { accountIcons, CATEGORY_COLORS } from '@/lib/constants';
 import { getAccounts, deleteAccount } from '@/lib/accounts';
@@ -29,33 +36,6 @@ const TIMELINE_OPTIONS = [
   { value: "year-to-date", label: "Year to Date" },
   { value: "all-time", label: "All Time" },
 ];
-
-function TimelineSelectInner({ value, onValueChange }: { value: string; onValueChange: (value: string) => void }) {
-  const { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } = require("@/components/ui/select");
-  
-  return (
-    <Select value={value} onValueChange={onValueChange}>
-      <SelectTrigger className="w-[180px]">
-        <SelectValue placeholder="Select timeline" />
-      </SelectTrigger>
-      <SelectContent>
-        {TIMELINE_OPTIONS.map((option) => (
-          <SelectItem key={option.value} value={option.value}>
-            {option.label}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
-  );
-}
-
-const TimelineSelect = dynamic(() => Promise.resolve(TimelineSelectInner), {
-  ssr: false,
-  loading: () => (
-    <div className="w-[180px] h-12 rounded-lg border border-input bg-background animate-pulse" />
-  ),
-});
-
 
 interface Account {
   id: string;
@@ -109,6 +89,7 @@ const transformAccountsFromApi = (accountsData: Awaited<ReturnType<typeof getAcc
   }));
 
 export default function Accounts() {
+  const router = useRouter();
   const [isAddAccountOpen, setIsAddAccountOpen] = useState(false);
   const [editingAccount, setEditingAccount] = useState<Account | null>(null);
   const [accountToDelete, setAccountToDelete] = useState<Account | null>(null);
@@ -243,14 +224,25 @@ export default function Accounts() {
     {/* Net Worth Chart */}
     <Card className="w-full mb-6">
         <CardHeader>
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <div>
                     <CardTitle>Net Worth Over Time</CardTitle>
                     <CardDescription>
                       Current: {formatCurrency(currentNetWorth)}
                     </CardDescription>
                 </div>
-                <TimelineSelect value={netWorthTimeline} onValueChange={setNetWorthTimeline} />
+                <Select value={netWorthTimeline} onValueChange={setNetWorthTimeline}>
+                  <SelectTrigger className="w-full sm:w-[180px]" aria-label="Select timeline range">
+                    <SelectValue placeholder="Select timeline" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {TIMELINE_OPTIONS.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
             </div>
         </CardHeader>
         <CardContent className="pt-6">
@@ -386,7 +378,16 @@ export default function Accounts() {
                                             return (
                                             <div
                                                 key={account.id}
-                                                className="flex items-center justify-between p-4 hover:bg-accent/50 transition-colors border-b last:border-b-0"
+                                                className="flex cursor-pointer items-center justify-between border-b p-4 transition-colors hover:bg-accent/50 last:border-b-0"
+                                                role="button"
+                                                tabIndex={0}
+                                                onClick={() => router.push(`/accounts/${account.id}`)}
+                                                onKeyDown={(event) => {
+                                                  if (event.key === 'Enter' || event.key === ' ') {
+                                                    event.preventDefault();
+                                                    router.push(`/accounts/${account.id}`);
+                                                  }
+                                                }}
                                             >
                                                 <div className="flex items-center gap-4 flex-1 min-w-0">
                                                     <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center shrink-0">

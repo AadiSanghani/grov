@@ -94,6 +94,33 @@ export async function getTransactionsInRange(startDate: string, endDate: string)
   return data?.map(mapTransactionForClient) as Transaction[]
 }
 
+export async function getRecentTransactionsForAccount(
+  accountId: string | number,
+  limit: number = 10
+) {
+  const supabase = createServerSupabaseClient()
+  const { userId } = await auth()
+
+  if (!userId) {
+    throw new Error('User not authenticated')
+  }
+
+  const normalizedAccountId = typeof accountId === 'number' ? String(accountId) : accountId
+
+  const { data, error } = await supabase
+    .from('transactions')
+    .select('*')
+    .eq('user_id', userId)
+    .or(`account_type_id.eq.${normalizedAccountId},to_account_type_id.eq.${normalizedAccountId}`)
+    .order('date', { ascending: false })
+    .order('created_at', { ascending: false })
+    .limit(limit)
+
+  if (error) throw error
+
+  return data?.map(mapTransactionForClient) as Transaction[]
+}
+
 export async function createTransaction(data: {
   transaction_type: "outgoing" | "incoming" | "transfer"
   incoming_subtype?: "income" | "reimbursement" | null

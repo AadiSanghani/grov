@@ -2,7 +2,8 @@
 
 import { createServerSupabaseClient } from '@/ssr/client'
 import { auth } from '@clerk/nextjs/server'
-import { DailyBalance, NetWorthDataPoint } from './types'
+import { eachDayOfInterval, eachMonthOfInterval, endOfMonth, format } from 'date-fns'
+import { AccountGrowthDataPoint, DailyBalance, NetWorthDataPoint } from './types'
 import { getAccountById } from './accounts'
 import { calculateBalanceDelta, getCategoryFromAccountType, toLocalDateString } from './utils'
 
@@ -325,6 +326,131 @@ export async function getNetWorthHistory(
     
     return results.sort((a, b) => a.date.localeCompare(b.date))
   }
+}
+
+function roundTo2(value: number): number {
+  return Math.round((value + Number.EPSILON) * 100) / 100
+}
+
+function getBalanceOnOrBeforeDate(
+  history: Array<{ date: string; balance: number }>,
+  targetDate: string
+): number | null {
+  let result: number | null = null
+  for (const entry of history) {
+    if (entry.date <= targetDate) {
+      result = entry.balance
+    } else {
+      break
+    }
+  }
+  return result
+}
+
+export async function getAccountGrowthHistory(
+  accountId: number,
+  startDate: string,
+  endDate: string,
+  granularity: 'daily' | 'monthly' = 'daily'
+): Promise<AccountGrowthDataPoint[]> {
+  const supabase = createServerSupabaseClient()
+  const { userId } = await auth()
+
+  if (!userId) {
+    throw new Error('User not authenticated')
+  }
+
+  const { data: balances, error } = await supabase
+    .from('account_daily_balances')
+    .select('date, balance_amount')
+    .eq('user_id', userId)
+    .eq('account_id', accountId)
+    .lte('date', endDate)
+    .order('date', { ascending: true })
+
+  if (error) throw error
+  if (!balances || balances.length === 0) return []
+
+  const history = balances.map((row) => ({
+    date: row.date,
+    balance: Number(row.balance_amount),
+  }))
+
+  const firstHistoryDate = history[0]?.date
+  if (!firstHistoryDate) return []
+
+  const rangeHasStartingBalance = firstHistoryDate <= startDate
+
+  if (granularity === 'daily') {
+    const allDaysInRange = eachDayOfInterval({
+      start: new Date(`${startDate}T12:00:00.000Z`),
+      end: new Date(`${endDate}T12:00:00.000Z`),
+    }).map((date) => format(date, 'yyyy-MM-dd'))
+
+    const effectiveDates = rangeHasStartingBalance
+      ? allDaysInRange
+      : allDaysInRange.filter((date) => date >= firstHistoryDate)
+
+    if (effectiveDates.length === 0) return []
+
+    const firstBalance = getBalanceOnOrBeforeDate(history, effectiveDates[0])
+    if (firstBalance == null) return []
+
+    return effectiveDates.map((date) => {
+      const balance = getBalanceOnOrBeforeDate(history, date) ?? firstBalance
+      const growthAmount = balance - firstBalance
+      const growthPct =
+        firstBalance === 0
+          ? 0
+          : (growthAmount / Math.abs(firstBalance)) * 100
+
+      return {
+        date,
+        balance: roundTo2(balance),
+        growth_amount: roundTo2(growthAmount),
+        growth_pct: roundTo2(growthPct),
+      }
+    })
+  }
+
+  const monthStarts = eachMonthOfInterval({
+    start: new Date(`${startDate}T12:00:00.000Z`),
+    end: new Date(`${endDate}T12:00:00.000Z`),
+  })
+
+  const monthKeys = monthStarts.map((month) => format(month, 'yyyy-MM'))
+  const firstHistoryMonth = firstHistoryDate.slice(0, 7)
+  const effectiveMonths = rangeHasStartingBalance
+    ? monthKeys
+    : monthKeys.filter((month) => month >= firstHistoryMonth)
+
+  if (effectiveMonths.length === 0) return []
+
+  const firstMonthSnapshotDate = `${effectiveMonths[0]}-01`
+  const firstMonthEndDate = format(endOfMonth(new Date(`${firstMonthSnapshotDate}T12:00:00.000Z`)), 'yyyy-MM-dd')
+  const firstSnapshotDate = firstMonthEndDate > endDate ? endDate : firstMonthEndDate
+  const firstBalance = getBalanceOnOrBeforeDate(history, firstSnapshotDate)
+
+  if (firstBalance == null) return []
+
+  return effectiveMonths.map((month) => {
+    const monthDate = `${month}-01`
+    const monthEndDate = format(endOfMonth(new Date(`${monthDate}T12:00:00.000Z`)), 'yyyy-MM-dd')
+    const snapshotDate = monthEndDate > endDate ? endDate : monthEndDate
+    const balance = getBalanceOnOrBeforeDate(history, snapshotDate) ?? firstBalance
+    const growthAmount = balance - firstBalance
+    const growthPct =
+      firstBalance === 0
+        ? 0
+        : (growthAmount / Math.abs(firstBalance)) * 100
+
+    return {
+      date: month,
+      balance: roundTo2(balance),
+      growth_amount: roundTo2(growthAmount),
+      growth_pct: roundTo2(growthPct),
+    }
+  })
 }
 
 /**
