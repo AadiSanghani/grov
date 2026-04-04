@@ -79,42 +79,43 @@ function ReportsDateSelect() {
         </SelectContent>
       </Select>
 
-      <Popover>
-        <PopoverTrigger asChild>
-          <Button
-            variant="outline"
-            id="date-picker-range"
-            className={cn(
-              "h-9 justify-start px-2.5 font-normal text-sm min-w-[220px]",
-              timeline !== "custom" && "text-muted-foreground",
-              !date?.from && "text-muted-foreground"
-            )}
-          >
-            <CalendarIcon className="mr-2 h-4 w-4 shrink-0" />
-            {timeline === "custom" && date?.from ? (
-              date.to ? (
-                <>
-                  {format(date.from, "LLL dd, y")} -{" "}
-                  {format(date.to, "LLL dd, y")}
-                </>
+      {timeline === "custom" && (
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button
+              variant="outline"
+              id="date-picker-range"
+              className={cn(
+                "h-9 justify-start px-2.5 font-normal text-sm min-w-[220px]",
+                !date?.from && "text-muted-foreground"
+              )}
+            >
+              <CalendarIcon className="mr-2 h-4 w-4 shrink-0" />
+              {date?.from ? (
+                date.to ? (
+                  <>
+                    {format(date.from, "LLL dd, y")} -{" "}
+                    {format(date.to, "LLL dd, y")}
+                  </>
+                ) : (
+                  format(date.from, "LLL dd, y")
+                )
               ) : (
-                format(date.from, "LLL dd, y")
-              )
-            ) : (
-              <span>Select custom range</span>
-            )}
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent className="w-auto p-0" align="end">
-          <Calendar
-            mode="range"
-            defaultMonth={date?.from}
-            selected={date}
-            onSelect={handleSelect}
-            numberOfMonths={2}
-          />
-        </PopoverContent>
-      </Popover>
+                <span>Pick a date</span>
+              )}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0" align="end">
+            <Calendar
+              mode="range"
+              defaultMonth={date?.from}
+              selected={date}
+              onSelect={handleSelect}
+              numberOfMonths={2}
+            />
+          </PopoverContent>
+        </Popover>
+      )}
     </div>
   )
 }
