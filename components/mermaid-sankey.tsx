@@ -21,7 +21,10 @@ function escapeCsvValue(value: string): string {
   return safe
 }
 
-export type AccountMap = Record<string, { name: string; category: "asset" | "liability"; accountType: string }>
+export type AccountMap = Record<
+  string,
+  { name: string; category: "asset" | "liability"; accountType: string; accountSubtype: string }
+>
 
 /** Map of transaction id -> PayrollDeduction[] */
 export type DeductionsMap = Record<string, PayrollDeduction[]>
@@ -39,6 +42,11 @@ export interface SankeyBuildResult {
   csv: string
   dynamicHeight: number
   isGrouped: boolean
+  excludedInternalTransfers: {
+    count: number
+    totalAmount: number
+    topDestinations: Array<{ destination: string; amount: number }>
+  }
 }
 
 function normalizeAggregateLabel(value: string): string {
@@ -97,6 +105,9 @@ export function buildSankeyData(
   let totalAssetTransfers = 0
   let totalDeductions = 0
   let totalInvestmentContributions = 0
+  let excludedInternalTransferCount = 0
+  let excludedInternalTransferTotal = 0
+  const excludedInternalTransferByDestination: Record<string, number> = {}
 
   transactions.forEach((t) => {
     if (t.transaction_type === "incoming") {
@@ -141,13 +152,33 @@ export function buildSankeyData(
       totalExpenses += amount
     } else if (t.transaction_type === "transfer" && t.to_account_type_id && accountsMap) {
       const toAccount = accountsMap[t.to_account_type_id]
-      if (toAccount?.category === "asset") {
-        const label = `To ${toAccount.name}`
-        const amount = Number(t.amount) || 0
-        accumulateAmount(assetTransferByDestination, label, amount)
-        totalAssetTransfers += amount
+      const fromAccount = t.account_type_id != null ? accountsMap[t.account_type_id] : undefined
+      const amount = Number(t.amount) || 0
+
+      if (!toAccount || amount <= 0) {
+        return
       }
-      // Transfers to liability (e.g. CC payments) are excluded from diagram
+      if (toAccount.category !== "asset") {
+        // Transfers to liability (e.g. CC payments) are excluded from diagram
+        return
+      }
+
+      const isCashToCash = fromAccount?.accountType === "Cash" && toAccount.accountType === "Cash"
+      const shouldIncludeCashToCash = isCashToCash && toAccount.accountSubtype === "Savings"
+      const shouldExcludeAsInternal = isCashToCash && !shouldIncludeCashToCash
+
+      if (shouldExcludeAsInternal) {
+        const destinationLabel = normalizeAggregateLabel(`To ${toAccount.name}`)
+        excludedInternalTransferCount += 1
+        excludedInternalTransferTotal += amount
+        excludedInternalTransferByDestination[destinationLabel] =
+          (excludedInternalTransferByDestination[destinationLabel] || 0) + amount
+        return
+      }
+
+      const label = `To ${toAccount.name}`
+      accumulateAmount(assetTransferByDestination, label, amount)
+      totalAssetTransfers += amount
     }
   })
 
@@ -209,12 +240,22 @@ export function buildSankeyData(
   )
 
   const isGrouped = groupedIncomeSources.grouped || groupedOutflows.grouped
+  const excludedTopDestinations = Object.entries(excludedInternalTransferByDestination)
+    .filter(([, amount]) => amount > 0)
+    .sort(sortByAmountDesc)
+    .slice(0, 3)
+    .map(([destination, amount]) => ({ destination, amount }))
 
   if (lines.length === 0) {
     return {
       csv: "",
       dynamicHeight: MIN_SANKEY_HEIGHT,
       isGrouped,
+      excludedInternalTransfers: {
+        count: excludedInternalTransferCount,
+        totalAmount: excludedInternalTransferTotal,
+        topDestinations: excludedTopDestinations,
+      },
     }
   }
 
@@ -222,6 +263,11 @@ export function buildSankeyData(
     csv: `sankey-beta\n${lines.join("\n")}`,
     dynamicHeight,
     isGrouped,
+    excludedInternalTransfers: {
+      count: excludedInternalTransferCount,
+      totalAmount: excludedInternalTransferTotal,
+      topDestinations: excludedTopDestinations,
+    },
   }
 }
 
