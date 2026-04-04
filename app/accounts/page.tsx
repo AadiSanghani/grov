@@ -51,6 +51,12 @@ interface GroupedAccounts {
   [key: string]: Account[];
 }
 
+interface AccountDisplayGroup {
+  key: string
+  label: string
+  accounts: Account[]
+}
+
 const ASSET_TYPES = ['Cash', 'Investments', 'Real Estate', 'Valuables', 'Other Assets'];
 const LIABILITY_TYPES = ['Credit Card', 'Mortgage', 'Loans', 'Vehicles','Other Liabilities' ];
 
@@ -191,6 +197,30 @@ export default function Accounts() {
     acc[account.type].push(account);
     return acc;
   }, {} as GroupedAccounts);
+
+  const displayGroups = useMemo<AccountDisplayGroup[]>(() => {
+    const byBalanceDesc = (a: Account, b: Account) => b.balance - a.balance
+
+    const cashAccounts = accounts
+      .filter((account) => account.type === 'Cash')
+      .sort(byBalanceDesc)
+
+    const investmentAccounts = accounts
+      .filter((account) => account.type === 'Investments')
+      .sort(byBalanceDesc)
+
+    const liabilityAccounts = accounts
+      .filter((account) => LIABILITY_TYPES.includes(account.type))
+      .sort(byBalanceDesc)
+
+    const groups: AccountDisplayGroup[] = [
+      { key: 'cash', label: 'Cash', accounts: cashAccounts },
+      { key: 'investments', label: 'Investments', accounts: investmentAccounts },
+      { key: 'liabilities', label: 'Liabilities', accounts: liabilityAccounts },
+    ]
+
+    return groups.filter((group) => group.accounts.length > 0)
+  }, [accounts])
 
   const getGroupTotal = (groupName: string) => {
     return groupedAccounts[groupName]?.reduce((sum, acc) => sum + acc.balance, 0) || 0;
@@ -349,16 +379,16 @@ export default function Accounts() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Accounts Grouped List - Takes 2 columns */}
             <div className="lg:col-span-2 space-y-4">
-                {Object.keys(groupedAccounts).length > 0 ? (
-                    Object.entries(groupedAccounts).map(([groupName, groupAccounts]) => {
-                        const isCollapsed = collapsedGroups.has(groupName);
-                        const total = getGroupTotal(groupName);
+                {displayGroups.length > 0 ? (
+                    displayGroups.map((group) => {
+                        const isCollapsed = collapsedGroups.has(group.key);
+                        const total = group.accounts.reduce((sum, acc) => sum + acc.balance, 0);
                         
                         return (
-                            <Card key={groupName} className="w-full">
+                            <Card key={group.key} className="w-full">
                                 <div
                                     className="flex items-center justify-between p-4 cursor-pointer hover:bg-accent/50 transition-colors"
-                                    onClick={() => toggleGroup(groupName)}
+                                    onClick={() => toggleGroup(group.key)}
                                 >
                                     <div className="flex items-center gap-3">
                                         {isCollapsed ? (
@@ -366,14 +396,14 @@ export default function Accounts() {
                                         ) : (
                                             <ChevronDown className="h-4 w-4 text-muted-foreground" />
                                         )}
-                                        <span className="font-semibold">{groupName}</span>
+                                        <span className="font-semibold">{group.label}</span>
                                     </div>
                                     <span className="font-semibold">{formatCurrency(total)}</span>
                                 </div>
 
                                 {!isCollapsed && (
                                     <div className="border-t">
-                                        {groupAccounts.map((account) => {
+                                        {group.accounts.map((account) => {
                                             const IconComponent = account.icon;
                                             return (
                                             <div
