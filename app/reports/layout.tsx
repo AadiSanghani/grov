@@ -53,9 +53,14 @@ function ReportsDateSelect() {
   const handleSelect = (range: DateRange | undefined) => {
     setDate(range)
     if (range?.from && range?.to) {
-      const start = range.from.toISOString().slice(0, 10)
-      const end = range.to.toISOString().slice(0, 10)
-      if (start <= end) setCustomDateRange(start, end)
+      const start = format(range.from, "yyyy-MM-dd")
+      const end = format(range.to, "yyyy-MM-dd")
+      if (start <= end) {
+        setCustomDateRange(start, end)
+        if (timeline !== "custom") {
+          setTimeline("custom")
+        }
+      }
     }
   }
 
@@ -74,43 +79,42 @@ function ReportsDateSelect() {
         </SelectContent>
       </Select>
 
-      {timeline === "custom" && (
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button
-              variant="outline"
-              id="date-picker-range"
-              className={cn(
-                "h-9 justify-start px-2.5 font-normal text-sm min-w-[200px]",
-                !date?.from && "text-muted-foreground"
-              )}
-            >
-              <CalendarIcon className="mr-2 h-4 w-4 shrink-0" />
-              {date?.from ? (
-                date.to ? (
-                  <>
-                    {format(date.from, "LLL dd, y")} -{" "}
-                    {format(date.to, "LLL dd, y")}
-                  </>
-                ) : (
-                  format(date.from, "LLL dd, y")
-                )
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button
+            variant="outline"
+            id="date-picker-range"
+            className={cn(
+              "h-9 justify-start px-2.5 font-normal text-sm min-w-[220px]",
+              timeline !== "custom" && "text-muted-foreground",
+              !date?.from && "text-muted-foreground"
+            )}
+          >
+            <CalendarIcon className="mr-2 h-4 w-4 shrink-0" />
+            {timeline === "custom" && date?.from ? (
+              date.to ? (
+                <>
+                  {format(date.from, "LLL dd, y")} -{" "}
+                  {format(date.to, "LLL dd, y")}
+                </>
               ) : (
-                <span>Pick a date</span>
-              )}
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-auto p-0" align="end">
-            <Calendar
-              mode="range"
-              defaultMonth={date?.from}
-              selected={date}
-              onSelect={handleSelect}
-              numberOfMonths={2}
-            />
-          </PopoverContent>
-        </Popover>
-      )}
+                format(date.from, "LLL dd, y")
+              )
+            ) : (
+              <span>Select custom range</span>
+            )}
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-auto p-0" align="end">
+          <Calendar
+            mode="range"
+            defaultMonth={date?.from}
+            selected={date}
+            onSelect={handleSelect}
+            numberOfMonths={2}
+          />
+        </PopoverContent>
+      </Popover>
     </div>
   )
 }

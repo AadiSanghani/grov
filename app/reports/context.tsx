@@ -1,10 +1,11 @@
 "use client"
 
 import { createContext, useContext, useMemo, useState } from "react"
-import { format, subMonths, startOfMonth, startOfYear } from "date-fns"
+import { format, subMonths, startOfMonth, startOfYear, endOfMonth } from "date-fns"
 
 export const TIMELINE_OPTIONS = [
   { value: "month-to-date", label: "Month to Date" },
+  { value: "last-month", label: "Last Month" },
   { value: "last-6-months", label: "Last 6 Months" },
   { value: "year-to-date", label: "Year to Date" },
   { value: "all-time", label: "All Time" },
@@ -20,6 +21,13 @@ export function getReportsDateRange(timeline: string): { startDate: string; endD
   switch (timeline) {
     case "month-to-date":
       return { startDate: format(startOfMonth(today), "yyyy-MM-dd"), endDate }
+    case "last-month": {
+      const lastMonth = subMonths(today, 1)
+      return {
+        startDate: format(startOfMonth(lastMonth), "yyyy-MM-dd"),
+        endDate: format(endOfMonth(lastMonth), "yyyy-MM-dd"),
+      }
+    }
     case "last-6-months":
       return { startDate: format(subMonths(today, 6), "yyyy-MM-dd"), endDate }
     case "year-to-date":
