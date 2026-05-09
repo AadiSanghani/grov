@@ -19,6 +19,10 @@ function formatCurrency(amount: number) {
   }).format(amount)
 }
 
+function formatPeriodLabel(startDate: string, endDate: string) {
+  return `${startDate} to ${endDate}`
+}
+
 export default function CashFlowPage() {
   const { startDate, endDate } = useReportsContext()
   const [transactions, setTransactions] = useState<Transaction[]>([])
@@ -194,6 +198,9 @@ export default function CashFlowPage() {
           <CardTitle>Cash Flow</CardTitle>
           <p className="text-sm text-muted-foreground">
             Income and expenses by category for the selected period.
+          </p>
+          <p className="text-xs text-muted-foreground">
+            Selected period: {formatPeriodLabel(startDate, endDate)}
           </p>
           {sankeyData.isGrouped && (
             <p className="text-xs text-muted-foreground">

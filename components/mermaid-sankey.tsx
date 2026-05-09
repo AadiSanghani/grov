@@ -42,6 +42,8 @@ export interface SankeyBuildResult {
   csv: string
   dynamicHeight: number
   isGrouped: boolean
+  cashDrawdownTotal: number
+  cashDrawdownToWealth: number
   excludedInternalTransfers: {
     count: number
     totalAmount: number
@@ -84,6 +86,10 @@ function groupTopEntries(
   return { entries: groupedEntries.sort(sortByAmountDesc), grouped: true }
 }
 
+function sumEntries(entries: SankeyEntry[]): number {
+  return entries.reduce((sum, [, amount]) => sum + amount, 0)
+}
+
 function accumulateAmount(map: Record<string, number>, label: string, amount: number): void {
   if (amount <= 0) return
   const normalizedLabel = normalizeAggregateLabel(label)
@@ -101,9 +107,6 @@ export function buildSankeyData(
   const deductionByLabel: Record<string, number> = {}
   const investmentContribByDest: Record<string, number> = {}
   let totalIncome = 0
-  let totalExpenses = 0
-  let totalAssetTransfers = 0
-  let totalDeductions = 0
   let totalInvestmentContributions = 0
   let excludedInternalTransferCount = 0
   let excludedInternalTransferTotal = 0
@@ -139,17 +142,23 @@ export function buildSankeyData(
 
         // Accumulate deductions by label
         for (const d of txDeductions) {
-          const dedLabel = d.label || "Deduction"
           const dedAmount = Number(d.amount) || 0
-          accumulateAmount(deductionByLabel, dedLabel, dedAmount)
-          totalDeductions += dedAmount
+          const targetAccount =
+            d.target_account_id != null ? accountsMap?.[String(d.target_account_id)] : undefined
+
+          if (targetAccount?.category === "asset") {
+            const label = `To ${targetAccount.name}`
+            accumulateAmount(assetTransferByDestination, label, dedAmount)
+          } else {
+            const dedLabel = d.label || "Deduction"
+            accumulateAmount(deductionByLabel, dedLabel, dedAmount)
+          }
         }
       }
     } else if (t.transaction_type === "outgoing") {
       const category = t.category || "Expense"
       const amount = getSpendingAmount(t)
       accumulateAmount(expenseByCategory, category, amount)
-      totalExpenses += amount
     } else if (t.transaction_type === "transfer" && t.to_account_type_id && accountsMap) {
       const toAccount = accountsMap[t.to_account_type_id]
       const fromAccount = t.account_type_id != null ? accountsMap[t.account_type_id] : undefined
@@ -184,15 +193,15 @@ export function buildSankeyData(
 
       const label = `To ${toAccount.name}`
       accumulateAmount(assetTransferByDestination, label, amount)
-      totalAssetTransfers += amount
     }
   })
 
   const lines: string[] = []
   const totalIncomeLabel = "Total Income"
-  const investmentContribLabel = "Investment Contributions"
+  const investmentContribLabel = "Direct Investment Deposits"
+  const wealthFundingLabel = "Investment & Savings Funding"
   const savingsLabel = "Savings"
-  const shortfallLabel = "Cash Drawdown"
+  const cashDrawdownLabel = "Existing Cash Used"
   const groupedIncomeSources = groupTopEntries(
     Object.entries(incomeBySource),
     TOP_INCOME_SOURCES,
@@ -207,26 +216,54 @@ export function buildSankeyData(
     lines.push(`${escapeCsvValue(sourceLabel)}, ${escapeCsvValue(totalIncomeLabel)}, ${amount}`)
   })
 
-  // Residual balance: gross income - expenses - transfers - deductions
-  // If negative, show an explicit balancing inflow to avoid implying income covered all outflows.
-  const residual = totalIncome - totalExpenses - totalAssetTransfers - totalDeductions
-  if (residual < 0) {
-    lines.push(`${escapeCsvValue(shortfallLabel)}, ${escapeCsvValue(totalIncomeLabel)}, ${Math.abs(residual)}`)
-  }
-
-  // Unified outflows from Total Income, sorted high → low for stable top-to-bottom ordering.
-  const outflows: Array<[string, number]> = [
+  // Cash expenses and non-investment payroll deductions consume period income first.
+  const cashOutflows: Array<[string, number]> = [
     ...Object.entries(expenseByCategory),
-    ...Object.entries(assetTransferByDestination),
     ...Object.entries(deductionByLabel),
   ]
-  if (residual > 0) {
-    outflows.push([savingsLabel, residual])
-  }
-  const groupedOutflows = groupTopEntries(outflows, TOP_OUTFLOWS, "Other Outflows")
-  groupedOutflows.entries.forEach(([label, amount]) => {
-    lines.push(`${escapeCsvValue(totalIncomeLabel)}, ${escapeCsvValue(label)}, ${amount}`)
+  const groupedCashOutflows = groupTopEntries(cashOutflows, TOP_OUTFLOWS, "Other Outflows")
+  let remainingIncome = totalIncome
+  let cashDrawdownTotal = 0
+
+  groupedCashOutflows.entries.forEach(([label, amount]) => {
+    const incomeFundedAmount = Math.min(amount, remainingIncome)
+    const drawdownFundedAmount = amount - incomeFundedAmount
+
+    if (incomeFundedAmount > 0) {
+      lines.push(`${escapeCsvValue(totalIncomeLabel)}, ${escapeCsvValue(label)}, ${incomeFundedAmount}`)
+      remainingIncome -= incomeFundedAmount
+    }
+    if (drawdownFundedAmount > 0) {
+      lines.push(`${escapeCsvValue(cashDrawdownLabel)}, ${escapeCsvValue(label)}, ${drawdownFundedAmount}`)
+      cashDrawdownTotal += drawdownFundedAmount
+    }
   })
+
+  // Asset transfers and targeted payroll deductions are wealth-building flows, not spending.
+  const groupedWealthDestinations = groupTopEntries(
+    Object.entries(assetTransferByDestination),
+    TOP_OUTFLOWS,
+    "Other Investment & Savings Transfers"
+  )
+  const totalWealthFunding = sumEntries(groupedWealthDestinations.entries)
+  const incomeFundedWealth = Math.min(totalWealthFunding, remainingIncome)
+  const cashDrawdownToWealth = totalWealthFunding - incomeFundedWealth
+
+  if (incomeFundedWealth > 0) {
+    lines.push(`${escapeCsvValue(totalIncomeLabel)}, ${escapeCsvValue(wealthFundingLabel)}, ${incomeFundedWealth}`)
+    remainingIncome -= incomeFundedWealth
+  }
+  if (cashDrawdownToWealth > 0) {
+    lines.push(`${escapeCsvValue(cashDrawdownLabel)}, ${escapeCsvValue(wealthFundingLabel)}, ${cashDrawdownToWealth}`)
+    cashDrawdownTotal += cashDrawdownToWealth
+  }
+  groupedWealthDestinations.entries.forEach(([label, amount]) => {
+    lines.push(`${escapeCsvValue(wealthFundingLabel)}, ${escapeCsvValue(label)}, ${amount}`)
+  })
+
+  if (remainingIncome > 0) {
+    lines.push(`${escapeCsvValue(totalIncomeLabel)}, ${escapeCsvValue(savingsLabel)}, ${remainingIncome}`)
+  }
 
   // Investment contributions as a separate flow (not part of Total Income)
   if (totalInvestmentContributions > 0) {
@@ -236,16 +273,17 @@ export function buildSankeyData(
   }
 
   const leftNodes =
-    groupedIncomeSources.entries.length + (residual < 0 ? 1 : 0) + (totalInvestmentContributions > 0 ? 1 : 0)
-  const rightNodes = groupedOutflows.entries.length + investmentDestinations.length
+    groupedIncomeSources.entries.length + (cashDrawdownTotal > 0 ? 1 : 0) + (totalInvestmentContributions > 0 ? 1 : 0)
+  const middleNodes = totalWealthFunding > 0 ? 2 : 1
+  const rightNodes = groupedCashOutflows.entries.length + groupedWealthDestinations.entries.length + investmentDestinations.length
   const maxColumnNodes = Math.max(leftNodes, rightNodes)
   const dynamicHeight = clamp(
-    (maxColumnNodes + NODE_HEIGHT_BUFFER) * NODE_HEIGHT_MULTIPLIER,
+    (maxColumnNodes + middleNodes + NODE_HEIGHT_BUFFER) * NODE_HEIGHT_MULTIPLIER,
     MIN_SANKEY_HEIGHT,
     MAX_SANKEY_HEIGHT
   )
 
-  const isGrouped = groupedIncomeSources.grouped || groupedOutflows.grouped
+  const isGrouped = groupedIncomeSources.grouped || groupedCashOutflows.grouped || groupedWealthDestinations.grouped
   const excludedTopDestinations = Object.entries(excludedInternalTransferByDestination)
     .filter(([, amount]) => amount > 0)
     .sort(sortByAmountDesc)
@@ -257,6 +295,8 @@ export function buildSankeyData(
       csv: "",
       dynamicHeight: MIN_SANKEY_HEIGHT,
       isGrouped,
+      cashDrawdownTotal,
+      cashDrawdownToWealth,
       excludedInternalTransfers: {
         count: excludedInternalTransferCount,
         totalAmount: excludedInternalTransferTotal,
@@ -269,6 +309,8 @@ export function buildSankeyData(
     csv: `sankey-beta\n${lines.join("\n")}`,
     dynamicHeight,
     isGrouped,
+    cashDrawdownTotal,
+    cashDrawdownToWealth,
     excludedInternalTransfers: {
       count: excludedInternalTransferCount,
       totalAmount: excludedInternalTransferTotal,
