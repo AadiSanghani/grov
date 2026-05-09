@@ -28,6 +28,8 @@ import {
 import { Input } from "@/components/ui/input"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { TripDialog, toTripDialogValues } from "@/components/trip-dialog"
+import { TripSharedLedger } from "@/components/trip-shared-ledger"
+import { getAccounts, type Account } from "@/lib/accounts"
 import { getCategories } from "@/lib/categories"
 import {
   deleteTrip,
@@ -38,8 +40,16 @@ import {
   setTripTravelTransactions,
   updateTrip,
 } from "@/lib/trips"
+import { getTripSharedLedger } from "@/lib/trip-shared-ledger"
 import { type Category } from "@/lib/categories"
-import { type Transaction, type Trip, type TripMetrics } from "@/lib/types"
+import {
+  type Transaction,
+  type Trip,
+  type TripImportBatch,
+  type TripMetrics,
+  type TripSharedEntry,
+  type TripSharedLedgerSummary,
+} from "@/lib/types"
 import { findCategoryByValue, getSpendingAmount, isReimbursementTransaction } from "@/lib/utils"
 
 type TripTravelCandidate = Awaited<ReturnType<typeof getTravelTransactionsForTrip>>[number]
@@ -79,6 +89,22 @@ export default function TripDetailPage() {
   const [metrics, setMetrics] = useState<TripMetrics | null>(null)
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [categories, setCategories] = useState<Category[]>([])
+  const [accounts, setAccounts] = useState<Account[]>([])
+  const [sharedEntries, setSharedEntries] = useState<TripSharedEntry[]>([])
+  const [sharedBatches, setSharedBatches] = useState<TripImportBatch[]>([])
+  const [sharedSummary, setSharedSummary] = useState<TripSharedLedgerSummary>({
+    importedRows: 0,
+    expenseRows: 0,
+    paymentRows: 0,
+    ignoredRows: 0,
+    myTripSpend: 0,
+    paidByMe: 0,
+    paidByOthersForMe: 0,
+    reimbursements: 0,
+    netBalance: 0,
+    settled: false,
+    currency: null,
+  })
 
   const loadData = useCallback(async () => {
     if (!tripId) return
@@ -90,16 +116,27 @@ export default function TripDetailPage() {
         getTripTransactions(tripId),
         getCategories(),
       ])
+      const [accountsData, sharedLedgerData] = await Promise.all([
+        getAccounts(),
+        getTripSharedLedger(tripId),
+      ])
       setTrip(tripData)
       setMetrics(metricsData)
       setTransactions(transactionData)
       setCategories(categoriesData ?? [])
+      setAccounts(accountsData ?? [])
+      setSharedEntries(sharedLedgerData.entries)
+      setSharedBatches(sharedLedgerData.batches)
+      setSharedSummary(sharedLedgerData.summary)
     } catch (error) {
       console.error("Failed to load trip detail:", error)
       setTrip(null)
       setMetrics(null)
       setTransactions([])
       setCategories([])
+      setAccounts([])
+      setSharedEntries([])
+      setSharedBatches([])
     } finally {
       setLoading(false)
     }
@@ -327,6 +364,16 @@ export default function TripDetailPage() {
           </CardContent>
         </Card>
       </div>
+
+      <TripSharedLedger
+        tripId={tripId}
+        accounts={accounts}
+        categories={categories}
+        entries={sharedEntries}
+        batches={sharedBatches}
+        summary={sharedSummary}
+        onAfterChange={loadData}
+      />
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
