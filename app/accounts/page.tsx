@@ -22,7 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { ChevronDown, ChevronRight, Pencil, Plus, Trash2 } from 'lucide-react';
+import { Archive, ChevronDown, ChevronRight, Pencil, Plus } from 'lucide-react';
 import { accountIcons, CATEGORY_COLORS } from '@/lib/constants';
 import { getAccounts, deleteAccount } from '@/lib/accounts';
 import { toast } from 'sonner';
@@ -121,9 +121,9 @@ export default function Accounts() {
       const accountsData = await getAccounts();
       setAccounts(transformAccountsFromApi(accountsData));
       setAccountToDelete(null);
-      toast.success('Account deleted');
+      toast.success('Account archived');
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Failed to delete account');
+      toast.error(e instanceof Error ? e.message : 'Failed to archive account');
     }
   };
 
@@ -352,15 +352,15 @@ export default function Accounts() {
           setAccounts={setAccounts}
         />
 
-        {/* Delete Account Confirmation Modal */}
+        {/* Archive Account Confirmation Modal */}
         <Dialog open={!!accountToDelete} onOpenChange={(open) => !open && setAccountToDelete(null)}>
           <DialogContent showCloseButton={true}>
             <DialogHeader>
-              <DialogTitle>Delete account</DialogTitle>
+              <DialogTitle>Archive account</DialogTitle>
               <DialogDescription>
                 {accountToDelete ? (
                   <>
-                    Are you sure you want to delete <strong>{accountToDelete.name}</strong>? Transactions that used this account will remain but will no longer be linked to an account.
+                    Archive <strong>{accountToDelete.name}</strong>? It will be hidden from active account lists, but historical transactions and reports will keep their account links.
                   </>
                 ) : null}
               </DialogDescription>
@@ -370,7 +370,7 @@ export default function Accounts() {
                 Cancel
               </Button>
               <Button variant="destructive" onClick={handleDeleteAccount}>
-                Delete
+                Archive
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -432,8 +432,8 @@ export default function Accounts() {
                                                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); setEditingAccount(account); }} aria-label="Edit account">
                                                         <Pencil className="h-4 w-4" />
                                                     </Button>
-                                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={(e) => { e.stopPropagation(); setAccountToDelete(account); }} aria-label="Delete account">
-                                                        <Trash2 className="h-4 w-4" />
+                                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={(e) => { e.stopPropagation(); setAccountToDelete(account); }} aria-label="Archive account">
+                                                        <Archive className="h-4 w-4" />
                                                     </Button>
                                                 </div>
                                                 <div className="text-right w-24 shrink-0">

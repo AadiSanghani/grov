@@ -11,10 +11,11 @@ export interface Account {
   account_balance: string
   account_subtype: string
   category: 'asset' | 'liability'
+  archived_at?: string | null
   user_id?: string
 }
 
-export async function getAccounts() {
+export async function getAccounts(options: { includeArchived?: boolean } = {}) {
   const supabase = createServerSupabaseClient()
   const { userId } = await auth()
   
@@ -22,11 +23,17 @@ export async function getAccounts() {
     throw new Error('User not authenticated')
   }
   
-  const { data, error } = await supabase
+  let query = supabase
     .from('account_types')
     .select('*')
     .eq('user_id', userId)
-    
+
+  if (!options.includeArchived) {
+    query = query.is('archived_at', null)
+  }
+
+  const { data, error } = await query
+	    
   if (error) throw error
   return data
 }
@@ -202,9 +209,10 @@ export async function deleteAccount(accountId: string | number) {
 
   const { error } = await supabase
     .from('account_types')
-    .delete()
+    .update({ archived_at: new Date().toISOString() })
     .eq('id', numericAccountId)
     .eq('user_id', userId)
+    .is('archived_at', null)
 
   if (error) throw error
 }

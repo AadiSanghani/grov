@@ -44,6 +44,11 @@ export interface SankeyBuildResult {
   isGrouped: boolean
   cashDrawdownTotal: number
   cashDrawdownToWealth: number
+  excludedIncompleteTransfers: {
+    count: number
+    totalAmount: number
+    topDestinations: Array<{ destination: string; amount: number }>
+  }
   excludedInternalTransfers: {
     count: number
     totalAmount: number
@@ -110,7 +115,10 @@ export function buildSankeyData(
   let totalInvestmentContributions = 0
   let excludedInternalTransferCount = 0
   let excludedInternalTransferTotal = 0
+  let excludedIncompleteTransferCount = 0
+  let excludedIncompleteTransferTotal = 0
   const excludedInternalTransferByDestination: Record<string, number> = {}
+  const excludedIncompleteTransferByDestination: Record<string, number> = {}
 
   transactions.forEach((t) => {
     if (t.transaction_type === "incoming") {
@@ -169,6 +177,14 @@ export function buildSankeyData(
       }
       if (toAccount.category !== "asset") {
         // Transfers to liability (e.g. CC payments) are excluded from diagram
+        return
+      }
+      if (!fromAccount) {
+        const destinationLabel = normalizeAggregateLabel(`To ${toAccount.name}`)
+        excludedIncompleteTransferCount += 1
+        excludedIncompleteTransferTotal += amount
+        excludedIncompleteTransferByDestination[destinationLabel] =
+          (excludedIncompleteTransferByDestination[destinationLabel] || 0) + amount
         return
       }
 
@@ -289,6 +305,11 @@ export function buildSankeyData(
     .sort(sortByAmountDesc)
     .slice(0, 3)
     .map(([destination, amount]) => ({ destination, amount }))
+  const excludedIncompleteTopDestinations = Object.entries(excludedIncompleteTransferByDestination)
+    .filter(([, amount]) => amount > 0)
+    .sort(sortByAmountDesc)
+    .slice(0, 3)
+    .map(([destination, amount]) => ({ destination, amount }))
 
   if (lines.length === 0) {
     return {
@@ -297,6 +318,11 @@ export function buildSankeyData(
       isGrouped,
       cashDrawdownTotal,
       cashDrawdownToWealth,
+      excludedIncompleteTransfers: {
+        count: excludedIncompleteTransferCount,
+        totalAmount: excludedIncompleteTransferTotal,
+        topDestinations: excludedIncompleteTopDestinations,
+      },
       excludedInternalTransfers: {
         count: excludedInternalTransferCount,
         totalAmount: excludedInternalTransferTotal,
@@ -311,6 +337,11 @@ export function buildSankeyData(
     isGrouped,
     cashDrawdownTotal,
     cashDrawdownToWealth,
+    excludedIncompleteTransfers: {
+      count: excludedIncompleteTransferCount,
+      totalAmount: excludedIncompleteTransferTotal,
+      topDestinations: excludedIncompleteTopDestinations,
+    },
     excludedInternalTransfers: {
       count: excludedInternalTransferCount,
       totalAmount: excludedInternalTransferTotal,

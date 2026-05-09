@@ -36,7 +36,7 @@ export default function CashFlowPage() {
       try {
         const [txData, accData] = await Promise.all([
           getTransactionsInRange(startDate, endDate),
-          getAccounts(),
+          getAccounts({ includeArchived: true }),
         ])
         const txs = txData ?? []
         setTransactions(txs)
@@ -205,6 +205,19 @@ export default function CashFlowPage() {
           {sankeyData.isGrouped && (
             <p className="text-xs text-muted-foreground">
               Showing top flows; smaller flows are grouped.
+            </p>
+          )}
+          {sankeyData.excludedIncompleteTransfers.count > 0 && (
+            <p className="text-xs text-muted-foreground">
+              Excluded {sankeyData.excludedIncompleteTransfers.count} transfer
+              {sankeyData.excludedIncompleteTransfers.count === 1 ? "" : "s"} missing a source account (
+              {formatCurrency(sankeyData.excludedIncompleteTransfers.totalAmount)} total
+              {sankeyData.excludedIncompleteTransfers.topDestinations.length > 0
+                ? `, including ${sankeyData.excludedIncompleteTransfers.topDestinations
+                    .map((item) => `${item.destination} ${formatCurrency(item.amount)}`)
+                    .join(", ")}`
+                : ""}
+              ).
             </p>
           )}
         </CardHeader>

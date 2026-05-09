@@ -21,6 +21,7 @@ export async function getInvestmentAccounts(): Promise<InvestmentAccount[]> {
     .select('id, account_name, account_subtype')
     .eq('user_id', resolvedUserId)
     .eq('account_type', 'Investments')
+    .is('archived_at', null)
     .order('account_name', { ascending: true })
 
   if (error) throw error
@@ -46,6 +47,7 @@ export async function assertInvestmentAccountOwnership(
     .eq('id', Number(accountTypeId))
     .eq('user_id', userId)
     .eq('account_type', 'Investments')
+    .is('archived_at', null)
     .maybeSingle()
 
   if (error) throw error
