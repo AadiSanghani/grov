@@ -166,8 +166,14 @@ export function buildSankeyData(
       const isCashToCash = fromAccount?.accountType === "Cash" && toAccount.accountType === "Cash"
       const shouldIncludeCashToCash = isCashToCash && toAccount.accountSubtype === "Savings"
       const shouldExcludeAsInternal = isCashToCash && !shouldIncludeCashToCash
+      const isSameAccountBucketTransfer =
+        !!fromAccount &&
+        fromAccount.category === "asset" &&
+        toAccount.category === "asset" &&
+        fromAccount.accountType === toAccount.accountType &&
+        fromAccount.accountSubtype === toAccount.accountSubtype
 
-      if (shouldExcludeAsInternal) {
+      if (shouldExcludeAsInternal || isSameAccountBucketTransfer) {
         const destinationLabel = normalizeAggregateLabel(`To ${toAccount.name}`)
         excludedInternalTransferCount += 1
         excludedInternalTransferTotal += amount
