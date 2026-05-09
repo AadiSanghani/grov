@@ -665,7 +665,7 @@ function ImportSplitwiseDialog({
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent
-        className="relative flex max-h-[94vh] !w-[96vw] !max-w-[1600px] flex-col overflow-hidden"
+        className="flex max-h-[94vh] !w-[96vw] !max-w-[1600px] flex-col overflow-hidden"
         showCloseButton={!submitting}
         aria-busy={submitting}
       >
