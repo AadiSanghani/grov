@@ -29,6 +29,10 @@ interface TransactionRow {
   notes?: string | null
   spending_amount?: number | null
   to_account_type_id?: string | number | null
+  affects_balance?: boolean | null
+  trip_id?: string | number | null
+  trip_entry_id?: string | number | null
+  source_type?: string | null
   created_at?: string | null
   updated_at?: string | null
 }
@@ -51,6 +55,10 @@ function mapTransactionForClient(transaction: TransactionRow): Transaction {
     spending_amount: transaction.spending_amount ?? null,
     created_at: transaction.created_at ? new Date(String(transaction.created_at)) : undefined,
     updated_at: transaction.updated_at ? new Date(String(transaction.updated_at)) : undefined,
+    affects_balance: transaction.affects_balance ?? true,
+    trip_id: transaction.trip_id != null ? String(transaction.trip_id) : null,
+    trip_entry_id: transaction.trip_entry_id != null ? String(transaction.trip_entry_id) : null,
+    source_type: transaction.source_type ?? null,
   }
 }
 
@@ -127,11 +135,15 @@ export async function createTransaction(data: {
   amount: number
   merchant: string
   date: Date | string
-  account_type_id: string
+  account_type_id: string | null
   category: string
   notes?: string
   spending_amount?: number | null
   to_account_type_id?: string | null
+  affects_balance?: boolean
+  trip_id?: string | null
+  trip_entry_id?: string | null
+  source_type?: string | null
   deductions?: { label: string; amount: number; target_account_id?: number | null }[]
 }) {
   const supabase = createServerSupabaseClient()
@@ -148,8 +160,12 @@ export async function createTransaction(data: {
       : null
   
   const isTransfer = data.transaction_type === 'transfer'
-  if (isTransfer && !data.to_account_type_id) {
-    throw new Error('to_account_type_id is required when transaction_type is transfer')
+  if (isTransfer && (!data.account_type_id || !data.to_account_type_id)) {
+    throw new Error('account_type_id and to_account_type_id are required when transaction_type is transfer')
+  }
+  const affectsBalance = data.affects_balance ?? true
+  if (!isTransfer && affectsBalance && !data.account_type_id) {
+    throw new Error('account_type_id is required when affects_balance is true')
   }
   
   const transactionData: Record<string, unknown> = {
@@ -162,6 +178,10 @@ export async function createTransaction(data: {
     category: data.category,
     notes: data.notes || null,
     incoming_subtype: incomingSubtype,
+    affects_balance: affectsBalance,
+    trip_id: data.trip_id ?? null,
+    trip_entry_id: data.trip_entry_id ?? null,
+    source_type: data.source_type ?? 'manual',
     spending_amount: (data.transaction_type === 'outgoing' && data.spending_amount != null)
       ? data.spending_amount
       : null,
@@ -197,7 +217,10 @@ export async function createTransaction(data: {
 
   after(async () => {
     try {
-      if (isTransfer && data.to_account_type_id) {
+      if (!affectsBalance) {
+        return
+      }
+      if (isTransfer && data.account_type_id && data.to_account_type_id) {
         // Transfer: update both from and to accounts
         const [fromAccount, toAccount] = await Promise.all([
           getAccountById(data.account_type_id),
@@ -230,6 +253,7 @@ export async function createTransaction(data: {
         ])
       } else {
         // Single-account: outgoing or incoming (not transfer)
+        if (!data.account_type_id) return
         const singleType = data.transaction_type as 'outgoing' | 'incoming'
         const account = await getAccountById(data.account_type_id)
         const currentBalance = parseFloat(account.account_balance)
@@ -326,6 +350,10 @@ export async function duplicateTransaction(id: string, date?: Date | string) {
     notes: sourceTx.notes ?? undefined,
     spending_amount: sourceTx.spending_amount ?? null,
     to_account_type_id: sourceTx.to_account_type_id != null ? String(sourceTx.to_account_type_id) : null,
+    affects_balance: sourceTx.affects_balance ?? true,
+    trip_id: sourceTx.trip_id != null ? String(sourceTx.trip_id) : null,
+    trip_entry_id: sourceTx.trip_entry_id != null ? String(sourceTx.trip_entry_id) : null,
+    source_type: sourceTx.source_type ?? 'manual',
     deductions: deductionsInput.length > 0 ? deductionsInput : undefined,
   })
 }
@@ -379,8 +407,14 @@ export async function updateTransaction(
   if (data.account_type_id !== undefined) updateData.account_type_id = data.account_type_id
   if (data.category) updateData.category = data.category
   if (data.notes !== undefined) updateData.notes = data.notes
+  if (data.affects_balance !== undefined) updateData.affects_balance = data.affects_balance
+  if (data.trip_id !== undefined) updateData.trip_id = data.trip_id
+  if (data.trip_entry_id !== undefined) updateData.trip_entry_id = data.trip_entry_id
+  if (data.source_type !== undefined) updateData.source_type = data.source_type
   
   const effectiveType = (data.transaction_type || oldTransaction.transaction_type) as 'outgoing' | 'incoming' | 'transfer'
+  const oldAffectedBalance = oldTransaction.affects_balance ?? true
+  const newAffectsBalance = data.affects_balance ?? oldAffectedBalance
   const effectiveCategory = data.category ?? oldTransaction.category
   if (effectiveType === 'incoming') {
     const existingSubtype =
@@ -449,6 +483,7 @@ export async function updateTransaction(
   after(async () => {
     try {
       const reverseOld = async () => {
+        if (!oldAffectedBalance) return
         if (oldFromId == null) return
         if (oldWasTransfer && oldToId) {
           const [fromAcc, toAcc] = await Promise.all([
@@ -478,6 +513,7 @@ export async function updateTransaction(
       }
 
       const applyNew = async () => {
+        if (!newAffectsBalance) return
         if (newFromId == null) return
         if (newIsTransfer && newToId) {
           const [fromAcc, toAcc] = await Promise.all([
@@ -592,9 +628,13 @@ export async function deleteTransaction(id: string) {
   const wasTransfer = deletedTransaction.transaction_type === 'transfer'
   const toId = deletedTransaction.to_account_type_id != null ? deletedTransaction.to_account_type_id.toString() : null
   const txDate = deletedTransaction.date
+  const affectedBalance = deletedTransaction.affects_balance ?? true
 
   after(async () => {
     try {
+      if (!affectedBalance) {
+        return
+      }
       const fromId = deletedTransaction.account_type_id != null ? deletedTransaction.account_type_id.toString() : null
       if (fromId == null) {
         // No account to reverse balance for; deductions reversal still runs below

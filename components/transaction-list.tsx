@@ -65,6 +65,11 @@ function accountName(accounts: Account[], id: string | null | undefined) {
   return name ?? "Unassigned"
 }
 
+function transactionAccountLabel(transaction: Transaction, accounts: Account[]) {
+  if (transaction.affects_balance === false) return "Paid by friend"
+  return accountName(accounts, transaction.account_type_id)
+}
+
 function getAmountTone(
   mode: AmountColorMode,
   type: Transaction["transaction_type"]
@@ -254,7 +259,7 @@ export const TransactionList = React.memo(function TransactionList({
 
                       <div className="flex min-h-5 flex-wrap items-center gap-1.5">
                         <span className="min-w-0 truncate text-xs text-muted-foreground">
-                          {accountName(accounts, transaction.account_type_id)}
+                          {transactionAccountLabel(transaction, accounts)}
                         </span>
                         {isReimbursement && (
                           <>
