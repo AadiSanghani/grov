@@ -72,19 +72,59 @@ export interface DerivedHolding {
   security_name: string | null
   asset_type: string
   quantity: number
+  holding_currency: string
+  avg_cost: number
   avg_cost_cad: number
+  cost_basis: number
   cost_basis_cad: number
   current_price: number
   current_price_currency: string
+  market_value: number
   market_value_cad: number
   previous_close_price: number | null
+  previous_close_value: number | null
   previous_close_value_cad: number | null
+  day_change: number
   day_change_cad: number
+  unrealized_pnl: number
   unrealized_pnl_cad: number
   unrealized_pnl_pct: number
   allocation_pct: number
   quote_as_of: string | null
   price_source: "cache" | "live" | "fallback"
+  has_override: boolean
+  original_account_type_id: string
+  original_security_id: string
+  original_ticker: string
+}
+
+export interface InvestmentHoldingOverride {
+  id: string
+  user_id: string
+  account_type_id: string
+  security_id: string
+  override_account_type_id: string | null
+  override_security_id: string | null
+  quantity: number | null
+  avg_cost: number | null
+  currency: string | null
+  notes: string | null
+  created_at: string
+  updated_at: string
+  security?: InvestmentSecurity
+  override_security?: InvestmentSecurity | null
+  override_account_name?: string | null
+}
+
+export interface UpsertInvestmentHoldingOverrideInput {
+  account_type_id: string
+  security_id: string
+  override_account_type_id: string
+  ticker: string
+  quantity: number
+  avg_cost: number
+  currency: string
+  notes?: string | null
 }
 
 export interface PortfolioSummary {

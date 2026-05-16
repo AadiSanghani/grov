@@ -9,11 +9,13 @@ import {
   getQuoteSnapshotsForSecurities,
 } from '@/lib/investments/market-data'
 import { deriveHoldingsAndRealized } from '@/lib/investments/ledger'
+import { getInvestmentHoldingOverrides } from '@/lib/investments/holding-overrides'
 import { getInvestmentTransactions } from '@/lib/investments/transactions'
 import type {
   BenchmarkSeriesPoint,
   InvestmentAllocationData,
   InvestmentDashboardData,
+  InvestmentHoldingOverride,
   InvestmentRealizedData,
   InvestmentSecurity,
   InvestmentTimeRange,
@@ -73,6 +75,32 @@ function buildSecurityMap(transactions: InvestmentTransaction[]): Map<string, In
     }
   }
   return map
+}
+
+function makePositionKey(accountTypeId: string, securityId: string): string {
+  return `${accountTypeId}:${securityId}`
+}
+
+function buildHoldingOverrideMap(overrides: InvestmentHoldingOverride[]): Map<string, InvestmentHoldingOverride> {
+  const map = new Map<string, InvestmentHoldingOverride>()
+  for (const override of overrides) {
+    map.set(makePositionKey(override.account_type_id, override.security_id), override)
+  }
+  return map
+}
+
+function addOverrideSecuritiesToMap(
+  securityById: Map<string, InvestmentSecurity>,
+  overrides: InvestmentHoldingOverride[],
+): void {
+  for (const override of overrides) {
+    if (override.security) {
+      securityById.set(override.security.id, override.security)
+    }
+    if (override.override_security) {
+      securityById.set(override.override_security.id, override.override_security)
+    }
+  }
 }
 
 function sortTransactionsAscending(transactions: InvestmentTransaction[]): InvestmentTransaction[] {
@@ -316,9 +344,10 @@ export async function getInvestmentDashboardData(input?: {
   const endDate = todayDate()
   const startDate = toRangeStartDate(range, endDate)
 
-  const [accounts, transactions] = await Promise.all([
+  const [accounts, transactions, holdingOverrides] = await Promise.all([
     getInvestmentAccounts(),
     getInvestmentTransactions(),
+    getInvestmentHoldingOverrides(),
   ])
 
   if (transactions.length === 0) {
@@ -348,6 +377,7 @@ export async function getInvestmentDashboardData(input?: {
   }
 
   const securityById = buildSecurityMap(transactions)
+  addOverrideSecuritiesToMap(securityById, holdingOverrides)
   const securities = Array.from(securityById.values())
 
   const fxCurrencies = new Set<string>()
@@ -385,6 +415,7 @@ export async function getInvestmentDashboardData(input?: {
     transactions,
     securityById,
     quoteBySecurityId,
+    holdingOverrideByPositionKey: buildHoldingOverrideMap(holdingOverrides),
     fxToCadResolver,
     valuationDate: endDate,
   })
@@ -472,9 +503,10 @@ export async function getInvestmentAllocationData(input?: {
   const endDate = todayDate()
   const startDate = toRangeStartDate(range, endDate)
 
-  const [accounts, transactions] = await Promise.all([
+  const [accounts, transactions, holdingOverrides] = await Promise.all([
     getInvestmentAccounts(),
     getInvestmentTransactions(),
+    getInvestmentHoldingOverrides(),
   ])
 
   if (transactions.length === 0) {
@@ -501,6 +533,7 @@ export async function getInvestmentAllocationData(input?: {
   }
 
   const securityById = buildSecurityMap(transactions)
+  addOverrideSecuritiesToMap(securityById, holdingOverrides)
   const securities = Array.from(securityById.values())
 
   const fxCurrencies = new Set<string>()
@@ -538,6 +571,7 @@ export async function getInvestmentAllocationData(input?: {
     transactions,
     securityById,
     quoteBySecurityId,
+    holdingOverrideByPositionKey: buildHoldingOverrideMap(holdingOverrides),
     fxToCadResolver,
     valuationDate: endDate,
   })

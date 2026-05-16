@@ -1,23 +1,24 @@
 "use client"
 
 import { useMemo, useState } from 'react'
-import { ArrowUpDown } from 'lucide-react'
+import { ArrowUpDown, Pencil } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
-import { formatCurrency, formatCurrencyCad, formatPercent, formatSignedCad } from '@/components/investments/format'
+import { formatCurrency, formatPercent, formatSignedCurrency } from '@/components/investments/format'
 import type { DerivedHolding } from '@/lib/investments/types'
 
 interface HoldingsTableProps {
   holdings: DerivedHolding[]
+  onEditHolding?: (holding: DerivedHolding) => void
 }
 
 type SortKey =
   | 'ticker'
   | 'quantity'
-  | 'avg_cost_cad'
+  | 'avg_cost'
   | 'current_price'
-  | 'market_value_cad'
-  | 'unrealized_pnl_cad'
+  | 'market_value'
+  | 'unrealized_pnl'
   | 'allocation_pct'
   | 'account_name'
 
@@ -41,17 +42,17 @@ function sortRows(rows: DerivedHolding[], key: SortKey, direction: SortDirection
       case 'quantity':
         comparison = a.quantity - b.quantity
         break
-      case 'avg_cost_cad':
-        comparison = a.avg_cost_cad - b.avg_cost_cad
+      case 'avg_cost':
+        comparison = a.avg_cost - b.avg_cost
         break
       case 'current_price':
         comparison = a.current_price - b.current_price
         break
-      case 'market_value_cad':
-        comparison = a.market_value_cad - b.market_value_cad
+      case 'market_value':
+        comparison = a.market_value - b.market_value
         break
-      case 'unrealized_pnl_cad':
-        comparison = a.unrealized_pnl_cad - b.unrealized_pnl_cad
+      case 'unrealized_pnl':
+        comparison = a.unrealized_pnl - b.unrealized_pnl
         break
       case 'allocation_pct':
         comparison = a.allocation_pct - b.allocation_pct
@@ -106,8 +107,8 @@ function HeaderCell({
   )
 }
 
-export function InvestmentsHoldingsTable({ holdings }: HoldingsTableProps) {
-  const [sortKey, setSortKey] = useState<SortKey>('market_value_cad')
+export function InvestmentsHoldingsTable({ holdings, onEditHolding }: HoldingsTableProps) {
+  const [sortKey, setSortKey] = useState<SortKey>('market_value')
   const [direction, setDirection] = useState<SortDirection>('desc')
 
   const sorted = useMemo(() => sortRows(holdings, sortKey, direction), [holdings, sortKey, direction])
@@ -137,39 +138,56 @@ export function InvestmentsHoldingsTable({ holdings }: HoldingsTableProps) {
           <thead>
             <tr className="border-b bg-muted/40">
               <HeaderCell title="Ticker" sortKey="ticker" currentSort={sortKey} direction={direction} onSort={onSort} />
-              <HeaderCell title="Qty" sortKey="quantity" currentSort={sortKey} direction={direction} onSort={onSort} align="right" />
-              <HeaderCell title="Avg Cost (CAD)" sortKey="avg_cost_cad" currentSort={sortKey} direction={direction} onSort={onSort} align="right" />
+              <HeaderCell title="Shares" sortKey="quantity" currentSort={sortKey} direction={direction} onSort={onSort} align="right" />
+              <HeaderCell title="Avg Cost" sortKey="avg_cost" currentSort={sortKey} direction={direction} onSort={onSort} align="right" />
               <HeaderCell title="Price" sortKey="current_price" currentSort={sortKey} direction={direction} onSort={onSort} align="right" />
-              <HeaderCell title="Market Value (CAD)" sortKey="market_value_cad" currentSort={sortKey} direction={direction} onSort={onSort} align="right" />
-              <HeaderCell title="Unrealized" sortKey="unrealized_pnl_cad" currentSort={sortKey} direction={direction} onSort={onSort} align="right" />
+              <HeaderCell title="Market Value" sortKey="market_value" currentSort={sortKey} direction={direction} onSort={onSort} align="right" />
+              <HeaderCell title="Unrealized" sortKey="unrealized_pnl" currentSort={sortKey} direction={direction} onSort={onSort} align="right" />
               <HeaderCell title="Allocation" sortKey="allocation_pct" currentSort={sortKey} direction={direction} onSort={onSort} align="right" />
               <HeaderCell title="Account" sortKey="account_name" currentSort={sortKey} direction={direction} onSort={onSort} />
+              {onEditHolding ? (
+                <th className="px-3 py-2 text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground">Actions</th>
+              ) : null}
             </tr>
           </thead>
           <tbody>
             {sorted.map((holding) => {
-              const unrealizedClass = holding.unrealized_pnl_cad >= 0 ? 'text-primary' : 'text-destructive'
+              const holdingCurrency = holding.holding_currency || holding.current_price_currency
+              const unrealizedClass = holding.unrealized_pnl >= 0 ? 'text-primary' : 'text-destructive'
 
               return (
-                <tr key={`${holding.account_type_id}:${holding.security_id}`} className="border-b last:border-0">
+                <tr key={`${holding.original_account_type_id}:${holding.original_security_id}`} className="border-b last:border-0">
                   <td className="px-3 py-3 align-top">
                     <div className="font-medium">{holding.ticker}</div>
                     <div className="text-xs text-muted-foreground">{holding.security_name ?? 'Unknown security'}</div>
                   </td>
                   <td className="px-3 py-3 text-right tabular-nums">{sharesFormatter.format(holding.quantity)}</td>
-                  <td className="px-3 py-3 text-right tabular-nums">{formatCurrencyCad(holding.avg_cost_cad)}</td>
+                  <td className="px-3 py-3 text-right tabular-nums">{formatCurrency(holding.avg_cost, holdingCurrency)}</td>
                   <td className="px-3 py-3 text-right tabular-nums">
-                    {formatCurrency(holding.current_price, holding.current_price_currency)}
+                    {formatCurrency(holding.current_price, holdingCurrency)}
                   </td>
-                  <td className="px-3 py-3 text-right tabular-nums font-medium">{formatCurrencyCad(holding.market_value_cad)}</td>
+                  <td className="px-3 py-3 text-right tabular-nums font-medium">{formatCurrency(holding.market_value, holdingCurrency)}</td>
                   <td className={`px-3 py-3 text-right tabular-nums ${unrealizedClass}`}>
-                    <div>{formatSignedCad(holding.unrealized_pnl_cad)}</div>
+                    <div>{formatSignedCurrency(holding.unrealized_pnl, holdingCurrency)}</div>
                     <div className="text-xs">{formatPercent(holding.unrealized_pnl_pct)}</div>
                   </td>
                   <td className="px-3 py-3 text-right tabular-nums">{formatPercent(holding.allocation_pct)}</td>
                   <td className="px-3 py-3">
                     <span className="text-sm">{holding.account_name}</span>
                   </td>
+                  {onEditHolding ? (
+                    <td className="px-3 py-3 text-right">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => onEditHolding(holding)}
+                        aria-label={`Edit ${holding.ticker} holding`}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                    </td>
+                  ) : null}
                 </tr>
               )
             })}

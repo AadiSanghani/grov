@@ -2,6 +2,7 @@
 
 import type {
   DerivedHolding,
+  InvestmentHoldingOverride,
   InvestmentQuoteSnapshot,
   InvestmentSecurity,
   InvestmentTransaction,
@@ -14,6 +15,7 @@ interface PositionState {
   account_name: string
   security: InvestmentSecurity
   quantity: number
+  cost_basis: number
   cost_basis_cad: number
   last_trade_price: number
 }
@@ -28,6 +30,7 @@ interface DeriveInput {
   transactions: InvestmentTransaction[]
   securityById: Map<string, InvestmentSecurity>
   quoteBySecurityId: Map<string, InvestmentQuoteSnapshot>
+  holdingOverrideByPositionKey?: Map<string, InvestmentHoldingOverride>
   fxToCadResolver: (currency: string, date: string) => Promise<number>
   valuationDate: string
 }
@@ -81,6 +84,7 @@ export async function deriveHoldingsAndRealized(input: DeriveInput): Promise<Der
       account_name: safeAccountName(tx),
       security,
       quantity: 0,
+      cost_basis: 0,
       cost_basis_cad: 0,
       last_trade_price: tx.unit_price,
     }
@@ -93,10 +97,21 @@ export async function deriveHoldingsAndRealized(input: DeriveInput): Promise<Der
 
     const grossTrade = tx.quantity * tx.unit_price
     const feesCad = tx.fees * fxToCad
+    const positionCurrency = normalizeCurrency(position.security.quote_currency)
+    const positionFxToCad =
+      positionCurrency === CAD_CURRENCY
+        ? 1
+        : tradeCurrency === positionCurrency
+          ? fxToCad
+          : await input.fxToCadResolver(positionCurrency, tx.trade_date)
 
     if (tx.transaction_type === 'BUY' || tx.transaction_type === 'DRIP') {
       const totalCostCad = grossTrade * fxToCad + feesCad
+      const totalCost = tradeCurrency === positionCurrency
+        ? grossTrade + tx.fees
+        : totalCostCad / positionFxToCad
       position.quantity += tx.quantity
+      position.cost_basis += totalCost
       position.cost_basis_cad += totalCostCad
       position.last_trade_price = tx.unit_price
     } else if (tx.transaction_type === 'SELL') {
@@ -110,7 +125,9 @@ export async function deriveHoldingsAndRealized(input: DeriveInput): Promise<Der
       // Assumption (explicit): realized P/L uses Average Cost basis.
       // Each sell relieves cost proportionally based on position-level average CAD cost per share.
       const averageCostCad = position.cost_basis_cad / quantityBeforeSell
+      const averageCost = position.cost_basis / quantityBeforeSell
       const relievedCostCad = soldQuantity * averageCostCad
+      const relievedCost = soldQuantity * averageCost
       const proceedsCad = grossTrade * fxToCad - feesCad
       const realizedPnlCad = proceedsCad - relievedCostCad
 
@@ -126,6 +143,7 @@ export async function deriveHoldingsAndRealized(input: DeriveInput): Promise<Der
       })
 
       position.quantity = Math.max(0, quantityBeforeSell - soldQuantity)
+      position.cost_basis = Math.max(0, position.cost_basis - relievedCost)
       position.cost_basis_cad = Math.max(0, position.cost_basis_cad - relievedCostCad)
       position.last_trade_price = tx.unit_price
     }
@@ -139,9 +157,14 @@ export async function deriveHoldingsAndRealized(input: DeriveInput): Promise<Der
   for (const position of positions.values()) {
     if (position.quantity <= 0) continue
 
-    const quote = input.quoteBySecurityId.get(position.security.id)
+    const positionKey = makePositionKey(position.account_type_id, position.security.id)
+    const override = input.holdingOverrideByPositionKey?.get(positionKey)
+    const displaySecurity = override?.override_security ?? position.security
+    const displayAccountTypeId = override?.override_account_type_id ?? position.account_type_id
+    const displayAccountName = override?.override_account_name ?? position.account_name
+    const quote = input.quoteBySecurityId.get(displaySecurity.id)
     const quoteCurrency = normalizeCurrency(
-      quote?.quote_currency ?? position.security.quote_currency ?? CAD_CURRENCY,
+      quote?.quote_currency ?? displaySecurity.quote_currency ?? CAD_CURRENCY,
     )
 
     const quoteFxToCad =
@@ -149,43 +172,87 @@ export async function deriveHoldingsAndRealized(input: DeriveInput): Promise<Der
 
     const currentPrice = quote?.price ?? position.last_trade_price
     const previousClosePrice = quote?.previous_close ?? null
-    const marketValueCad = position.quantity * currentPrice * quoteFxToCad
+    const displayQuantity = override?.quantity ?? position.quantity
+    const quantityRatio = position.quantity > 0 ? displayQuantity / position.quantity : 1
+    const overrideCostCurrency = normalizeCurrency(override?.currency ?? quoteCurrency)
+    const overrideCostFxToCad =
+      overrideCostCurrency === CAD_CURRENCY
+        ? 1
+        : await input.fxToCadResolver(overrideCostCurrency, valuationDate)
+    const costBasis =
+      override?.avg_cost != null
+        ? override.avg_cost * displayQuantity
+        : position.cost_basis * quantityRatio
+    const costBasisCad =
+      override?.avg_cost != null
+        ? costBasis * overrideCostFxToCad
+        : position.cost_basis_cad * quantityRatio
+    const costBasisInQuoteCurrency =
+      override?.avg_cost != null
+        ? overrideCostCurrency === quoteCurrency
+          ? costBasis
+          : costBasisCad / quoteFxToCad
+        : position.cost_basis * quantityRatio
+
+    const marketValue = displayQuantity * currentPrice
+    const marketValueCad = displayQuantity * currentPrice * quoteFxToCad
+    const previousCloseValue =
+      previousClosePrice != null
+        ? displayQuantity * previousClosePrice
+        : null
     const previousCloseValueCad =
       previousClosePrice != null
-        ? position.quantity * previousClosePrice * quoteFxToCad
+        ? displayQuantity * previousClosePrice * quoteFxToCad
         : null
+
+    const dayChange =
+      previousCloseValue != null
+        ? marketValue - previousCloseValue
+        : 0
 
     const dayChangeCad =
       previousCloseValueCad != null
         ? marketValueCad - previousCloseValueCad
         : 0
 
-    const unrealizedPnlCad = marketValueCad - position.cost_basis_cad
+    const unrealizedPnl = marketValue - costBasisInQuoteCurrency
+    const unrealizedPnlCad = marketValueCad - costBasisCad
     const unrealizedPnlPct =
-      position.cost_basis_cad > 0
-        ? (unrealizedPnlCad / position.cost_basis_cad) * 100
+      costBasisInQuoteCurrency > 0
+        ? (unrealizedPnl / costBasisInQuoteCurrency) * 100
         : 0
 
     holdings.push({
-      account_type_id: position.account_type_id,
-      account_name: position.account_name,
-      security_id: position.security.id,
-      ticker: position.security.ticker,
-      security_name: position.security.name,
-      asset_type: position.security.asset_type,
-      quantity: round2(position.quantity),
-      avg_cost_cad:
-        position.quantity > 0
-          ? round2(position.cost_basis_cad / position.quantity)
+      account_type_id: displayAccountTypeId,
+      account_name: displayAccountName,
+      security_id: displaySecurity.id,
+      ticker: displaySecurity.ticker,
+      security_name: displaySecurity.name,
+      asset_type: displaySecurity.asset_type,
+      quantity: round2(displayQuantity),
+      holding_currency: quoteCurrency,
+      avg_cost:
+        displayQuantity > 0
+          ? round2(costBasisInQuoteCurrency / displayQuantity)
           : 0,
-      cost_basis_cad: round2(position.cost_basis_cad),
+      avg_cost_cad:
+        displayQuantity > 0
+          ? round2(costBasisCad / displayQuantity)
+          : 0,
+      cost_basis: round2(costBasisInQuoteCurrency),
+      cost_basis_cad: round2(costBasisCad),
       current_price: round2(currentPrice),
       current_price_currency: quoteCurrency,
+      market_value: round2(marketValue),
       market_value_cad: round2(marketValueCad),
       previous_close_price: previousClosePrice != null ? round2(previousClosePrice) : null,
+      previous_close_value:
+        previousCloseValue != null ? round2(previousCloseValue) : null,
       previous_close_value_cad:
         previousCloseValueCad != null ? round2(previousCloseValueCad) : null,
+      day_change: round2(dayChange),
       day_change_cad: round2(dayChangeCad),
+      unrealized_pnl: round2(unrealizedPnl),
       unrealized_pnl_cad: round2(unrealizedPnlCad),
       unrealized_pnl_pct: round2(unrealizedPnlPct),
       allocation_pct: 0,
@@ -198,6 +265,10 @@ export async function deriveHoldingsAndRealized(input: DeriveInput): Promise<Der
               ? 'live'
               : 'cache'
           : 'fallback',
+      has_override: Boolean(override),
+      original_account_type_id: position.account_type_id,
+      original_security_id: position.security.id,
+      original_ticker: position.security.ticker,
     })
   }
 

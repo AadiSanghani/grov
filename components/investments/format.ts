@@ -24,3 +24,8 @@ export function formatSignedCad(amount: number): string {
   const formatted = formatCurrencyCad(Math.abs(amount))
   return `${amount >= 0 ? '+' : '-'}${formatted}`
 }
+
+export function formatSignedCurrency(amount: number, currency: string): string {
+  const formatted = formatCurrency(Math.abs(amount), currency)
+  return `${amount >= 0 ? '+' : '-'}${formatted}`
+}

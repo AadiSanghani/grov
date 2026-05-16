@@ -6,6 +6,7 @@ import {
   getInvestmentRealizedData,
 } from '@/lib/investments/portfolio'
 import { runInvestmentMarketSync } from '@/lib/investments/sync'
+import { upsertInvestmentHoldingOverride } from '@/lib/investments/holding-overrides'
 import {
   createInvestmentTransaction,
   deleteInvestmentTransaction,
@@ -16,6 +17,7 @@ import type {
   CreateInvestmentTransactionInput,
   InvestmentSyncSlot,
   InvestmentTimeRange,
+  UpsertInvestmentHoldingOverrideInput,
   UpdateInvestmentTransactionInput,
 } from '@/lib/investments/types'
 
@@ -59,6 +61,10 @@ export async function updateInvestmentTransactionAction(
 
 export async function deleteInvestmentTransactionAction(transactionId: string) {
   return deleteInvestmentTransaction(transactionId)
+}
+
+export async function upsertInvestmentHoldingOverrideAction(input: UpsertInvestmentHoldingOverrideInput) {
+  return upsertInvestmentHoldingOverride(input)
 }
 
 export async function triggerInvestmentMarketSyncAction(input?: {
