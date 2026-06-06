@@ -3,6 +3,7 @@
 import { useMemo } from "react"
 import { Transaction, PayrollDeduction } from "@/lib/types"
 import { getSpendingAmount, isIncomeForReporting } from "@/lib/utils"
+import { isInsurancePayrollDeductionLabel, isTaxPayrollDeductionLabel } from "@/lib/payroll-deductions"
 
 /** Sanitize label for Mermaid sankey-beta (ASCII only; non-ASCII breaks the parser). */
 function sanitizeLabel(value: string): string {
@@ -192,6 +193,8 @@ function getNodeColor(label: string, index: number): string {
   if (label === "Total Income") return "#f28e2b"
   if (label === "Savings") return "#76b7b2"
   if (label === "Spending & Deductions") return "#e15759"
+  if (label === "Taxes") return "#b07aa1"
+  if (label === "Insurance") return "#4e79a7"
   if (label === "Existing Cash Used") return "#59a14f"
   if (label === "Direct Investment Deposits") return "#af7aa1"
 
@@ -352,6 +355,8 @@ export function buildSankeyData(
   const expenseByCategory: Record<string, number> = {}
   const assetTransferByDestination: Record<string, number> = {}
   const deductionByLabel: Record<string, number> = {}
+  const taxByLabel: Record<string, number> = {}
+  const insuranceByLabel: Record<string, number> = {}
   const investmentContribByDest: Record<string, number> = {}
   let totalIncome = 0
   let totalInvestmentContributions = 0
@@ -393,6 +398,10 @@ export function buildSankeyData(
 
           if (targetAccount?.category === "asset") {
             accumulateAmount(assetTransferByDestination, `To ${targetAccount.name}`, amount)
+          } else if (isTaxPayrollDeductionLabel(deduction.label)) {
+            accumulateAmount(taxByLabel, deduction.label || "Tax", amount)
+          } else if (isInsurancePayrollDeductionLabel(deduction.label)) {
+            accumulateAmount(insuranceByLabel, deduction.label || "Insurance", amount)
           } else {
             accumulateAmount(deductionByLabel, deduction.label || "Deduction", amount)
           }
@@ -446,6 +455,8 @@ export function buildSankeyData(
   const investmentContribLabel = "Direct Investment Deposits"
   const savingsHubLabel = "Savings"
   const spendingHubLabel = "Spending & Deductions"
+  const taxesHubLabel = "Taxes"
+  const insuranceHubLabel = "Insurance"
   const remainingSavingsLabel = "Remaining Savings"
   const cashDrawdownLabel = "Existing Cash Used"
   const groupedIncomeSources = groupTopEntries(
@@ -457,6 +468,16 @@ export function buildSankeyData(
     combineEntries([...Object.entries(expenseByCategory), ...Object.entries(deductionByLabel)]),
     TOP_OUTFLOWS,
     "Other Outflows"
+  )
+  const groupedTaxOutflows = groupTopEntries(
+    Object.entries(taxByLabel),
+    TOP_OUTFLOWS,
+    "Other Taxes"
+  )
+  const groupedInsuranceOutflows = groupTopEntries(
+    Object.entries(insuranceByLabel),
+    TOP_OUTFLOWS,
+    "Other Insurance"
   )
   const groupedWealthDestinations = groupTopEntries(
     combineEntries([...Object.entries(assetTransferByDestination), ...Object.entries(investmentContribByDest)]),
@@ -489,12 +510,17 @@ export function buildSankeyData(
   )
   const totalAssetWealthFunding = sumEntries(groupedAssetDestinations.entries)
   const spendingTotal = sumEntries(groupedCashOutflows.entries)
+  const taxesTotal = sumEntries(groupedTaxOutflows.entries)
+  const insuranceTotal = sumEntries(groupedInsuranceOutflows.entries)
   const wealthDestinationTotal = sumEntries(groupedWealthDestinations.entries)
-  const requestedOutflows = spendingTotal + wealthDestinationTotal
+  const requestedOutflows = spendingTotal + taxesTotal + insuranceTotal + wealthDestinationTotal
   const cashDrawdownTotal = Math.max(0, requestedOutflows - totalIncome - totalInvestmentContributions)
   const totalAvailableFunds = totalIncome + totalInvestmentContributions + cashDrawdownTotal
   const remainingIncome = Math.max(0, totalAvailableFunds - requestedOutflows)
-  const incomeAfterSpending = Math.max(0, totalIncome + totalInvestmentContributions - spendingTotal)
+  const incomeAfterSpending = Math.max(
+    0,
+    totalIncome + totalInvestmentContributions - spendingTotal - taxesTotal - insuranceTotal
+  )
   const cashDrawdownToWealth = Math.max(0, totalAssetWealthFunding - incomeAfterSpending)
   const savingsTotal = wealthDestinationTotal + remainingIncome
 
@@ -514,6 +540,16 @@ export function buildSankeyData(
     addLink(links, totalIncomeLabel, spendingHubLabel, spendingTotal)
   }
 
+  if (taxesTotal > 0) {
+    registerNode(taxesHubLabel, "use", taxesTotal)
+    addLink(links, totalIncomeLabel, taxesHubLabel, taxesTotal)
+  }
+
+  if (insuranceTotal > 0) {
+    registerNode(insuranceHubLabel, "use", insuranceTotal)
+    addLink(links, totalIncomeLabel, insuranceHubLabel, insuranceTotal)
+  }
+
   if (savingsTotal > 0) {
     registerNode(savingsHubLabel, "use", savingsTotal)
     addLink(links, totalIncomeLabel, savingsHubLabel, savingsTotal)
@@ -526,6 +562,14 @@ export function buildSankeyData(
   groupedCashOutflows.entries.forEach(([label, amount]) => {
     registerNode(label, "destination", amount)
     addLink(links, spendingHubLabel, label, amount)
+  })
+  groupedTaxOutflows.entries.forEach(([label, amount]) => {
+    registerNode(label, "destination", amount)
+    addLink(links, taxesHubLabel, label, amount)
+  })
+  groupedInsuranceOutflows.entries.forEach(([label, amount]) => {
+    registerNode(label, "destination", amount)
+    addLink(links, insuranceHubLabel, label, amount)
   })
 
   if (remainingIncome > 0) {
@@ -546,15 +590,15 @@ export function buildSankeyData(
 
   const leftNodes =
     groupedIncomeSources.entries.length + (cashDrawdownTotal > 0 ? 1 : 0) + (totalInvestmentContributions > 0 ? 1 : 0)
-  const useNodes = (spendingTotal > 0 ? 1 : 0) + (savingsTotal > 0 ? 1 : 0)
-  const rightNodes = groupedCashOutflows.entries.length + groupedWealthDestinations.entries.length + (remainingIncome > 0 ? 1 : 0)
+  const useNodes = (spendingTotal > 0 ? 1 : 0) + (taxesTotal > 0 ? 1 : 0) + (insuranceTotal > 0 ? 1 : 0) + (savingsTotal > 0 ? 1 : 0)
+  const rightNodes = groupedCashOutflows.entries.length + groupedTaxOutflows.entries.length + groupedInsuranceOutflows.entries.length + groupedWealthDestinations.entries.length + (remainingIncome > 0 ? 1 : 0)
   const maxColumnNodes = Math.max(leftNodes, rightNodes)
   const dynamicHeight = clamp(
     (maxColumnNodes + useNodes + NODE_HEIGHT_BUFFER) * NODE_HEIGHT_MULTIPLIER,
     MIN_SANKEY_HEIGHT,
     MAX_SANKEY_HEIGHT
   )
-  const isGrouped = groupedIncomeSources.grouped || groupedCashOutflows.grouped || groupedWealthDestinations.grouped
+  const isGrouped = groupedIncomeSources.grouped || groupedCashOutflows.grouped || groupedTaxOutflows.grouped || groupedInsuranceOutflows.grouped || groupedWealthDestinations.grouped
   const excludedTopDestinations = Object.entries(excludedInternalTransferByDestination)
     .filter(([, amount]) => amount > 0)
     .sort(sortByAmountDesc)
