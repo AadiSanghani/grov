@@ -247,16 +247,6 @@ function buildLayout(diagram: SankeyDiagram, height: number): SankeyLayout {
     columns[node.column].push(layoutNode)
   })
 
-  const sortedDestinationNodes = columns.destination.sort((a, b) => {
-    if (b.sortValue !== a.sortValue) return b.sortValue - a.sortValue
-    return a.label.localeCompare(b.label)
-  })
-  let destinationY = TOP_PADDING
-  sortedDestinationNodes.forEach((node) => {
-    node.y = destinationY
-    destinationY += node.height + NODE_PADDING
-  })
-
   const linksWithNodes = diagram.links
     .map((link) => {
       const sourceNode = nodeMap.get(link.source)
@@ -265,6 +255,35 @@ function buildLayout(diagram: SankeyDiagram, height: number): SankeyLayout {
       return { ...link, sourceNode, targetNode }
     })
     .filter((link): link is SankeyDiagramLink & { sourceNode: LayoutNode; targetNode: LayoutNode } => link != null)
+
+  const useRankById = new Map(
+    [...columns.use]
+      .sort((a, b) => {
+        if (b.sortValue !== a.sortValue) return b.sortValue - a.sortValue
+        return a.label.localeCompare(b.label)
+      })
+      .map((node, index) => [node.id, index])
+  )
+  const destinationParentRank = (node: LayoutNode) => {
+    const incomingRanks = linksWithNodes
+      .filter((link) => link.target === node.id && link.sourceNode.column === "use")
+      .map((link) => useRankById.get(link.source))
+      .filter((rank): rank is number => rank != null)
+
+    if (incomingRanks.length === 0) return Number.MAX_SAFE_INTEGER
+    return Math.min(...incomingRanks)
+  }
+  const sortedDestinationNodes = columns.destination.sort((a, b) => {
+    const parentRank = destinationParentRank(a) - destinationParentRank(b)
+    if (parentRank !== 0) return parentRank
+    if (b.sortValue !== a.sortValue) return b.sortValue - a.sortValue
+    return a.label.localeCompare(b.label)
+  })
+  let destinationY = TOP_PADDING
+  sortedDestinationNodes.forEach((node) => {
+    node.y = destinationY
+    destinationY += node.height + NODE_PADDING
+  })
 
   const centerForTargets = (node: LayoutNode) => {
     const outgoing = linksWithNodes.filter((link) => link.source === node.id)
