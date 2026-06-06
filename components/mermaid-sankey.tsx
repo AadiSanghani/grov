@@ -37,6 +37,11 @@ const NODE_HEIGHT_MULTIPLIER = 28
 const NODE_HEIGHT_BUFFER = 4
 
 type SankeyEntry = [string, number]
+type SankeyFlow = {
+  source: string
+  target: string
+  amount: number
+}
 
 export interface SankeyBuildResult {
   csv: string
@@ -93,6 +98,11 @@ function groupTopEntries(
 
 function sumEntries(entries: SankeyEntry[]): number {
   return entries.reduce((sum, [, amount]) => sum + amount, 0)
+}
+
+function addFlow(flows: SankeyFlow[], source: string, target: string, amount: number): void {
+  if (amount <= 0) return
+  flows.push({ source, target, amount })
 }
 
 function accumulateAmount(map: Record<string, number>, label: string, amount: number): void {
@@ -218,6 +228,16 @@ export function buildSankeyData(
   const wealthFundingLabel = "Investment & Savings Funding"
   const savingsLabel = "Savings"
   const cashDrawdownLabel = "Existing Cash Used"
+  const destinationTotals = new Map<string, number>()
+  const middleFlows: SankeyFlow[] = []
+  const destinationFlows: SankeyFlow[] = []
+
+  const addDestinationFlow = (source: string, target: string, amount: number) => {
+    if (amount <= 0) return
+    addFlow(destinationFlows, source, target, amount)
+    destinationTotals.set(target, (destinationTotals.get(target) || 0) + amount)
+  }
+
   const groupedIncomeSources = groupTopEntries(
     Object.entries(incomeBySource),
     TOP_INCOME_SOURCES,
@@ -246,11 +266,11 @@ export function buildSankeyData(
     const drawdownFundedAmount = amount - incomeFundedAmount
 
     if (incomeFundedAmount > 0) {
-      lines.push(`${escapeCsvValue(totalIncomeLabel)}, ${escapeCsvValue(label)}, ${incomeFundedAmount}`)
+      addDestinationFlow(totalIncomeLabel, label, incomeFundedAmount)
       remainingIncome -= incomeFundedAmount
     }
     if (drawdownFundedAmount > 0) {
-      lines.push(`${escapeCsvValue(cashDrawdownLabel)}, ${escapeCsvValue(label)}, ${drawdownFundedAmount}`)
+      addDestinationFlow(cashDrawdownLabel, label, drawdownFundedAmount)
       cashDrawdownTotal += drawdownFundedAmount
     }
   })
@@ -266,27 +286,57 @@ export function buildSankeyData(
   const cashDrawdownToWealth = totalWealthFunding - incomeFundedWealth
 
   if (incomeFundedWealth > 0) {
-    lines.push(`${escapeCsvValue(totalIncomeLabel)}, ${escapeCsvValue(wealthFundingLabel)}, ${incomeFundedWealth}`)
+    addFlow(middleFlows, totalIncomeLabel, wealthFundingLabel, incomeFundedWealth)
     remainingIncome -= incomeFundedWealth
   }
   if (cashDrawdownToWealth > 0) {
-    lines.push(`${escapeCsvValue(cashDrawdownLabel)}, ${escapeCsvValue(wealthFundingLabel)}, ${cashDrawdownToWealth}`)
+    addFlow(middleFlows, cashDrawdownLabel, wealthFundingLabel, cashDrawdownToWealth)
     cashDrawdownTotal += cashDrawdownToWealth
   }
   groupedWealthDestinations.entries.forEach(([label, amount]) => {
-    lines.push(`${escapeCsvValue(wealthFundingLabel)}, ${escapeCsvValue(label)}, ${amount}`)
+    addDestinationFlow(wealthFundingLabel, label, amount)
   })
 
   if (remainingIncome > 0) {
-    lines.push(`${escapeCsvValue(totalIncomeLabel)}, ${escapeCsvValue(savingsLabel)}, ${remainingIncome}`)
+    addDestinationFlow(totalIncomeLabel, savingsLabel, remainingIncome)
   }
 
   // Investment contributions as a separate flow (not part of Total Income)
   if (totalInvestmentContributions > 0) {
     investmentDestinations.forEach(([label, amount]) => {
-      lines.push(`${escapeCsvValue(investmentContribLabel)}, ${escapeCsvValue(label)}, ${amount}`)
+      addDestinationFlow(investmentContribLabel, label, amount)
     })
   }
+
+  middleFlows.forEach(({ source, target, amount }) => {
+    lines.push(`${escapeCsvValue(source)}, ${escapeCsvValue(target)}, ${amount}`)
+  })
+
+  const destinationOrder = new Map(
+    Array.from(destinationTotals.entries())
+      .sort(sortByAmountDesc)
+      .map(([label], index) => [label, index])
+  )
+  const sourceOrder = new Map(
+    [wealthFundingLabel, totalIncomeLabel, investmentContribLabel, cashDrawdownLabel].map((label, index) => [
+      label,
+      index,
+    ])
+  )
+
+  destinationFlows
+    .sort((a, b) => {
+      const destinationRank = (destinationOrder.get(a.target) ?? 0) - (destinationOrder.get(b.target) ?? 0)
+      if (destinationRank !== 0) return destinationRank
+
+      const sourceRank = (sourceOrder.get(a.source) ?? sourceOrder.size) - (sourceOrder.get(b.source) ?? sourceOrder.size)
+      if (sourceRank !== 0) return sourceRank
+
+      return b.amount - a.amount || a.source.localeCompare(b.source)
+    })
+    .forEach(({ source, target, amount }) => {
+      lines.push(`${escapeCsvValue(source)}, ${escapeCsvValue(target)}, ${amount}`)
+    })
 
   const leftNodes =
     groupedIncomeSources.entries.length + (cashDrawdownTotal > 0 ? 1 : 0) + (totalInvestmentContributions > 0 ? 1 : 0)
