@@ -14,6 +14,13 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Calendar } from "@/components/ui/calendar"
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import {
   Popover,
   PopoverContent,
   PopoverTrigger,
@@ -38,6 +45,7 @@ import { type Account } from "@/lib/accounts"
 import { createTransaction } from "@/lib/transactions"
 import { type Category } from "@/lib/categories"
 import { useDataContext } from "@/app/data-context"
+import { PAYROLL_DEDUCTION_LABELS } from "@/lib/payroll-deductions"
 
 export interface TransactionFormData {
   transaction_type: "outgoing" | "incoming" | "transfer"
@@ -578,12 +586,24 @@ export function AddTransactionDialog({
                       <div className="flex items-center gap-2">
                         <div className="flex-1 space-y-1">
                           <Label className="text-xs">Label</Label>
-                          <Input
-                            placeholder="e.g. RRSP, Income Tax, CPP, EI"
+                          <Select
                             value={ded.label}
-                            onChange={(e) => updateDeduction(index, "label", e.target.value)}
-                            aria-invalid={!!formErrors[`deductionLabel-${index}`]}
-                          />
+                            onValueChange={(value) => updateDeduction(index, "label", value)}
+                          >
+                            <SelectTrigger
+                              className="h-10 rounded-md px-3 py-2 text-sm"
+                              aria-invalid={!!formErrors[`deductionLabel-${index}`]}
+                            >
+                              <SelectValue placeholder="Select deduction" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {PAYROLL_DEDUCTION_LABELS.map((label) => (
+                                <SelectItem key={label} value={label}>
+                                  {label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
                           {formErrors[`deductionLabel-${index}`] ? <p className="text-xs text-destructive">{formErrors[`deductionLabel-${index}`]}</p> : null}
                         </div>
                         <div className="w-[140px] space-y-1">
