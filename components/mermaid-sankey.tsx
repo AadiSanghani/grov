@@ -1,7 +1,6 @@
 "use client"
 
-import { useLayoutEffect, useMemo, useRef, useId } from "react"
-import mermaid from "mermaid"
+import { useMemo } from "react"
 import { Transaction, PayrollDeduction } from "@/lib/types"
 import { getSpendingAmount, isIncomeForReporting } from "@/lib/utils"
 
@@ -9,7 +8,7 @@ import { getSpendingAmount, isIncomeForReporting } from "@/lib/utils"
 function sanitizeLabel(value: string): string {
   return value
     .replace(/\s+/g, " ")
-    .replace(/[^\x20-\x7E]/g, "") // strip non-ASCII
+    .replace(/[^\x20-\x7E]/g, "")
     .trim() || "Unnamed"
 }
 
@@ -35,12 +34,54 @@ const MIN_SANKEY_HEIGHT = 700
 const MAX_SANKEY_HEIGHT = 2200
 const NODE_HEIGHT_MULTIPLIER = 28
 const NODE_HEIGHT_BUFFER = 4
+const DIAGRAM_WIDTH = 1400
+const NODE_WIDTH = 10
+const NODE_PADDING = 24
+const TOP_PADDING = 24
+const BOTTOM_PADDING = 28
 
 type SankeyEntry = [string, number]
-type SankeyFlow = {
+type SankeyColumn = "source" | "income" | "use" | "destination"
+
+interface SankeyDiagramNode {
+  id: string
+  label: string
+  column: SankeyColumn
+  value: number
+  sortValue: number
+}
+
+interface SankeyDiagramLink {
   source: string
   target: string
   amount: number
+}
+
+interface SankeyDiagram {
+  nodes: SankeyDiagramNode[]
+  links: SankeyDiagramLink[]
+}
+
+interface LayoutNode extends SankeyDiagramNode {
+  x: number
+  y: number
+  height: number
+  color: string
+}
+
+interface LayoutLink extends SankeyDiagramLink {
+  sourceNode: LayoutNode
+  targetNode: LayoutNode
+  sourceY: number
+  targetY: number
+  width: number
+  color: string
+}
+
+interface SankeyLayout {
+  nodes: LayoutNode[]
+  links: LayoutLink[]
+  scale: number
 }
 
 export interface SankeyBuildResult {
@@ -49,6 +90,7 @@ export interface SankeyBuildResult {
   isGrouped: boolean
   cashDrawdownTotal: number
   cashDrawdownToWealth: number
+  diagram: SankeyDiagram
   excludedIncompleteTransfers: {
     count: number
     totalAmount: number
@@ -100,15 +142,205 @@ function sumEntries(entries: SankeyEntry[]): number {
   return entries.reduce((sum, [, amount]) => sum + amount, 0)
 }
 
-function addFlow(flows: SankeyFlow[], source: string, target: string, amount: number): void {
-  if (amount <= 0) return
-  flows.push({ source, target, amount })
+function combineEntries(entries: SankeyEntry[]): SankeyEntry[] {
+  const combined = new Map<string, number>()
+  entries.forEach(([label, amount]) => {
+    if (amount <= 0) return
+    combined.set(label, (combined.get(label) || 0) + amount)
+  })
+  return Array.from(combined.entries())
 }
 
 function accumulateAmount(map: Record<string, number>, label: string, amount: number): void {
   if (amount <= 0) return
   const normalizedLabel = normalizeAggregateLabel(label)
   map[normalizedLabel] = (map[normalizedLabel] || 0) + amount
+}
+
+function addLink(links: SankeyDiagramLink[], source: string, target: string, amount: number): void {
+  if (amount <= 0) return
+  links.push({ source, target, amount })
+}
+
+function makeEmptyResult(
+  isGrouped: boolean,
+  cashDrawdownTotal: number,
+  cashDrawdownToWealth: number,
+  excludedIncompleteTransfers: SankeyBuildResult["excludedIncompleteTransfers"],
+  excludedInternalTransfers: SankeyBuildResult["excludedInternalTransfers"]
+): SankeyBuildResult {
+  return {
+    csv: "",
+    dynamicHeight: MIN_SANKEY_HEIGHT,
+    isGrouped,
+    cashDrawdownTotal,
+    cashDrawdownToWealth,
+    diagram: { nodes: [], links: [] },
+    excludedIncompleteTransfers,
+    excludedInternalTransfers,
+  }
+}
+
+function formatSankeyAmount(amount: number): string {
+  return new Intl.NumberFormat("en-US", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  }).format(amount)
+}
+
+function getNodeColor(label: string, index: number): string {
+  if (label === "Total Income") return "#f28e2b"
+  if (label === "Savings") return "#76b7b2"
+  if (label === "Spending & Deductions") return "#e15759"
+  if (label === "Existing Cash Used") return "#59a14f"
+  if (label === "Direct Investment Deposits") return "#af7aa1"
+
+  const palette = [
+    "#4e79a7",
+    "#e15759",
+    "#76b7b2",
+    "#59a14f",
+    "#edc949",
+    "#af7aa1",
+    "#ff9da7",
+    "#9c755f",
+    "#bab0ac",
+    "#f28e2b",
+  ]
+  return palette[index % palette.length]
+}
+
+function buildLayout(diagram: SankeyDiagram, height: number): SankeyLayout {
+  const totalDestinationValue = diagram.nodes
+    .filter((node) => node.column === "destination")
+    .reduce((sum, node) => sum + node.value, 0)
+  const destinationCount = diagram.nodes.filter((node) => node.column === "destination").length
+  const availableHeight = Math.max(1, height - TOP_PADDING - BOTTOM_PADDING - NODE_PADDING * Math.max(0, destinationCount - 1))
+  const scale = totalDestinationValue > 0 ? availableHeight / totalDestinationValue : 0
+  const xByColumn: Record<SankeyColumn, number> = {
+    source: 24,
+    income: 440,
+    use: 800,
+    destination: DIAGRAM_WIDTH - 34,
+  }
+
+  const nodeMap = new Map<string, LayoutNode>()
+  const columns: Record<SankeyColumn, LayoutNode[]> = {
+    source: [],
+    income: [],
+    use: [],
+    destination: [],
+  }
+
+  diagram.nodes.forEach((node, index) => {
+    const layoutNode: LayoutNode = {
+      ...node,
+      x: xByColumn[node.column],
+      y: TOP_PADDING,
+      height: Math.max(2, node.value * scale),
+      color: getNodeColor(node.label, index),
+    }
+    nodeMap.set(node.id, layoutNode)
+    columns[node.column].push(layoutNode)
+  })
+
+  const sortedDestinationNodes = columns.destination.sort((a, b) => {
+    if (b.sortValue !== a.sortValue) return b.sortValue - a.sortValue
+    return a.label.localeCompare(b.label)
+  })
+  let destinationY = TOP_PADDING
+  sortedDestinationNodes.forEach((node) => {
+    node.y = destinationY
+    destinationY += node.height + NODE_PADDING
+  })
+
+  const linksWithNodes = diagram.links
+    .map((link) => {
+      const sourceNode = nodeMap.get(link.source)
+      const targetNode = nodeMap.get(link.target)
+      if (!sourceNode || !targetNode) return null
+      return { ...link, sourceNode, targetNode }
+    })
+    .filter((link): link is SankeyDiagramLink & { sourceNode: LayoutNode; targetNode: LayoutNode } => link != null)
+
+  const centerForTargets = (node: LayoutNode) => {
+    const outgoing = linksWithNodes.filter((link) => link.source === node.id)
+    const total = outgoing.reduce((sum, link) => sum + link.amount, 0)
+    if (total <= 0) return height / 2
+
+    return outgoing.reduce((sum, link) => {
+      return sum + (link.targetNode.y + link.targetNode.height / 2) * link.amount
+    }, 0) / total
+  }
+
+  columns.use
+    .sort((a, b) => centerForTargets(a) - centerForTargets(b))
+    .forEach((node) => {
+      node.y = clamp(centerForTargets(node) - node.height / 2, TOP_PADDING, height - BOTTOM_PADDING - node.height)
+    })
+
+  const useNodes = [...columns.use].sort((a, b) => a.y - b.y)
+  for (let index = 1; index < useNodes.length; index += 1) {
+    const previous = useNodes[index - 1]
+    const current = useNodes[index]
+    if (current.y < previous.y + previous.height + NODE_PADDING) {
+      current.y = previous.y + previous.height + NODE_PADDING
+    }
+  }
+  for (let index = useNodes.length - 2; index >= 0; index -= 1) {
+    const current = useNodes[index]
+    const next = useNodes[index + 1]
+    if (next.y + next.height > height - BOTTOM_PADDING) {
+      next.y = height - BOTTOM_PADDING - next.height
+    }
+    if (current.y + current.height + NODE_PADDING > next.y) {
+      current.y = next.y - NODE_PADDING - current.height
+    }
+  }
+
+  columns.income.forEach((node) => {
+    node.y = clamp(centerForTargets(node) - node.height / 2, TOP_PADDING, height - BOTTOM_PADDING - node.height)
+  })
+
+  const sourceNodes = columns.source.sort((a, b) => {
+    if (b.sortValue !== a.sortValue) return b.sortValue - a.sortValue
+    return a.label.localeCompare(b.label)
+  })
+  let sourceY = TOP_PADDING
+  sourceNodes.forEach((node) => {
+    node.y = sourceY
+    sourceY += node.height + NODE_PADDING
+  })
+
+  const sourceOffsets = new Map<string, number>()
+  const targetOffsets = new Map<string, number>()
+  const sortedLinks = [...linksWithNodes].sort((a, b) => {
+    const sourceRank = a.sourceNode.y - b.sourceNode.y || a.sourceNode.x - b.sourceNode.x
+    if (sourceRank !== 0) return sourceRank
+    return a.targetNode.y - b.targetNode.y || b.amount - a.amount
+  })
+
+  const layoutLinks = sortedLinks.map((link) => {
+    const width = Math.max(1, link.amount * scale)
+    const sourceOffset = sourceOffsets.get(link.source) || 0
+    const targetOffset = targetOffsets.get(link.target) || 0
+    sourceOffsets.set(link.source, sourceOffset + link.amount * scale)
+    targetOffsets.set(link.target, targetOffset + link.amount * scale)
+
+    return {
+      ...link,
+      sourceY: link.sourceNode.y + sourceOffset + width / 2,
+      targetY: link.targetNode.y + targetOffset + width / 2,
+      width,
+      color: link.targetNode.color,
+    }
+  })
+
+  return {
+    nodes: Array.from(nodeMap.values()),
+    links: layoutLinks.sort((a, b) => a.width - b.width),
+    scale,
+  }
 }
 
 export function buildSankeyData(
@@ -140,43 +372,34 @@ export function buildSankeyData(
       const isInvestment = account?.accountType === "Investments"
 
       if (isInvestment && account) {
-        // Investment contributions (e.g. direct RRSP/TFSA deposits) — separate flow
         const label = `To ${account.name}`
         accumulateAmount(investmentContribByDest, label, netAmount)
         totalInvestmentContributions += netAmount
       } else {
-        // Regular cash income — flows into Total Income
         const category = t.category || "Income"
         const sourceName = (t.merchant || "").trim()
         const incomeLabel = sourceName ? `${category} - ${sourceName}` : category
-
-        // Sum deductions for this transaction to compute gross
         const txDeductions = (t.id && deductionsMap?.[t.id]) || t.deductions || []
-        const deductionSum = txDeductions.reduce((s, d) => s + (Number(d.amount) || 0), 0)
+        const deductionSum = txDeductions.reduce((sum, deduction) => sum + (Number(deduction.amount) || 0), 0)
         const grossAmount = netAmount + deductionSum
 
         accumulateAmount(incomeBySource, incomeLabel, grossAmount)
         totalIncome += grossAmount
 
-        // Accumulate deductions by label
-        for (const d of txDeductions) {
-          const dedAmount = Number(d.amount) || 0
+        for (const deduction of txDeductions) {
+          const amount = Number(deduction.amount) || 0
           const targetAccount =
-            d.target_account_id != null ? accountsMap?.[String(d.target_account_id)] : undefined
+            deduction.target_account_id != null ? accountsMap?.[String(deduction.target_account_id)] : undefined
 
           if (targetAccount?.category === "asset") {
-            const label = `To ${targetAccount.name}`
-            accumulateAmount(assetTransferByDestination, label, dedAmount)
+            accumulateAmount(assetTransferByDestination, `To ${targetAccount.name}`, amount)
           } else {
-            const dedLabel = d.label || "Deduction"
-            accumulateAmount(deductionByLabel, dedLabel, dedAmount)
+            accumulateAmount(deductionByLabel, deduction.label || "Deduction", amount)
           }
         }
       }
     } else if (t.transaction_type === "outgoing") {
-      const category = t.category || "Expense"
-      const amount = getSpendingAmount(t)
-      accumulateAmount(expenseByCategory, category, amount)
+      accumulateAmount(expenseByCategory, t.category || "Expense", getSpendingAmount(t))
     } else if (t.transaction_type === "transfer" && t.to_account_type_id && accountsMap) {
       const toAccount = accountsMap[t.to_account_type_id]
       const fromAccount = t.account_type_id != null ? accountsMap[t.account_type_id] : undefined
@@ -186,7 +409,6 @@ export function buildSankeyData(
         return
       }
       if (toAccount.category !== "asset") {
-        // Transfers to liability (e.g. CC payments) are excluded from diagram
         return
       }
       if (!fromAccount) {
@@ -198,11 +420,10 @@ export function buildSankeyData(
         return
       }
 
-      const isCashToCash = fromAccount?.accountType === "Cash" && toAccount.accountType === "Cash"
+      const isCashToCash = fromAccount.accountType === "Cash" && toAccount.accountType === "Cash"
       const shouldIncludeCashToCash = isCashToCash && toAccount.accountSubtype === "Savings"
       const shouldExcludeAsInternal = isCashToCash && !shouldIncludeCashToCash
       const isSameAccountBucketTransfer =
-        !!fromAccount &&
         fromAccount.category === "asset" &&
         toAccount.category === "asset" &&
         fromAccount.accountType === toAccount.accountType &&
@@ -217,138 +438,122 @@ export function buildSankeyData(
         return
       }
 
-      const label = `To ${toAccount.name}`
-      accumulateAmount(assetTransferByDestination, label, amount)
+      accumulateAmount(assetTransferByDestination, `To ${toAccount.name}`, amount)
     }
   })
 
-  const lines: string[] = []
   const totalIncomeLabel = "Total Income"
   const investmentContribLabel = "Direct Investment Deposits"
-  const wealthFundingLabel = "Investment & Savings Funding"
-  const savingsLabel = "Savings"
+  const savingsHubLabel = "Savings"
+  const spendingHubLabel = "Spending & Deductions"
+  const remainingSavingsLabel = "Remaining Savings"
   const cashDrawdownLabel = "Existing Cash Used"
-  const destinationTotals = new Map<string, number>()
-  const middleFlows: SankeyFlow[] = []
-  const destinationFlows: SankeyFlow[] = []
-
-  const addDestinationFlow = (source: string, target: string, amount: number) => {
-    if (amount <= 0) return
-    addFlow(destinationFlows, source, target, amount)
-    destinationTotals.set(target, (destinationTotals.get(target) || 0) + amount)
-  }
-
   const groupedIncomeSources = groupTopEntries(
     Object.entries(incomeBySource),
     TOP_INCOME_SOURCES,
     "Other Income Sources"
   )
-  const investmentDestinations = Object.entries(investmentContribByDest)
-    .filter(([, amount]) => amount > 0)
-    .sort(sortByAmountDesc)
-
-  // Income sources (gross) → Total Income
-  groupedIncomeSources.entries.forEach(([sourceLabel, amount]) => {
-    lines.push(`${escapeCsvValue(sourceLabel)}, ${escapeCsvValue(totalIncomeLabel)}, ${amount}`)
-  })
-
-  // Cash expenses and non-investment payroll deductions consume period income first.
-  const cashOutflows: Array<[string, number]> = [
-    ...Object.entries(expenseByCategory),
-    ...Object.entries(deductionByLabel),
-  ]
-  const groupedCashOutflows = groupTopEntries(cashOutflows, TOP_OUTFLOWS, "Other Outflows")
-  let remainingIncome = totalIncome
-  let cashDrawdownTotal = 0
-
-  groupedCashOutflows.entries.forEach(([label, amount]) => {
-    const incomeFundedAmount = Math.min(amount, remainingIncome)
-    const drawdownFundedAmount = amount - incomeFundedAmount
-
-    if (incomeFundedAmount > 0) {
-      addDestinationFlow(totalIncomeLabel, label, incomeFundedAmount)
-      remainingIncome -= incomeFundedAmount
-    }
-    if (drawdownFundedAmount > 0) {
-      addDestinationFlow(cashDrawdownLabel, label, drawdownFundedAmount)
-      cashDrawdownTotal += drawdownFundedAmount
-    }
-  })
-
-  // Asset transfers and targeted payroll deductions are wealth-building flows, not spending.
+  const groupedCashOutflows = groupTopEntries(
+    combineEntries([...Object.entries(expenseByCategory), ...Object.entries(deductionByLabel)]),
+    TOP_OUTFLOWS,
+    "Other Outflows"
+  )
   const groupedWealthDestinations = groupTopEntries(
+    combineEntries([...Object.entries(assetTransferByDestination), ...Object.entries(investmentContribByDest)]),
+    TOP_OUTFLOWS,
+    "Other Investment & Savings Transfers"
+  )
+
+  const links: SankeyDiagramLink[] = []
+  const nodeValues = new Map<string, { label: string; column: SankeyColumn; value: number; sortValue: number }>()
+  const registerNode = (label: string, column: SankeyColumn, value: number, sortValue = value) => {
+    if (value <= 0) return
+    const current = nodeValues.get(label)
+    if (!current) {
+      nodeValues.set(label, { label, column, value, sortValue })
+      return
+    }
+    current.value = Math.max(current.value, value)
+    current.sortValue = Math.max(current.sortValue, sortValue)
+  }
+
+  groupedIncomeSources.entries.forEach(([sourceLabel, amount]) => {
+    registerNode(sourceLabel, "source", amount)
+    addLink(links, sourceLabel, totalIncomeLabel, amount)
+  })
+
+  const groupedAssetDestinations = groupTopEntries(
     Object.entries(assetTransferByDestination),
     TOP_OUTFLOWS,
     "Other Investment & Savings Transfers"
   )
-  const totalWealthFunding = sumEntries(groupedWealthDestinations.entries)
-  const incomeFundedWealth = Math.min(totalWealthFunding, remainingIncome)
-  const cashDrawdownToWealth = totalWealthFunding - incomeFundedWealth
+  const totalAssetWealthFunding = sumEntries(groupedAssetDestinations.entries)
+  const spendingTotal = sumEntries(groupedCashOutflows.entries)
+  const wealthDestinationTotal = sumEntries(groupedWealthDestinations.entries)
+  const requestedOutflows = spendingTotal + wealthDestinationTotal
+  const cashDrawdownTotal = Math.max(0, requestedOutflows - totalIncome - totalInvestmentContributions)
+  const totalAvailableFunds = totalIncome + totalInvestmentContributions + cashDrawdownTotal
+  const remainingIncome = Math.max(0, totalAvailableFunds - requestedOutflows)
+  const incomeAfterSpending = Math.max(0, totalIncome + totalInvestmentContributions - spendingTotal)
+  const cashDrawdownToWealth = Math.max(0, totalAssetWealthFunding - incomeAfterSpending)
+  const savingsTotal = wealthDestinationTotal + remainingIncome
 
-  if (incomeFundedWealth > 0) {
-    addFlow(middleFlows, totalIncomeLabel, wealthFundingLabel, incomeFundedWealth)
-    remainingIncome -= incomeFundedWealth
+  if (cashDrawdownTotal > 0) {
+    registerNode(cashDrawdownLabel, "source", cashDrawdownTotal)
+    addLink(links, cashDrawdownLabel, totalIncomeLabel, cashDrawdownTotal)
   }
-  if (cashDrawdownToWealth > 0) {
-    addFlow(middleFlows, cashDrawdownLabel, wealthFundingLabel, cashDrawdownToWealth)
-    cashDrawdownTotal += cashDrawdownToWealth
+  if (totalInvestmentContributions > 0) {
+    registerNode(investmentContribLabel, "source", totalInvestmentContributions)
+    addLink(links, investmentContribLabel, totalIncomeLabel, totalInvestmentContributions)
   }
+
+  registerNode(totalIncomeLabel, "income", totalAvailableFunds)
+
+  if (spendingTotal > 0) {
+    registerNode(spendingHubLabel, "use", spendingTotal)
+    addLink(links, totalIncomeLabel, spendingHubLabel, spendingTotal)
+  }
+
+  if (savingsTotal > 0) {
+    registerNode(savingsHubLabel, "use", savingsTotal)
+    addLink(links, totalIncomeLabel, savingsHubLabel, savingsTotal)
+  }
+
   groupedWealthDestinations.entries.forEach(([label, amount]) => {
-    addDestinationFlow(wealthFundingLabel, label, amount)
+    registerNode(label, "destination", amount)
+    addLink(links, savingsHubLabel, label, amount)
+  })
+  groupedCashOutflows.entries.forEach(([label, amount]) => {
+    registerNode(label, "destination", amount)
+    addLink(links, spendingHubLabel, label, amount)
   })
 
   if (remainingIncome > 0) {
-    addDestinationFlow(totalIncomeLabel, savingsLabel, remainingIncome)
+    registerNode(remainingSavingsLabel, "destination", remainingIncome)
+    addLink(links, savingsHubLabel, remainingSavingsLabel, remainingIncome)
   }
 
-  // Investment contributions as a separate flow (not part of Total Income)
-  if (totalInvestmentContributions > 0) {
-    investmentDestinations.forEach(([label, amount]) => {
-      addDestinationFlow(investmentContribLabel, label, amount)
-    })
-  }
-
-  middleFlows.forEach(({ source, target, amount }) => {
-    lines.push(`${escapeCsvValue(source)}, ${escapeCsvValue(target)}, ${amount}`)
+  const nodes: SankeyDiagramNode[] = Array.from(nodeValues.entries()).map(([id, node]) => ({
+    id,
+    label: node.label,
+    column: node.column,
+    value: node.value,
+    sortValue: node.sortValue,
+  }))
+  const csvLines = links.map((link) => {
+    return `${escapeCsvValue(link.source)}, ${escapeCsvValue(link.target)}, ${link.amount}`
   })
-
-  const destinationOrder = new Map(
-    Array.from(destinationTotals.entries())
-      .sort(sortByAmountDesc)
-      .map(([label], index) => [label, index])
-  )
-  const sourceOrder = new Map(
-    [wealthFundingLabel, totalIncomeLabel, investmentContribLabel, cashDrawdownLabel].map((label, index) => [
-      label,
-      index,
-    ])
-  )
-
-  destinationFlows
-    .sort((a, b) => {
-      const destinationRank = (destinationOrder.get(a.target) ?? 0) - (destinationOrder.get(b.target) ?? 0)
-      if (destinationRank !== 0) return destinationRank
-
-      const sourceRank = (sourceOrder.get(a.source) ?? sourceOrder.size) - (sourceOrder.get(b.source) ?? sourceOrder.size)
-      if (sourceRank !== 0) return sourceRank
-
-      return b.amount - a.amount || a.source.localeCompare(b.source)
-    })
-    .forEach(({ source, target, amount }) => {
-      lines.push(`${escapeCsvValue(source)}, ${escapeCsvValue(target)}, ${amount}`)
-    })
 
   const leftNodes =
     groupedIncomeSources.entries.length + (cashDrawdownTotal > 0 ? 1 : 0) + (totalInvestmentContributions > 0 ? 1 : 0)
-  const middleNodes = totalWealthFunding > 0 ? 2 : 1
-  const rightNodes = groupedCashOutflows.entries.length + groupedWealthDestinations.entries.length + investmentDestinations.length
+  const useNodes = (spendingTotal > 0 ? 1 : 0) + (savingsTotal > 0 ? 1 : 0)
+  const rightNodes = groupedCashOutflows.entries.length + groupedWealthDestinations.entries.length + (remainingIncome > 0 ? 1 : 0)
   const maxColumnNodes = Math.max(leftNodes, rightNodes)
   const dynamicHeight = clamp(
-    (maxColumnNodes + middleNodes + NODE_HEIGHT_BUFFER) * NODE_HEIGHT_MULTIPLIER,
+    (maxColumnNodes + useNodes + NODE_HEIGHT_BUFFER) * NODE_HEIGHT_MULTIPLIER,
     MIN_SANKEY_HEIGHT,
     MAX_SANKEY_HEIGHT
   )
-
   const isGrouped = groupedIncomeSources.grouped || groupedCashOutflows.grouped || groupedWealthDestinations.grouped
   const excludedTopDestinations = Object.entries(excludedInternalTransferByDestination)
     .filter(([, amount]) => amount > 0)
@@ -360,43 +565,36 @@ export function buildSankeyData(
     .sort(sortByAmountDesc)
     .slice(0, 3)
     .map(([destination, amount]) => ({ destination, amount }))
+  const excludedIncompleteTransfers = {
+    count: excludedIncompleteTransferCount,
+    totalAmount: excludedIncompleteTransferTotal,
+    topDestinations: excludedIncompleteTopDestinations,
+  }
+  const excludedInternalTransfers = {
+    count: excludedInternalTransferCount,
+    totalAmount: excludedInternalTransferTotal,
+    topDestinations: excludedTopDestinations,
+  }
 
-  if (lines.length === 0) {
-    return {
-      csv: "",
-      dynamicHeight: MIN_SANKEY_HEIGHT,
+  if (links.length === 0) {
+    return makeEmptyResult(
       isGrouped,
       cashDrawdownTotal,
       cashDrawdownToWealth,
-      excludedIncompleteTransfers: {
-        count: excludedIncompleteTransferCount,
-        totalAmount: excludedIncompleteTransferTotal,
-        topDestinations: excludedIncompleteTopDestinations,
-      },
-      excludedInternalTransfers: {
-        count: excludedInternalTransferCount,
-        totalAmount: excludedInternalTransferTotal,
-        topDestinations: excludedTopDestinations,
-      },
-    }
+      excludedIncompleteTransfers,
+      excludedInternalTransfers
+    )
   }
 
   return {
-    csv: `sankey-beta\n${lines.join("\n")}`,
+    csv: `sankey-beta\n${csvLines.join("\n")}`,
     dynamicHeight,
     isGrouped,
     cashDrawdownTotal,
     cashDrawdownToWealth,
-    excludedIncompleteTransfers: {
-      count: excludedIncompleteTransferCount,
-      totalAmount: excludedIncompleteTransferTotal,
-      topDestinations: excludedIncompleteTopDestinations,
-    },
-    excludedInternalTransfers: {
-      count: excludedInternalTransferCount,
-      totalAmount: excludedInternalTransferTotal,
-      topDestinations: excludedTopDestinations,
-    },
+    diagram: { nodes, links },
+    excludedIncompleteTransfers,
+    excludedInternalTransfers,
   }
 }
 
@@ -415,71 +613,16 @@ export function MermaidSankey({
   buildResult,
   className,
 }: MermaidSankeyProps) {
-  const containerRef = useRef<HTMLDivElement>(null)
-  const reactId = useId().replace(/:/g, "-")
-  const renderCountRef = useRef(0)
   const sankeyData = useMemo(
     () => buildResult ?? buildSankeyData(transactions, accountsMap, deductionsMap),
     [buildResult, transactions, accountsMap, deductionsMap]
   )
+  const layout = useMemo(
+    () => buildLayout(sankeyData.diagram, sankeyData.dynamicHeight),
+    [sankeyData.diagram, sankeyData.dynamicHeight]
+  )
 
-  useLayoutEffect(() => {
-    const csv = sankeyData.csv
-    if (!csv) return
-
-    renderCountRef.current += 1
-    const diagramId = `sankey-${reactId}-${renderCountRef.current}`
-
-    mermaid.initialize({
-      startOnLoad: false,
-      theme: "base",
-      securityLevel: "loose",
-      sankey: {
-        width: 1400,
-        height: sankeyData.dynamicHeight,
-        useMaxWidth: true,
-        showValues: true,
-      },
-    })
-
-    let cancelled = false
-    const render = async () => {
-      try {
-        const { svg } = await mermaid.render(diagramId, csv)
-        if (!cancelled && containerRef.current) {
-          containerRef.current.innerHTML = svg
-          const svgEl = containerRef.current.querySelector("svg")
-          if (svgEl) {
-            svgEl.removeAttribute("width")
-            svgEl.removeAttribute("height")
-            svgEl.setAttribute("preserveAspectRatio", "xMidYMid meet")
-            svgEl.style.width = "100%"
-            svgEl.style.height = "100%"
-          }
-        }
-      } catch (err) {
-        if (!cancelled && containerRef.current) {
-          containerRef.current.innerHTML = `<p class="text-muted-foreground text-sm p-4">Unable to render diagram. Not enough flow data.</p>`
-        }
-        console.warn("Mermaid Sankey render error:", err)
-      }
-    }
-
-    // Defer render until after the container is in the DOM and laid out (fixes first-load not showing)
-    const rafId = requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        if (!containerRef.current) return
-        render()
-      })
-    })
-    return () => {
-      cancelled = true
-      cancelAnimationFrame(rafId)
-    }
-  }, [sankeyData, reactId]);
-
-  const csv = sankeyData.csv
-  if (!csv) {
+  if (sankeyData.diagram.links.length === 0) {
     return (
       <div className={className}>
         <p className="text-muted-foreground text-sm p-4">No transaction data to display.</p>
@@ -489,9 +632,65 @@ export function MermaidSankey({
 
   return (
     <div
-      ref={containerRef}
       className={className}
       style={{ minHeight: `${sankeyData.dynamicHeight}px`, width: "100%" }}
-    />
+    >
+      <svg
+        role="img"
+        aria-label="Cash flow Sankey diagram"
+        viewBox={`0 0 ${DIAGRAM_WIDTH} ${sankeyData.dynamicHeight}`}
+        preserveAspectRatio="xMidYMid meet"
+        className="h-full min-h-full w-full overflow-visible"
+      >
+        <g fill="none">
+          {layout.links.map((link) => {
+            const sourceX = link.sourceNode.x + NODE_WIDTH
+            const targetX = link.targetNode.x
+            const curveX = sourceX + (targetX - sourceX) * 0.55
+            const path = `M${sourceX},${link.sourceY} C${curveX},${link.sourceY} ${curveX},${link.targetY} ${targetX},${link.targetY}`
+            return (
+              <path
+                key={`${link.source}-${link.target}-${link.amount}`}
+                d={path}
+                stroke={link.color}
+                strokeWidth={link.width}
+                strokeOpacity={0.42}
+                className="mix-blend-multiply"
+              />
+            )
+          })}
+        </g>
+        <g>
+          {layout.nodes.map((node) => {
+            const isRightSide = node.column === "destination"
+            const labelX = isRightSide ? node.x - 8 : node.x + NODE_WIDTH + 8
+            const anchor = isRightSide ? "end" : "start"
+            return (
+              <g key={node.id}>
+                <rect
+                  x={node.x}
+                  y={node.y}
+                  width={NODE_WIDTH}
+                  height={node.height}
+                  fill={node.color}
+                />
+                <text
+                  x={labelX}
+                  y={node.y + node.height / 2}
+                  textAnchor={anchor}
+                  dominantBaseline="middle"
+                  paintOrder="stroke"
+                  stroke="hsl(var(--background))"
+                  strokeWidth={5}
+                  className="fill-foreground text-[14px]"
+                >
+                  {node.label} {formatSankeyAmount(node.value)}
+                </text>
+              </g>
+            )
+          })}
+        </g>
+      </svg>
+    </div>
   )
 }
