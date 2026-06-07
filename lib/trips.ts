@@ -217,6 +217,19 @@ async function getTripLinkRows(
   return (data ?? []) as TripTransactionLinkRow[]
 }
 
+async function getAllTripLinkRows(
+  supabase: ReturnType<typeof createServerSupabaseClient>,
+  userId: string
+): Promise<TripTransactionLinkRow[]> {
+  const { data, error } = await supabase
+    .from('trip_transactions')
+    .select('trip_id, transaction_id')
+    .eq('user_id', userId)
+
+  if (error) throw error
+  return (data ?? []) as TripTransactionLinkRow[]
+}
+
 async function getTransactionsByIds(
   supabase: ReturnType<typeof createServerSupabaseClient>,
   userId: string,
@@ -479,8 +492,8 @@ export async function getTravelTransactionsForTrip(
   const numericTripId = toNumericTripId(tripId)
   await ensureTripOwnership(supabase, userId, numericTripId)
 
-  const [links, outgoingTxs] = await Promise.all([
-    getTripLinkRows(supabase, userId, numericTripId),
+  const [allLinks, outgoingTxs] = await Promise.all([
+    getAllTripLinkRows(supabase, userId),
     (async () => {
       const { data, error } = await supabase
         .from('transactions')
@@ -494,10 +507,22 @@ export async function getTravelTransactionsForTrip(
     })(),
   ])
 
-  const associatedSet = new Set(links.map((link) => String(link.transaction_id)))
+  const associatedSet = new Set(
+    allLinks
+      .filter((link) => link.trip_id === numericTripId)
+      .map((link) => String(link.transaction_id))
+  )
+  const linkedToOtherTripSet = new Set(
+    allLinks
+      .filter((link) => link.trip_id !== numericTripId)
+      .map((link) => String(link.transaction_id))
+  )
 
   return outgoingTxs
-    .filter((tx) => isTravelCategory(tx.category))
+    .filter((tx) => {
+      if (!isTravelCategory(tx.category)) return false
+      return !tx.id || associatedSet.has(tx.id) || !linkedToOtherTripSet.has(tx.id)
+    })
     .map((tx) => ({
       transaction: tx,
       associated: tx.id ? associatedSet.has(tx.id) : false,
@@ -534,8 +559,32 @@ export async function setTripTravelTransactions(
 
     if (eligibleError) throw eligibleError
 
+    const { data: existingLinks, error: linksError } = await supabase
+      .from('trip_transactions')
+      .select('trip_id, transaction_id')
+      .eq('user_id', userId)
+      .in('transaction_id', requestedIds)
+
+    if (linksError) throw linksError
+
+    const linkRows = (existingLinks ?? []) as TripTransactionLinkRow[]
+    const linkedToCurrentTripSet = new Set(
+      linkRows
+        .filter((link) => link.trip_id === numericTripId)
+        .map((link) => Number(link.transaction_id))
+    )
+    const linkedToOtherTripSet = new Set(
+      linkRows
+        .filter((link) => link.trip_id !== numericTripId)
+        .map((link) => Number(link.transaction_id))
+    )
+
     allowedIds = (eligibleRows ?? [])
       .filter((row) => isTravelCategory(row.category))
+      .filter((row) => {
+        const id = Number(row.id)
+        return linkedToCurrentTripSet.has(id) || !linkedToOtherTripSet.has(id)
+      })
       .map((row) => Number(row.id))
   }
 
