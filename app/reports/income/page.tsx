@@ -43,6 +43,19 @@ function formatCurrency(amount: number) {
   }).format(amount)
 }
 
+function TransactionNotes({ notes }: { notes?: string }) {
+  const trimmedNotes = notes?.trim()
+
+  return (
+    <p
+      className="truncate text-sm text-foreground"
+      title={trimmedNotes || undefined}
+    >
+      {trimmedNotes}
+    </p>
+  )
+}
+
 interface CategoryIncome {
   name: string
   value: string
@@ -109,6 +122,12 @@ function IncomeTransactionList({
             </span>
           </div>
           <div className="space-y-1">
+            <div className="hidden grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,1.4fr)_max-content] gap-4 px-4 py-1 text-xs font-medium uppercase tracking-wide text-muted-foreground md:grid">
+              <span>Merchant</span>
+              <span>Category</span>
+              <span>Notes</span>
+              <span className="text-right">Amount</span>
+            </div>
             {txs.map((transaction) => {
               const categoryInfo = findCategoryByValue(
                 categories,
@@ -117,32 +136,42 @@ function IncomeTransactionList({
               return (
                 <div
                   key={transaction.id}
-                  className="w-full flex items-center justify-between px-4 py-3 hover:bg-muted/50 rounded-lg transition-colors"
+                  className="w-full rounded-lg px-4 py-3 transition-colors hover:bg-muted/50"
                 >
-                  <div className="flex items-center gap-4 flex-1 min-w-0">
-                    <div className="min-w-[180px]">
+                  <div className="grid gap-2 md:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,1.4fr)_max-content] md:items-center md:gap-4">
+                    <div className="min-w-0">
                       <p className="font-medium truncate">{transaction.merchant}</p>
+                      {categoryInfo && (
+                        <div className="mt-1 flex items-center gap-2 md:hidden">
+                          <span className="text-sm">{categoryInfo.emoji}</span>
+                          <span className="text-sm text-muted-foreground">
+                            {categoryInfo.label}
+                          </span>
+                        </div>
+                      )}
                     </div>
                     {categoryInfo && (
-                      <div className="flex items-center gap-2 min-w-[150px]">
+                      <div className="hidden min-w-0 items-center gap-2 md:flex">
                         <span className="text-sm">{categoryInfo.emoji}</span>
-                        <span className="text-sm text-muted-foreground">
+                        <span className="truncate text-sm text-muted-foreground">
                           {categoryInfo.label}
                         </span>
                       </div>
                     )}
+                    {!categoryInfo && <span className="hidden md:block" />}
+                    <TransactionNotes notes={transaction.notes} />
+                    <span
+                      className={cn(
+                        "font-semibold md:text-right",
+                        transaction.transaction_type === "incoming"
+                          ? "text-accent"
+                          : "text-foreground"
+                      )}
+                    >
+                      {transaction.transaction_type === "incoming" ? "+" : ""}
+                      {formatCurrency(transaction.amount)}
+                    </span>
                   </div>
-                  <span
-                    className={cn(
-                      "font-semibold",
-                      transaction.transaction_type === "incoming"
-                        ? "text-accent"
-                        : "text-foreground"
-                    )}
-                  >
-                    {transaction.transaction_type === "incoming" ? "+" : ""}
-                    {formatCurrency(transaction.amount)}
-                  </span>
                 </div>
               )
             })}
