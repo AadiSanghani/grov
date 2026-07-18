@@ -50,18 +50,42 @@ function ReportsDateSelect() {
     })
   }, [customStartDate, customEndDate])
 
-  const handleSelect = (range: DateRange | undefined) => {
+  const applyRange = (range: DateRange) => {
+    if (!range.from || !range.to) return
+
     setDate(range)
-    if (range?.from && range?.to) {
-      const start = format(range.from, "yyyy-MM-dd")
-      const end = format(range.to, "yyyy-MM-dd")
-      if (start <= end) {
-        setCustomDateRange(start, end)
-        if (timeline !== "custom") {
-          setTimeline("custom")
-        }
-      }
+    setCustomDateRange(format(range.from, "yyyy-MM-dd"), format(range.to, "yyyy-MM-dd"))
+    if (timeline !== "custom") {
+      setTimeline("custom")
     }
+  }
+
+  const handleDayClick = (day: Date, _modifiers: unknown, event: React.MouseEvent) => {
+    // A double click always begins a fresh range. The first click still retains
+    // the familiar single-click behaviour of expanding the existing range.
+    if (event.detail >= 2) {
+      setDate({ from: day, to: undefined })
+      return
+    }
+
+    if (!date?.from) {
+      setDate({ from: day, to: undefined })
+      return
+    }
+
+    if (!date.to) {
+      applyRange(
+        day.getTime() < date.from.getTime()
+          ? { from: day, to: date.from }
+          : { from: date.from, to: day }
+      )
+      return
+    }
+
+    applyRange({
+      from: day.getTime() < date.from.getTime() ? day : date.from,
+      to: day.getTime() > date.to.getTime() ? day : date.to,
+    })
   }
 
   return (
@@ -106,11 +130,16 @@ function ReportsDateSelect() {
             </Button>
           </PopoverTrigger>
           <PopoverContent className="w-auto p-0" align="end">
+            <div className="border-b px-3 py-2 text-sm text-muted-foreground" aria-live="polite">
+              {date?.from && !date.to
+                ? "Now choose the end date."
+                : "Click to expand the range. Double-click a day to start a new range."}
+            </div>
             <Calendar
               mode="range"
               defaultMonth={date?.from}
               selected={date}
-              onSelect={handleSelect}
+              onDayClick={handleDayClick}
               numberOfMonths={2}
             />
           </PopoverContent>
