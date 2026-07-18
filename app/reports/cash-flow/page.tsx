@@ -202,6 +202,9 @@ export default function CashFlowPage() {
           <p className="text-xs text-muted-foreground">
             Selected period: {formatPeriodLabel(startDate, endDate)}
           </p>
+          <p className="text-xs text-muted-foreground">
+            Cash savings destinations show net deposits after withdrawals and direct spending.
+          </p>
           {sankeyData.isGrouped && (
             <p className="text-xs text-muted-foreground">
               Showing top flows; smaller flows are grouped.

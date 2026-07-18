@@ -383,8 +383,7 @@ export function buildSankeyData(
   const taxByLabel: Record<string, number> = {}
   const insuranceByLabel: Record<string, number> = {}
   const investmentContribByDest: Record<string, number> = {}
-  const cashSavingsFundingByAccount: Record<string, number> = {}
-  const cashSavingsInvestmentOutflowByAccount: Record<string, number> = {}
+  const cashSavingsNetChangeByAccount: Record<string, number> = {}
   let totalIncome = 0
   let totalInvestmentContributions = 0
   let excludedInternalTransferCount = 0
@@ -395,6 +394,15 @@ export function buildSankeyData(
   let excludedNonCashSpendingTotal = 0
   const excludedInternalTransferByDestination: Record<string, number> = {}
   const excludedIncompleteTransferByDestination: Record<string, number> = {}
+
+  const isCashSavingsAccount = (account: AccountMap[string] | undefined) =>
+    account?.accountType === "Cash" && account.accountSubtype === "Savings"
+  const adjustCashSavingsNetChange = (accountId: string | null | undefined, amount: number) => {
+    if (accountId == null || amount === 0) return
+    const normalizedId = String(accountId)
+    cashSavingsNetChangeByAccount[normalizedId] =
+      (cashSavingsNetChangeByAccount[normalizedId] || 0) + amount
+  }
 
   transactions.forEach((t) => {
     // These entries describe a personal share that was paid by someone else.
@@ -430,12 +438,18 @@ export function buildSankeyData(
         accumulateAmount(incomeBySource, incomeLabel, grossAmount)
         totalIncome += grossAmount
 
+        if (isCashSavingsAccount(account)) {
+          adjustCashSavingsNetChange(t.account_type_id, netAmount)
+        }
+
         for (const deduction of txDeductions) {
           const amount = Number(deduction.amount) || 0
           const targetAccount =
             deduction.target_account_id != null ? accountsMap?.[String(deduction.target_account_id)] : undefined
 
-          if (targetAccount?.category === "asset") {
+          if (isCashSavingsAccount(targetAccount)) {
+            adjustCashSavingsNetChange(String(deduction.target_account_id), amount)
+          } else if (targetAccount?.category === "asset") {
             accumulateAmount(assetTransferByDestination, `To ${targetAccount.name}`, amount)
           } else if (isTaxPayrollDeductionLabel(deduction.label)) {
             accumulateAmount(taxByLabel, deduction.label || "Tax", amount)
@@ -447,7 +461,12 @@ export function buildSankeyData(
         }
       }
     } else if (t.transaction_type === "outgoing") {
-      accumulateAmount(expenseByCategory, t.category || "Expense", getSpendingAmount(t))
+      const spendingAmount = getSpendingAmount(t)
+      accumulateAmount(expenseByCategory, t.category || "Expense", spendingAmount)
+      const account = t.account_type_id != null ? accountsMap?.[t.account_type_id] : undefined
+      if (isCashSavingsAccount(account)) {
+        adjustCashSavingsNetChange(t.account_type_id, -spendingAmount)
+      }
     } else if (t.transaction_type === "transfer" && t.to_account_type_id && accountsMap) {
       const toAccount = accountsMap[t.to_account_type_id]
       const fromAccount = t.account_type_id != null ? accountsMap[t.account_type_id] : undefined
@@ -456,10 +475,8 @@ export function buildSankeyData(
       if (!toAccount || amount <= 0) {
         return
       }
-      if (toAccount.category !== "asset") {
-        return
-      }
       if (!fromAccount) {
+        if (toAccount.category !== "asset") return
         const destinationLabel = normalizeAggregateLabel(`To ${toAccount.name}`)
         excludedIncompleteTransferCount += 1
         excludedIncompleteTransferTotal += amount
@@ -469,13 +486,29 @@ export function buildSankeyData(
       }
 
       const isCashToCash = fromAccount.accountType === "Cash" && toAccount.accountType === "Cash"
-      const shouldIncludeCashToCash = isCashToCash && toAccount.accountSubtype === "Savings"
-      const shouldExcludeAsInternal = isCashToCash && !shouldIncludeCashToCash
+      const isFromCashSavings = isCashSavingsAccount(fromAccount)
+      const isToCashSavings = isCashSavingsAccount(toAccount)
+      if (isFromCashSavings) {
+        adjustCashSavingsNetChange(t.account_type_id, -amount)
+      }
+      if (isToCashSavings) {
+        adjustCashSavingsNetChange(t.to_account_type_id, amount)
+      }
+
+      if (toAccount.category !== "asset") {
+        return
+      }
+
+      const shouldExcludeAsInternal = isCashToCash && !isToCashSavings
       const isSameAccountBucketTransfer =
         fromAccount.category === "asset" &&
         toAccount.category === "asset" &&
         fromAccount.accountType === toAccount.accountType &&
         fromAccount.accountSubtype === toAccount.accountSubtype
+
+      if (isToCashSavings) {
+        return
+      }
 
       if (shouldExcludeAsInternal || isSameAccountBucketTransfer) {
         const destinationLabel = normalizeAggregateLabel(`To ${toAccount.name}`)
@@ -486,38 +519,16 @@ export function buildSankeyData(
         return
       }
 
-      if (shouldIncludeCashToCash) {
-        const destinationId = String(t.to_account_type_id)
-        cashSavingsFundingByAccount[destinationId] =
-          (cashSavingsFundingByAccount[destinationId] || 0) + amount
-        return
-      }
-
-      const isSavingsToNonCashAsset =
-        fromAccount.accountType === "Cash" &&
-        fromAccount.accountSubtype === "Savings" &&
-        toAccount.accountType !== "Cash"
-      if (isSavingsToNonCashAsset && t.account_type_id != null) {
-        const sourceId = String(t.account_type_id)
-        cashSavingsInvestmentOutflowByAccount[sourceId] =
-          (cashSavingsInvestmentOutflowByAccount[sourceId] || 0) + amount
-      }
-
       accumulateAmount(assetTransferByDestination, `To ${toAccount.name}`, amount)
     }
   })
 
-  // A cash-to-savings transfer can be an intermediate step before an investment
-  // transfer in the same report range. Count only the portion retained in the
-  // savings account; the downstream investment is already represented above.
-  for (const [accountId, fundedAmount] of Object.entries(cashSavingsFundingByAccount)) {
-    const retainedAmount = Math.max(
-      0,
-      fundedAmount - (cashSavingsInvestmentOutflowByAccount[accountId] || 0)
-    )
+  // Cash savings contributes only its net change. Any funds later spent or
+  // transferred out are already represented by those downstream flows.
+  for (const [accountId, netChange] of Object.entries(cashSavingsNetChangeByAccount)) {
     const account = accountsMap?.[accountId]
     if (account) {
-      accumulateAmount(assetTransferByDestination, `To ${account.name}`, retainedAmount)
+      accumulateAmount(assetTransferByDestination, `To ${account.name}`, netChange)
     }
   }
 
