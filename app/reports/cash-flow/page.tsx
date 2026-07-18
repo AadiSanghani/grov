@@ -220,6 +220,13 @@ export default function CashFlowPage() {
               ).
             </p>
           )}
+          {sankeyData.excludedNonCashSpending.count > 0 && (
+            <p className="text-xs text-muted-foreground">
+              Excluded {sankeyData.excludedNonCashSpending.count} expense
+              {sankeyData.excludedNonCashSpending.count === 1 ? "" : "s"} marked as not affecting your balance (
+              {formatCurrency(sankeyData.excludedNonCashSpending.totalAmount)} total).
+            </p>
+          )}
         </CardHeader>
         <CardContent className="min-h-[70vh] w-full p-4">
           <MermaidSankey

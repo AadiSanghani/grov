@@ -102,6 +102,10 @@ export interface SankeyBuildResult {
     totalAmount: number
     topDestinations: Array<{ destination: string; amount: number }>
   }
+  excludedNonCashSpending: {
+    count: number
+    totalAmount: number
+  }
 }
 
 function normalizeAggregateLabel(value: string): string {
@@ -168,7 +172,8 @@ function makeEmptyResult(
   cashDrawdownTotal: number,
   cashDrawdownToWealth: number,
   excludedIncompleteTransfers: SankeyBuildResult["excludedIncompleteTransfers"],
-  excludedInternalTransfers: SankeyBuildResult["excludedInternalTransfers"]
+  excludedInternalTransfers: SankeyBuildResult["excludedInternalTransfers"],
+  excludedNonCashSpending: SankeyBuildResult["excludedNonCashSpending"]
 ): SankeyBuildResult {
   return {
     csv: "",
@@ -179,6 +184,7 @@ function makeEmptyResult(
     diagram: { nodes: [], links: [] },
     excludedIncompleteTransfers,
     excludedInternalTransfers,
+    excludedNonCashSpending,
   }
 }
 
@@ -377,16 +383,30 @@ export function buildSankeyData(
   const taxByLabel: Record<string, number> = {}
   const insuranceByLabel: Record<string, number> = {}
   const investmentContribByDest: Record<string, number> = {}
+  const cashSavingsFundingByAccount: Record<string, number> = {}
+  const cashSavingsInvestmentOutflowByAccount: Record<string, number> = {}
   let totalIncome = 0
   let totalInvestmentContributions = 0
   let excludedInternalTransferCount = 0
   let excludedInternalTransferTotal = 0
   let excludedIncompleteTransferCount = 0
   let excludedIncompleteTransferTotal = 0
+  let excludedNonCashSpendingCount = 0
+  let excludedNonCashSpendingTotal = 0
   const excludedInternalTransferByDestination: Record<string, number> = {}
   const excludedIncompleteTransferByDestination: Record<string, number> = {}
 
   transactions.forEach((t) => {
+    // These entries describe a personal share that was paid by someone else.
+    // They belong in spending analysis, but never in a cash-flow report.
+    if (t.affects_balance === false) {
+      if (t.transaction_type === "outgoing") {
+        excludedNonCashSpendingCount += 1
+        excludedNonCashSpendingTotal += getSpendingAmount(t)
+      }
+      return
+    }
+
     if (t.transaction_type === "incoming") {
       if (!isIncomeForReporting(t)) {
         return
@@ -466,9 +486,40 @@ export function buildSankeyData(
         return
       }
 
+      if (shouldIncludeCashToCash) {
+        const destinationId = String(t.to_account_type_id)
+        cashSavingsFundingByAccount[destinationId] =
+          (cashSavingsFundingByAccount[destinationId] || 0) + amount
+        return
+      }
+
+      const isSavingsToNonCashAsset =
+        fromAccount.accountType === "Cash" &&
+        fromAccount.accountSubtype === "Savings" &&
+        toAccount.accountType !== "Cash"
+      if (isSavingsToNonCashAsset && t.account_type_id != null) {
+        const sourceId = String(t.account_type_id)
+        cashSavingsInvestmentOutflowByAccount[sourceId] =
+          (cashSavingsInvestmentOutflowByAccount[sourceId] || 0) + amount
+      }
+
       accumulateAmount(assetTransferByDestination, `To ${toAccount.name}`, amount)
     }
   })
+
+  // A cash-to-savings transfer can be an intermediate step before an investment
+  // transfer in the same report range. Count only the portion retained in the
+  // savings account; the downstream investment is already represented above.
+  for (const [accountId, fundedAmount] of Object.entries(cashSavingsFundingByAccount)) {
+    const retainedAmount = Math.max(
+      0,
+      fundedAmount - (cashSavingsInvestmentOutflowByAccount[accountId] || 0)
+    )
+    const account = accountsMap?.[accountId]
+    if (account) {
+      accumulateAmount(assetTransferByDestination, `To ${account.name}`, retainedAmount)
+    }
+  }
 
   const totalIncomeLabel = "Total Income"
   const investmentContribLabel = "Direct Investment Deposits"
@@ -638,6 +689,10 @@ export function buildSankeyData(
     totalAmount: excludedInternalTransferTotal,
     topDestinations: excludedTopDestinations,
   }
+  const excludedNonCashSpending = {
+    count: excludedNonCashSpendingCount,
+    totalAmount: excludedNonCashSpendingTotal,
+  }
 
   if (links.length === 0) {
     return makeEmptyResult(
@@ -645,7 +700,8 @@ export function buildSankeyData(
       cashDrawdownTotal,
       cashDrawdownToWealth,
       excludedIncompleteTransfers,
-      excludedInternalTransfers
+      excludedInternalTransfers,
+      excludedNonCashSpending
     )
   }
 
@@ -658,6 +714,7 @@ export function buildSankeyData(
     diagram: { nodes, links },
     excludedIncompleteTransfers,
     excludedInternalTransfers,
+    excludedNonCashSpending,
   }
 }
 
