@@ -1,26 +1,16 @@
 'use server'
 
-import { after } from 'next/server'
 import { createServerSupabaseClient } from '@/ssr/client'
 import { auth } from '@clerk/nextjs/server'
 import { Transaction } from './types'
-import { getAccountById, updateAccountBalance } from './accounts'
-import { 
-  recordTransactionBalance,
-  reverseTransactionBalance
-} from './balances'
-import {
-  createDeductions,
-  getDeductionsByTransactionId,
-  deleteDeductionsByTransactionId,
-} from './deductions'
-import { calculateBalanceDelta, normalizeIncomingSubtype, toDateOnlyString, parseLocalDate } from './utils'
+import { createDeductions, deleteDeductionsByTransactionId, getDeductionsByTransactionId } from './deductions'
+import { normalizeIncomingSubtype, parseLocalDate, toDateOnlyString } from './utils'
 
 interface TransactionRow {
   id?: string | number
   user_id?: string
-  transaction_type: "outgoing" | "incoming" | "transfer"
-  incoming_subtype?: "income" | "reimbursement" | null
+  transaction_type: 'outgoing' | 'incoming' | 'transfer'
+  incoming_subtype?: 'income' | 'reimbursement' | null
   amount: number
   merchant: string
   date: string
@@ -37,101 +27,68 @@ interface TransactionRow {
   updated_at?: string | null
 }
 
-function mapTransactionForClient(transaction: TransactionRow): Transaction {
+function mapTransactionForClient(row: TransactionRow): Transaction {
   return {
-    id: transaction.id != null ? String(transaction.id) : undefined,
-    user_id: transaction.user_id,
-    transaction_type: transaction.transaction_type,
-    incoming_subtype: transaction.incoming_subtype ?? null,
-    amount: Number(transaction.amount),
-    merchant: transaction.merchant,
-    category: transaction.category,
-    notes: transaction.notes ?? undefined,
-    account_type_id:
-      transaction.account_type_id != null ? String(transaction.account_type_id) : null,
-    to_account_type_id:
-      transaction.to_account_type_id != null ? String(transaction.to_account_type_id) : undefined,
-    date: parseLocalDate(String(transaction.date)),
-    spending_amount: transaction.spending_amount ?? null,
-    created_at: transaction.created_at ? new Date(String(transaction.created_at)) : undefined,
-    updated_at: transaction.updated_at ? new Date(String(transaction.updated_at)) : undefined,
-    affects_balance: transaction.affects_balance ?? true,
-    trip_id: transaction.trip_id != null ? String(transaction.trip_id) : null,
-    trip_entry_id: transaction.trip_entry_id != null ? String(transaction.trip_entry_id) : null,
-    source_type: transaction.source_type ?? null,
+    id: row.id != null ? String(row.id) : undefined,
+    user_id: row.user_id,
+    transaction_type: row.transaction_type,
+    incoming_subtype: row.incoming_subtype ?? null,
+    amount: Number(row.amount),
+    merchant: row.merchant,
+    category: row.category,
+    notes: row.notes ?? undefined,
+    account_type_id: row.account_type_id != null ? String(row.account_type_id) : null,
+    to_account_type_id: row.to_account_type_id != null ? String(row.to_account_type_id) : undefined,
+    date: parseLocalDate(String(row.date)),
+    spending_amount: row.spending_amount ?? null,
+    created_at: row.created_at ? new Date(String(row.created_at)) : undefined,
+    updated_at: row.updated_at ? new Date(String(row.updated_at)) : undefined,
+    affects_balance: row.affects_balance ?? true,
+    trip_id: row.trip_id != null ? String(row.trip_id) : null,
+    trip_entry_id: row.trip_entry_id != null ? String(row.trip_entry_id) : null,
+    source_type: row.source_type ?? null,
   }
+}
+
+async function requireUserId() {
+  const { userId } = await auth()
+  if (!userId) throw new Error('User not authenticated')
+  return userId
 }
 
 export async function getTransactions() {
   const supabase = createServerSupabaseClient()
-  const { userId } = await auth()
-  
-  if (!userId) {
-    throw new Error('User not authenticated')
-  }
-  
-  const { data, error } = await supabase
-    .from('transactions')
-    .select('*')
-    .eq('user_id', userId)
-    .order('date', { ascending: false })
-    
+  const userId = await requireUserId()
+  const { data, error } = await supabase.from('transactions').select('*').eq('user_id', userId).order('date', { ascending: false })
   if (error) throw error
-  
   return data?.map(mapTransactionForClient) as Transaction[]
 }
 
 export async function getTransactionsInRange(startDate: string, endDate: string) {
   const supabase = createServerSupabaseClient()
-  const { userId } = await auth()
-
-  if (!userId) {
-    throw new Error('User not authenticated')
-  }
-
+  const userId = await requireUserId()
   const { data, error } = await supabase
-    .from('transactions')
-    .select('*')
-    .eq('user_id', userId)
-    .gte('date', startDate)
-    .lte('date', endDate)
-    .order('date', { ascending: false })
-
+    .from('transactions').select('*').eq('user_id', userId)
+    .gte('date', startDate).lte('date', endDate).order('date', { ascending: false })
   if (error) throw error
-
   return data?.map(mapTransactionForClient) as Transaction[]
 }
 
-export async function getRecentTransactionsForAccount(
-  accountId: string | number,
-  limit: number = 10
-) {
+export async function getRecentTransactionsForAccount(accountId: string | number, limit = 10) {
   const supabase = createServerSupabaseClient()
-  const { userId } = await auth()
-
-  if (!userId) {
-    throw new Error('User not authenticated')
-  }
-
-  const normalizedAccountId = typeof accountId === 'number' ? String(accountId) : accountId
-
+  const userId = await requireUserId()
+  const account = String(accountId)
   const { data, error } = await supabase
-    .from('transactions')
-    .select('*')
-    .eq('user_id', userId)
-    .or(`account_type_id.eq.${normalizedAccountId},to_account_type_id.eq.${normalizedAccountId}`)
-    .order('date', { ascending: false })
-    .order('created_at', { ascending: false })
-    .limit(limit)
-
+    .from('transactions').select('*').eq('user_id', userId)
+    .or(`account_type_id.eq.${account},to_account_type_id.eq.${account}`)
+    .order('date', { ascending: false }).order('created_at', { ascending: false }).limit(limit)
   if (error) throw error
-
   return data?.map(mapTransactionForClient) as Transaction[]
 }
 
 export async function createTransaction(data: {
-  transaction_type: "outgoing" | "incoming" | "transfer"
-  incoming_subtype?: "income" | "reimbursement" | null
+  transaction_type: 'outgoing' | 'incoming' | 'transfer'
+  incoming_subtype?: 'income' | 'reimbursement' | null
   amount: number
   merchant: string
   date: Date | string
@@ -147,565 +104,104 @@ export async function createTransaction(data: {
   deductions?: { label: string; amount: number; target_account_id?: number | null }[]
 }) {
   const supabase = createServerSupabaseClient()
-  const { userId } = await auth()
-  
-  if (!userId) {
-    throw new Error('User not authenticated')
-  }
-  
-  const transactionDate = toDateOnlyString(data.date)
-  const incomingSubtype =
-    data.transaction_type === 'incoming'
-      ? normalizeIncomingSubtype(data.incoming_subtype, data.category)
-      : null
-  
+  const userId = await requireUserId()
   const isTransfer = data.transaction_type === 'transfer'
-  if (isTransfer && (!data.account_type_id || !data.to_account_type_id)) {
-    throw new Error('account_type_id and to_account_type_id are required when transaction_type is transfer')
-  }
   const affectsBalance = data.affects_balance ?? true
-  if (!isTransfer && affectsBalance && !data.account_type_id) {
-    throw new Error('account_type_id is required when affects_balance is true')
-  }
-  
-  const transactionData: Record<string, unknown> = {
-    user_id: userId,
-    transaction_type: data.transaction_type,
-    amount: data.amount,
-    merchant: data.merchant,
-    date: transactionDate,
-    account_type_id: data.account_type_id,
-    category: data.category,
-    notes: data.notes || null,
-    incoming_subtype: incomingSubtype,
-    affects_balance: affectsBalance,
-    trip_id: data.trip_id ?? null,
-    trip_entry_id: data.trip_entry_id ?? null,
-    source_type: data.source_type ?? 'manual',
-    spending_amount: (data.transaction_type === 'outgoing' && data.spending_amount != null)
-      ? data.spending_amount
-      : null,
-  }
-  if (isTransfer) {
-    transactionData.to_account_type_id = data.to_account_type_id
-  }
-  
-  const { data: result, error } = await supabase
-    .from('transactions')
-    .insert(transactionData)
-    .select()
-    .single()
-    
-  if (error) {
-    console.error('Supabase error:', error)
-    throw error
-  }
+  if (isTransfer && (!data.account_type_id || !data.to_account_type_id)) throw new Error('Both accounts are required for a transfer')
+  if (!isTransfer && affectsBalance && !data.account_type_id) throw new Error('account_type_id is required when affects_balance is true')
 
-  // Insert payroll deductions if provided (only for incoming transactions)
-  const deductionsInput = data.transaction_type === 'incoming' && data.deductions?.length
-    ? data.deductions
-    : []
-  if (deductionsInput.length > 0 && result?.id) {
-    try {
-      await createDeductions(result.id, deductionsInput)
-    } catch (dedError) {
-      console.error('Failed to create payroll deductions:', dedError)
-    }
+  const row: Record<string, unknown> = {
+    user_id: userId, transaction_type: data.transaction_type, amount: data.amount,
+    merchant: data.merchant, date: toDateOnlyString(data.date), account_type_id: data.account_type_id,
+    category: data.category, notes: data.notes || null, affects_balance: affectsBalance,
+    incoming_subtype: data.transaction_type === 'incoming' ? normalizeIncomingSubtype(data.incoming_subtype, data.category) : null,
+    spending_amount: data.transaction_type === 'outgoing' && data.spending_amount != null ? data.spending_amount : null,
+    trip_id: data.trip_id ?? null, trip_entry_id: data.trip_entry_id ?? null, source_type: data.source_type ?? 'manual',
   }
+  if (isTransfer) row.to_account_type_id = data.to_account_type_id
 
-  const deductionsForBalance = deductionsInput.filter((d) => d.target_account_id)
+  // Database triggers atomically update the current balance and daily history.
+  const { data: result, error } = await supabase.from('transactions').insert(row).select().single()
+  if (error) throw error
 
-  after(async () => {
-    try {
-      if (!affectsBalance) {
-        return
-      }
-      if (isTransfer && data.account_type_id && data.to_account_type_id) {
-        // Transfer: update both from and to accounts
-        const [fromAccount, toAccount] = await Promise.all([
-          getAccountById(data.account_type_id),
-          getAccountById(data.to_account_type_id),
-        ])
-        const fromCategory = fromAccount.category || 'asset'
-        const toCategory = toAccount.category || 'asset'
-        const fromDelta = calculateBalanceDelta('outgoing', data.amount, fromCategory)
-        const toDelta = calculateBalanceDelta('incoming', data.amount, toCategory)
-        const fromBalance = parseFloat(fromAccount.account_balance)
-        const toBalance = parseFloat(toAccount.account_balance)
-        
-        await Promise.all([
-          updateAccountBalance(data.account_type_id, fromBalance + fromDelta),
-          updateAccountBalance(data.to_account_type_id, toBalance + toDelta),
-          recordTransactionBalance(
-            parseInt(data.account_type_id, 10),
-            transactionDate,
-            'outgoing',
-            data.amount,
-            fromCategory
-          ),
-          recordTransactionBalance(
-            parseInt(data.to_account_type_id, 10),
-            transactionDate,
-            'incoming',
-            data.amount,
-            toCategory
-          ),
-        ])
-      } else {
-        // Single-account: outgoing or incoming (not transfer)
-        if (!data.account_type_id) return
-        const singleType = data.transaction_type as 'outgoing' | 'incoming'
-        const account = await getAccountById(data.account_type_id)
-        const currentBalance = parseFloat(account.account_balance)
-        const accountCategory = account.category || 'asset'
-        const delta = calculateBalanceDelta(singleType, data.amount, accountCategory)
-        const newBalance = currentBalance + delta
-        
-        await Promise.all([
-          recordTransactionBalance(
-            parseInt(data.account_type_id, 10),
-            transactionDate,
-            singleType,
-            data.amount,
-            accountCategory
-          ),
-          updateAccountBalance(data.account_type_id, newBalance),
-        ])
-      }
-
-      for (const ded of deductionsForBalance) {
-        if (!ded.target_account_id) continue
-        const targetAcc = await getAccountById(ded.target_account_id)
-        const targetCategory = targetAcc.category || 'asset'
-        const targetBalance = parseFloat(targetAcc.account_balance)
-        const targetDelta = calculateBalanceDelta('incoming', ded.amount, targetCategory)
-        await Promise.all([
-          updateAccountBalance(ded.target_account_id, targetBalance + targetDelta),
-          recordTransactionBalance(
-            ded.target_account_id,
-            transactionDate,
-            'incoming',
-            ded.amount,
-            targetCategory
-          ),
-        ])
-      }
-    } catch (balanceError) {
-      console.error('Failed to update account balance:', balanceError)
-    }
-  })
-  
+  const deductions = data.transaction_type === 'incoming' ? data.deductions ?? [] : []
+  if (deductions.length > 0 && result?.id) await createDeductions(result.id, deductions)
   return result
 }
 
 export async function duplicateTransaction(id: string, date?: Date | string) {
   const supabase = createServerSupabaseClient()
-  const { userId } = await auth()
-
-  if (!userId) {
-    throw new Error('User not authenticated')
-  }
-
-  const { data: sourceTx, error } = await supabase
-    .from('transactions')
-    .select('*')
-    .eq('id', id)
-    .eq('user_id', userId)
-    .single()
-
-  if (error) {
-    console.error('Supabase error:', error)
-    throw error
-  }
-
-  if (sourceTx.account_type_id == null) {
-    throw new Error('Cannot duplicate an unassigned transaction')
-  }
-
-  let deductionsInput: { label: string; amount: number; target_account_id?: number | null }[] = []
-  if (sourceTx.transaction_type === 'incoming') {
-    try {
-      const sourceDeductions = await getDeductionsByTransactionId(id)
-      deductionsInput = sourceDeductions.map((d) => ({
-        label: d.label,
-        amount: d.amount,
-        target_account_id: d.target_account_id ?? null,
-      }))
-    } catch (dedError) {
-      console.error('Failed to fetch deductions for duplicate:', dedError)
-      throw dedError
-    }
-  }
-
-  const duplicateDate = date ? toDateOnlyString(date) : toDateOnlyString(new Date())
-
+  const userId = await requireUserId()
+  const { data: source, error } = await supabase.from('transactions').select('*').eq('id', id).eq('user_id', userId).single()
+  if (error) throw error
+  if (source.account_type_id == null) throw new Error('Cannot duplicate an unassigned transaction')
+  const deductions = source.transaction_type === 'incoming' ? await getDeductionsByTransactionId(id) : []
   return createTransaction({
-    transaction_type: sourceTx.transaction_type as 'outgoing' | 'incoming' | 'transfer',
-    incoming_subtype: sourceTx.incoming_subtype,
-    amount: sourceTx.amount,
-    merchant: sourceTx.merchant ?? 'Transaction Copy',
-    date: duplicateDate,
-    account_type_id: String(sourceTx.account_type_id),
-    category: sourceTx.category ?? '',
-    notes: sourceTx.notes ?? undefined,
-    spending_amount: sourceTx.spending_amount ?? null,
-    to_account_type_id: sourceTx.to_account_type_id != null ? String(sourceTx.to_account_type_id) : null,
-    affects_balance: sourceTx.affects_balance ?? true,
-    trip_id: sourceTx.trip_id != null ? String(sourceTx.trip_id) : null,
-    trip_entry_id: sourceTx.trip_entry_id != null ? String(sourceTx.trip_entry_id) : null,
-    source_type: sourceTx.source_type ?? 'manual',
-    deductions: deductionsInput.length > 0 ? deductionsInput : undefined,
+    transaction_type: source.transaction_type, incoming_subtype: source.incoming_subtype, amount: source.amount,
+    merchant: source.merchant ?? 'Transaction Copy', date: date ? toDateOnlyString(date) : toDateOnlyString(new Date()),
+    account_type_id: String(source.account_type_id), category: source.category ?? '', notes: source.notes ?? undefined,
+    spending_amount: source.spending_amount ?? null,
+    to_account_type_id: source.to_account_type_id != null ? String(source.to_account_type_id) : null,
+    affects_balance: source.affects_balance ?? true, trip_id: source.trip_id != null ? String(source.trip_id) : null,
+    trip_entry_id: source.trip_entry_id != null ? String(source.trip_entry_id) : null, source_type: source.source_type ?? 'manual',
+    deductions: deductions.map((d) => ({ label: d.label, amount: d.amount, target_account_id: d.target_account_id ?? null })),
   })
 }
 
-export async function updateTransaction(
-  id: string,
-  data: Omit<Partial<Transaction>, 'date'> & {
-    date?: Date | string
-    deductions?: { label: string; amount: number; target_account_id?: number | null }[]
-  }
-) {
+export async function updateTransaction(id: string, data: Omit<Partial<Transaction>, 'date'> & {
+  date?: Date | string
+  deductions?: { label: string; amount: number; target_account_id?: number | null }[]
+}) {
   const supabase = createServerSupabaseClient()
-  const { userId } = await auth()
-  
-  if (!userId) {
-    throw new Error('User not authenticated')
-  }
-  
-  // Get the old transaction to reverse its effect on the account balance
-  const { data: oldTransaction, error: fetchError } = await supabase
-    .from('transactions')
-    .select('*')
-    .eq('id', id)
-    .eq('user_id', userId)
-    .single()
-    
-  if (fetchError) {
-    console.error('Supabase error:', fetchError)
-    throw fetchError
-  }
+  const userId = await requireUserId()
+  const { data: existing, error: fetchError } = await supabase.from('transactions').select('*').eq('id', id).eq('user_id', userId).single()
+  if (fetchError) throw fetchError
 
-  // Fetch old deductions for reversal
-  let oldDeductions: { amount: number; target_account_id: number | null }[] = []
-  if (oldTransaction.transaction_type === 'incoming') {
-    try {
-      const deds = await getDeductionsByTransactionId(id)
-      oldDeductions = deds
-        .filter((d) => d.target_account_id)
-        .map((d) => ({ amount: d.amount, target_account_id: d.target_account_id ?? null }))
-    } catch (e) {
-      console.error('Failed to fetch old deductions:', e)
-    }
-  }
-  
-  const updateData: Record<string, unknown> = {}
-  
-  if (data.transaction_type) updateData.transaction_type = data.transaction_type
-  if (data.amount !== undefined) updateData.amount = data.amount
-  if (data.merchant) updateData.merchant = data.merchant
-  if (data.date) updateData.date = toDateOnlyString(data.date)
-  if (data.account_type_id !== undefined) updateData.account_type_id = data.account_type_id
-  if (data.category) updateData.category = data.category
-  if (data.notes !== undefined) updateData.notes = data.notes
-  if (data.affects_balance !== undefined) updateData.affects_balance = data.affects_balance
-  if (data.trip_id !== undefined) updateData.trip_id = data.trip_id
-  if (data.trip_entry_id !== undefined) updateData.trip_entry_id = data.trip_entry_id
-  if (data.source_type !== undefined) updateData.source_type = data.source_type
-  
-  const effectiveType = (data.transaction_type || oldTransaction.transaction_type) as 'outgoing' | 'incoming' | 'transfer'
-  const oldAffectedBalance = oldTransaction.affects_balance ?? true
-  const newAffectsBalance = data.affects_balance ?? oldAffectedBalance
-  const effectiveCategory = data.category ?? oldTransaction.category
-  if (effectiveType === 'incoming') {
-    const existingSubtype =
-      oldTransaction.transaction_type === 'incoming' ? oldTransaction.incoming_subtype : null
-    updateData.incoming_subtype = normalizeIncomingSubtype(data.incoming_subtype ?? existingSubtype, effectiveCategory)
-    updateData.spending_amount = null
-    updateData.to_account_type_id = null
-  } else if (effectiveType === 'transfer') {
-    updateData.incoming_subtype = null
-    if (data.to_account_type_id != null) updateData.to_account_type_id = data.to_account_type_id
-    updateData.spending_amount = null
+  const type = (data.transaction_type || existing.transaction_type) as 'outgoing' | 'incoming' | 'transfer'
+  const category = data.category ?? existing.category
+  const row: Record<string, unknown> = { updated_at: new Date().toISOString() }
+  if (data.transaction_type) row.transaction_type = data.transaction_type
+  if (data.amount !== undefined) row.amount = data.amount
+  if (data.merchant) row.merchant = data.merchant
+  if (data.date) row.date = toDateOnlyString(data.date)
+  if (data.account_type_id !== undefined) row.account_type_id = data.account_type_id
+  if (data.category) row.category = data.category
+  if (data.notes !== undefined) row.notes = data.notes
+  if (data.affects_balance !== undefined) row.affects_balance = data.affects_balance
+  if (data.trip_id !== undefined) row.trip_id = data.trip_id
+  if (data.trip_entry_id !== undefined) row.trip_entry_id = data.trip_entry_id
+  if (data.source_type !== undefined) row.source_type = data.source_type
+
+  if (type === 'incoming') {
+    row.incoming_subtype = normalizeIncomingSubtype(data.incoming_subtype ?? existing.incoming_subtype, category)
+    row.spending_amount = null
+    row.to_account_type_id = null
+  } else if (type === 'transfer') {
+    row.incoming_subtype = null
+    row.spending_amount = null
+    if (data.to_account_type_id != null) row.to_account_type_id = data.to_account_type_id
   } else {
-    updateData.incoming_subtype = null
-    updateData.to_account_type_id = null
-    if (data.spending_amount !== undefined) updateData.spending_amount = data.spending_amount
+    row.incoming_subtype = null
+    row.to_account_type_id = null
+    if (data.spending_amount !== undefined) row.spending_amount = data.spending_amount
   }
 
-  updateData.updated_at = new Date().toISOString()
-  
-  const { data: result, error } = await supabase
-    .from('transactions')
-    .update(updateData)
-    .eq('id', id)
-    .eq('user_id', userId) // Ensure user can only update their own transactions
-    .select()
-    .single()
-    
-  if (error) {
-    console.error('Supabase error:', error)
-    throw error
-  }
+  // The update trigger atomically reverses the old effect and applies the new one.
+  const { data: result, error } = await supabase.from('transactions').update(row).eq('id', id).eq('user_id', userId).select().single()
+  if (error) throw error
 
-  // Replace deductions if provided
-  const newDeductionsInput = effectiveType === 'incoming' && data.deductions
-    ? data.deductions
-    : []
-  // Delete old deductions and insert new ones
   if (data.deductions !== undefined) {
-    try {
-      await deleteDeductionsByTransactionId(id)
-      if (newDeductionsInput.length > 0) {
-        await createDeductions(Number(id), newDeductionsInput)
-      }
-    } catch (dedError) {
-      console.error('Failed to update deductions:', dedError)
-    }
+    await deleteDeductionsByTransactionId(id)
+    if (type === 'incoming' && data.deductions.length > 0) await createDeductions(Number(id), data.deductions)
   }
-
-  const newDeductionsForBalance = newDeductionsInput.filter((d) => d.target_account_id)
-  
-  // Capture values needed for balance bookkeeping before entering after()
-  const oldFromId = oldTransaction.account_type_id != null ? oldTransaction.account_type_id.toString() : null
-  const oldToId = oldTransaction.to_account_type_id != null ? oldTransaction.to_account_type_id.toString() : null
-  const oldWasTransfer = oldTransaction.transaction_type === 'transfer'
-  const newFromId = data.account_type_id ?? oldFromId
-  const newToId = effectiveType === 'transfer'
-    ? (data.to_account_type_id ?? (result?.to_account_type_id != null ? String(result.to_account_type_id) : null) ?? oldToId)
-    : null
-  const newIsTransfer = effectiveType === 'transfer'
-  const oldAmount = oldTransaction.amount
-  const newAmount = data.amount !== undefined ? data.amount : oldAmount
-  const oldDate = oldTransaction.date
-  const newDate = data.date ? toDateOnlyString(data.date) : oldDate
-
-  // Schedule balance bookkeeping to run after the response is sent.
-  after(async () => {
-    try {
-      const reverseOld = async () => {
-        if (!oldAffectedBalance) return
-        if (oldFromId == null) return
-        if (oldWasTransfer && oldToId) {
-          const [fromAcc, toAcc] = await Promise.all([
-            getAccountById(oldFromId),
-            getAccountById(oldToId),
-          ])
-          const fromCat = fromAcc.category || 'asset'
-          const toCat = toAcc.category || 'asset'
-          const fromDelta = calculateBalanceDelta('outgoing', oldAmount, fromCat)
-          const toDelta = calculateBalanceDelta('incoming', oldAmount, toCat)
-          await Promise.all([
-            updateAccountBalance(oldFromId, parseFloat(fromAcc.account_balance) - fromDelta),
-            updateAccountBalance(oldToId, parseFloat(toAcc.account_balance) - toDelta),
-            reverseTransactionBalance(parseInt(oldFromId, 10), oldDate, 'outgoing', oldAmount, fromCat),
-            reverseTransactionBalance(parseInt(oldToId, 10), oldDate, 'incoming', oldAmount, toCat),
-          ])
-        } else {
-          const type = oldTransaction.transaction_type as 'outgoing' | 'incoming'
-          const acc = await getAccountById(oldFromId)
-          const cat = acc.category || 'asset'
-          const delta = calculateBalanceDelta(type, oldAmount, cat)
-          await Promise.all([
-            updateAccountBalance(oldFromId, parseFloat(acc.account_balance) - delta),
-            reverseTransactionBalance(parseInt(oldFromId, 10), oldDate, type, oldAmount, cat),
-          ])
-        }
-      }
-
-      const applyNew = async () => {
-        if (!newAffectsBalance) return
-        if (newFromId == null) return
-        if (newIsTransfer && newToId) {
-          const [fromAcc, toAcc] = await Promise.all([
-            getAccountById(newFromId),
-            getAccountById(newToId),
-          ])
-          const fromCat = fromAcc.category || 'asset'
-          const toCat = toAcc.category || 'asset'
-          const fromDelta = calculateBalanceDelta('outgoing', newAmount, fromCat)
-          const toDelta = calculateBalanceDelta('incoming', newAmount, toCat)
-          await Promise.all([
-            updateAccountBalance(newFromId, parseFloat(fromAcc.account_balance) + fromDelta),
-            updateAccountBalance(newToId, parseFloat(toAcc.account_balance) + toDelta),
-            recordTransactionBalance(parseInt(newFromId, 10), newDate, 'outgoing', newAmount, fromCat),
-            recordTransactionBalance(parseInt(newToId, 10), newDate, 'incoming', newAmount, toCat),
-          ])
-        } else {
-          const type = effectiveType as 'outgoing' | 'incoming'
-          const acc = await getAccountById(newFromId)
-          const cat = acc.category || 'asset'
-          const delta = calculateBalanceDelta(type, newAmount, cat)
-          await Promise.all([
-            updateAccountBalance(newFromId, parseFloat(acc.account_balance) + delta),
-            recordTransactionBalance(parseInt(newFromId, 10), newDate, type, newAmount, cat),
-          ])
-        }
-      }
-
-      await reverseOld()
-
-      // Reverse old deduction balance effects
-      for (const ded of oldDeductions) {
-        if (!ded.target_account_id) continue
-        const acc = await getAccountById(ded.target_account_id)
-        const cat = acc.category || 'asset'
-        const delta = calculateBalanceDelta('incoming', ded.amount, cat)
-        await Promise.all([
-          updateAccountBalance(ded.target_account_id, parseFloat(acc.account_balance) - delta),
-          reverseTransactionBalance(ded.target_account_id, oldDate, 'incoming', ded.amount, cat),
-        ])
-      }
-
-      await applyNew()
-
-      // Apply new deduction balance effects
-      for (const ded of newDeductionsForBalance) {
-        if (!ded.target_account_id) continue
-        const acc = await getAccountById(ded.target_account_id)
-        const cat = acc.category || 'asset'
-        const bal = parseFloat(acc.account_balance)
-        const delta = calculateBalanceDelta('incoming', ded.amount, cat)
-        await Promise.all([
-          updateAccountBalance(ded.target_account_id, bal + delta),
-          recordTransactionBalance(ded.target_account_id, newDate, 'incoming', ded.amount, cat),
-        ])
-      }
-    } catch (balanceError) {
-      console.error('Failed to update account balance:', balanceError)
-    }
-  })
-  
   return result
 }
 
 export async function deleteTransaction(id: string) {
   const supabase = createServerSupabaseClient()
-  const { userId } = await auth()
-  
-  if (!userId) {
-    throw new Error('User not authenticated')
-  }
-  
-  // Get the transaction to reverse its effect on the account balance
-  const { data: transaction, error: fetchError } = await supabase
-    .from('transactions')
-    .select('*')
-    .eq('id', id)
-    .eq('user_id', userId)
-    .single()
-    
-  if (fetchError) {
-    console.error('Supabase error:', fetchError)
-    throw fetchError
-  }
-
-  // Fetch deductions BEFORE deleting (CASCADE will remove them)
-  let deductionsToReverse: { amount: number; target_account_id: number | null }[] = []
-  if (transaction.transaction_type === 'incoming') {
-    try {
-      const deds = await getDeductionsByTransactionId(id)
-      deductionsToReverse = deds
-        .filter((d) => d.target_account_id)
-        .map((d) => ({ amount: d.amount, target_account_id: d.target_account_id ?? null }))
-    } catch (e) {
-      console.error('Failed to fetch deductions for reversal:', e)
-    }
-  }
-  
-  const { error } = await supabase
-    .from('transactions')
-    .delete()
-    .eq('id', id)
-    .eq('user_id', userId) // Ensure user can only delete their own transactions
-    
-  if (error) {
-    console.error('Supabase error:', error)
-    throw error
-  }
-  
-  // Schedule balance reversal to run after the response is sent.
-  const deletedTransaction = transaction
-  const wasTransfer = deletedTransaction.transaction_type === 'transfer'
-  const toId = deletedTransaction.to_account_type_id != null ? deletedTransaction.to_account_type_id.toString() : null
-  const txDate = deletedTransaction.date
-  const affectedBalance = deletedTransaction.affects_balance ?? true
-
-  after(async () => {
-    try {
-      if (!affectedBalance) {
-        return
-      }
-      const fromId = deletedTransaction.account_type_id != null ? deletedTransaction.account_type_id.toString() : null
-      if (fromId == null) {
-        // No account to reverse balance for; deductions reversal still runs below
-      } else if (wasTransfer && toId) {
-        const [fromAccount, toAccount] = await Promise.all([
-          getAccountById(fromId),
-          getAccountById(toId),
-        ])
-        const fromCategory = fromAccount.category || 'asset'
-        const toCategory = toAccount.category || 'asset'
-        const fromDelta = calculateBalanceDelta('outgoing', deletedTransaction.amount, fromCategory)
-        const toDelta = calculateBalanceDelta('incoming', deletedTransaction.amount, toCategory)
-        await Promise.all([
-          updateAccountBalance(fromId, parseFloat(fromAccount.account_balance) - fromDelta),
-          updateAccountBalance(toId, parseFloat(toAccount.account_balance) - toDelta),
-          reverseTransactionBalance(
-            parseInt(fromId, 10),
-            deletedTransaction.date,
-            'outgoing',
-            deletedTransaction.amount,
-            fromCategory
-          ),
-          reverseTransactionBalance(
-            parseInt(toId, 10),
-            deletedTransaction.date,
-            'incoming',
-            deletedTransaction.amount,
-            toCategory
-          ),
-        ])
-      } else {
-        const account = await getAccountById(fromId)
-        const currentBalance = parseFloat(account.account_balance)
-        const accountCategory = account.category || 'asset'
-        const transactionType = deletedTransaction.transaction_type as 'outgoing' | 'incoming'
-        const delta = calculateBalanceDelta(transactionType, deletedTransaction.amount, accountCategory)
-        const newBalance = currentBalance - delta
-        await Promise.all([
-          updateAccountBalance(fromId, newBalance),
-          reverseTransactionBalance(
-            parseInt(fromId, 10),
-            deletedTransaction.date,
-            transactionType,
-            deletedTransaction.amount,
-            accountCategory
-          ),
-        ])
-      }
-
-      // Reverse deduction balance effects
-      for (const ded of deductionsToReverse) {
-        if (!ded.target_account_id) continue
-        const targetAcc = await getAccountById(ded.target_account_id)
-        const targetCategory = targetAcc.category || 'asset'
-        const targetBalance = parseFloat(targetAcc.account_balance)
-        const targetDelta = calculateBalanceDelta('incoming', ded.amount, targetCategory)
-        await Promise.all([
-          updateAccountBalance(ded.target_account_id, targetBalance - targetDelta),
-          reverseTransactionBalance(
-            ded.target_account_id,
-            txDate,
-            'incoming',
-            ded.amount,
-            targetCategory
-          ),
-        ])
-      }
-    } catch (balanceError) {
-      console.error('Failed to update account balance:', balanceError)
-    }
-  })
-
+  const userId = await requireUserId()
+  // The delete trigger reverses both the transaction and any cascading deductions.
+  const { error } = await supabase.from('transactions').delete().eq('id', id).eq('user_id', userId)
+  if (error) throw error
   return { success: true }
 }
