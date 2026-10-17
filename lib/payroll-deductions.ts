@@ -1,6 +1,7 @@
 export const PAYROLL_DEDUCTION_LABELS = [
   "RRSP",
   "CPP",
+  "CPP2",
   "FIT",
   "PIT",
   "EI",
@@ -14,7 +15,7 @@ export const PAYROLL_DEDUCTION_LABELS = [
 
 export type PayrollDeductionLabel = (typeof PAYROLL_DEDUCTION_LABELS)[number]
 
-export const TAX_PAYROLL_DEDUCTION_LABELS = ["CPP", "EI", "FIT", "PIT"] as const
+export const TAX_PAYROLL_DEDUCTION_LABELS = ["CPP", "CPP2", "EI", "FIT", "PIT"] as const
 export const INSURANCE_PAYROLL_DEDUCTION_LABELS = [
   "LTD",
   "STD",
