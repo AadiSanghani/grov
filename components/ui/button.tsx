@@ -44,6 +44,8 @@ const Button = React.forwardRef<HTMLButtonElement, React.ComponentProps<"button"
     variant = "default",
     size = "default",
     asChild = false,
+    // WebKit can skip implicit button tab stops when full keyboard navigation is off.
+    tabIndex = 0,
     ...props
   }, ref) {
   const Comp = asChild ? Slot : "button"
@@ -51,6 +53,7 @@ const Button = React.forwardRef<HTMLButtonElement, React.ComponentProps<"button"
   return (
     <Comp
       ref={ref}
+      tabIndex={tabIndex}
       data-slot="button"
       data-variant={variant}
       data-size={size}

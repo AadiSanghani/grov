@@ -563,6 +563,7 @@ export function AddTransactionDialog({
             <div className="space-y-3">
               <button
                 type="button"
+                tabIndex={0}
                 className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
                 onClick={() => {
                   setDeductionsOpen(!deductionsOpen)
