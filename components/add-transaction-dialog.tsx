@@ -683,6 +683,8 @@ export function AddTransactionDialog({
             <Popover open={merchantOpen} onOpenChange={setMerchantOpen}>
               <PopoverTrigger asChild>
                 <Button
+                  type="button"
+                  id="merchant"
                   variant="outline"
                   role="combobox"
                   aria-expanded={merchantOpen}
@@ -798,6 +800,8 @@ export function AddTransactionDialog({
             <Popover open={accountOpen} onOpenChange={setAccountOpen}>
               <PopoverTrigger asChild>
                 <Button
+                    type="button"
+                    id="account"
                     variant="outline"
                     role="combobox"
                     aria-expanded={accountOpen}
@@ -848,10 +852,12 @@ export function AddTransactionDialog({
           {/* To account (transfer only) */}
           {transactionType === "transfer" ? (
             <div className="space-y-2">
-              <Label>To account</Label>
+              <Label htmlFor="to-account">To account</Label>
               <Popover open={toAccountOpen} onOpenChange={setToAccountOpen}>
                 <PopoverTrigger asChild>
                   <Button
+                    type="button"
+                    id="to-account"
                     variant="outline"
                     role="combobox"
                     aria-expanded={toAccountOpen}
@@ -903,6 +909,8 @@ export function AddTransactionDialog({
             <Popover open={categoryOpen} onOpenChange={setCategoryOpen}>
               <PopoverTrigger asChild>
                 <Button
+                  type="button"
+                  id="category"
                   variant="outline"
                   role="combobox"
                   aria-expanded={categoryOpen}
