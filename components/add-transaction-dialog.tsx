@@ -45,6 +45,7 @@ import { type Account } from "@/lib/accounts"
 import { createTransaction } from "@/lib/transactions"
 import { type Category } from "@/lib/categories"
 import { useDataContext } from "@/app/data-context"
+import { useComboboxSearch } from "@/hooks/use-combobox-search"
 import { PAYROLL_DEDUCTION_LABELS } from "@/lib/payroll-deductions"
 
 export interface TransactionFormData {
@@ -159,16 +160,16 @@ export function AddTransactionDialog({
   const [amount, setAmount] = useState("")
   const [displayAmount, setDisplayAmount] = useState("$")
   const [merchant, setMerchant] = useState("")
-  const [merchantOpen, setMerchantOpen] = useState(false)
+  const merchantCombobox = useComboboxSearch({ search: merchant, onSearchChange: setMerchant })
   const [date, setDate] = useState<Date>(() => resolvedDefaultDate)
   const [dateInput, setDateInput] = useState(() => formatDateForInput(resolvedDefaultDate))
   const [dateOpen, setDateOpen] = useState(false)
   const [accountTypeId, setAccountTypeId] = useState("")
-  const [accountOpen, setAccountOpen] = useState(false)
+  const accountCombobox = useComboboxSearch()
   const [toAccountTypeId, setToAccountTypeId] = useState("")
-  const [toAccountOpen, setToAccountOpen] = useState(false)
+  const toAccountCombobox = useComboboxSearch()
   const [category, setCategory] = useState("")
-  const [categoryOpen, setCategoryOpen] = useState(false)
+  const categoryCombobox = useComboboxSearch()
   const [notes, setNotes] = useState("")
   const [spendingAmount, setSpendingAmount] = useState("")
   const [displaySpendingAmount, setDisplaySpendingAmount] = useState("$")
@@ -681,23 +682,25 @@ export function AddTransactionDialog({
           {/* Merchant */}
           <div className="space-y-2">
             <Label htmlFor="merchant">Merchant</Label>
-            <Popover open={merchantOpen} onOpenChange={setMerchantOpen}>
+            <Popover open={merchantCombobox.open} onOpenChange={merchantCombobox.setOpen}>
               <PopoverTrigger asChild>
                 <Button
                   type="button"
                   id="merchant"
                   variant="outline"
                   role="combobox"
-                  aria-expanded={merchantOpen}
+                  aria-expanded={merchantCombobox.open}
+                  onKeyDown={merchantCombobox.onTriggerKeyDown}
                   className="w-full justify-between font-normal"
                 >
                   {merchant || "Search merchants…"}
                   <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-(--radix-popover-trigger-width) p-0" align="start">
+              <PopoverContent onOpenAutoFocus={merchantCombobox.onOpenAutoFocus} className="w-(--radix-popover-trigger-width) p-0" align="start">
                 <Command>
                   <CommandInput
+                    ref={merchantCombobox.inputRef}
                     placeholder="Search merchants…"
                     value={merchant}
                     onValueChange={setMerchant}
@@ -708,7 +711,7 @@ export function AddTransactionDialog({
                         onSelect={() => {
                           // Persist the custom merchant to the database
                           addMerchant(merchant).catch(console.error)
-                          setMerchantOpen(false)
+                          merchantCombobox.setOpen(false)
                         }}
                       >
                         Add &quot;{merchant}&quot;
@@ -722,7 +725,7 @@ export function AddTransactionDialog({
                           value={m}
                           onSelect={(currentValue) => {
                             setMerchant(currentValue)
-                            setMerchantOpen(false)
+                            merchantCombobox.setOpen(false)
                           }}
                         >
                           <Check
@@ -798,14 +801,15 @@ export function AddTransactionDialog({
           {/* From account / Account */}
           <div className="space-y-2">
             <Label htmlFor="account">{transactionType === "transfer" ? "From account" : "Account"}</Label>
-            <Popover open={accountOpen} onOpenChange={setAccountOpen}>
+            <Popover open={accountCombobox.open} onOpenChange={accountCombobox.setOpen}>
               <PopoverTrigger asChild>
                 <Button
                     type="button"
                     id="account"
                     variant="outline"
                     role="combobox"
-                    aria-expanded={accountOpen}
+                    aria-expanded={accountCombobox.open}
+                    onKeyDown={accountCombobox.onTriggerKeyDown}
                     className="w-full justify-between font-normal"
                   >
                     {selectedAccount ? (
@@ -816,9 +820,14 @@ export function AddTransactionDialog({
                   <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-(--radix-popover-trigger-width) p-0" align="start">
+              <PopoverContent onOpenAutoFocus={accountCombobox.onOpenAutoFocus} className="w-(--radix-popover-trigger-width) p-0" align="start">
                 <Command>
-                  <CommandInput placeholder="Search accounts…" />
+                  <CommandInput
+                    ref={accountCombobox.inputRef}
+                    placeholder="Search accounts…"
+                    value={accountCombobox.search}
+                    onValueChange={accountCombobox.setSearch}
+                  />
                   <CommandList>
                     <CommandEmpty>
                       {accounts.length === 0 ? "No accounts found." : "No account found."}
@@ -830,7 +839,7 @@ export function AddTransactionDialog({
                           value={account.account_name}
                           onSelect={() => {
                             setAccountTypeId(account.id?.toString() || "")
-                            setAccountOpen(false)
+                            accountCombobox.setOpen(false)
                           }}
                         >
                           <Check
@@ -854,23 +863,29 @@ export function AddTransactionDialog({
           {transactionType === "transfer" ? (
             <div className="space-y-2">
               <Label htmlFor="to-account">To account</Label>
-              <Popover open={toAccountOpen} onOpenChange={setToAccountOpen}>
+              <Popover open={toAccountCombobox.open} onOpenChange={toAccountCombobox.setOpen}>
                 <PopoverTrigger asChild>
                   <Button
                     type="button"
                     id="to-account"
                     variant="outline"
                     role="combobox"
-                    aria-expanded={toAccountOpen}
+                    aria-expanded={toAccountCombobox.open}
+                    onKeyDown={toAccountCombobox.onTriggerKeyDown}
                     className="w-full justify-between font-normal"
                   >
                     {accounts.find((a) => a.id?.toString() === toAccountTypeId)?.account_name ?? "Select to account…"}
                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-(--radix-popover-trigger-width) p-0" align="start">
+                <PopoverContent onOpenAutoFocus={toAccountCombobox.onOpenAutoFocus} className="w-(--radix-popover-trigger-width) p-0" align="start">
                   <Command>
-                    <CommandInput placeholder="Search accounts…" />
+                    <CommandInput
+                      ref={toAccountCombobox.inputRef}
+                      placeholder="Search accounts…"
+                      value={toAccountCombobox.search}
+                      onValueChange={toAccountCombobox.setSearch}
+                    />
                     <CommandList>
                       <CommandEmpty>No account found.</CommandEmpty>
                       <CommandGroup>
@@ -882,7 +897,7 @@ export function AddTransactionDialog({
                               value={account.account_name}
                               onSelect={() => {
                                 setToAccountTypeId(account.id?.toString() || "")
-                                setToAccountOpen(false)
+                                toAccountCombobox.setOpen(false)
                               }}
                             >
                               <Check
@@ -907,14 +922,15 @@ export function AddTransactionDialog({
           {transactionType !== "transfer" ? (
           <div className="space-y-2">
             <Label htmlFor="category">Category</Label>
-            <Popover open={categoryOpen} onOpenChange={setCategoryOpen}>
+            <Popover open={categoryCombobox.open} onOpenChange={categoryCombobox.setOpen}>
               <PopoverTrigger asChild>
                 <Button
                   type="button"
                   id="category"
                   variant="outline"
                   role="combobox"
-                  aria-expanded={categoryOpen}
+                  aria-expanded={categoryCombobox.open}
+                  onKeyDown={categoryCombobox.onTriggerKeyDown}
                   className="w-full justify-between font-normal"
                 >
                   {selectedCategory ? (
@@ -928,9 +944,14 @@ export function AddTransactionDialog({
                   <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-(--radix-popover-trigger-width) p-0 max-h-[800px]" side="right" align="start">
+              <PopoverContent onOpenAutoFocus={categoryCombobox.onOpenAutoFocus} className="w-(--radix-popover-trigger-width) p-0 max-h-[800px]" side="right" align="start">
                 <Command>
-                  <CommandInput placeholder="Search categories…" />
+                  <CommandInput
+                    ref={categoryCombobox.inputRef}
+                    placeholder="Search categories…"
+                    value={categoryCombobox.search}
+                    onValueChange={categoryCombobox.setSearch}
+                  />
                   <CommandList className="max-h-[750px]">
                     <CommandEmpty>No category found.</CommandEmpty>
                     {formattedCategories.map((group) => (
@@ -941,7 +962,7 @@ export function AddTransactionDialog({
                             value={item.value}
                             onSelect={(currentValue) => {
                               setCategory(currentValue)
-                              setCategoryOpen(false)
+                              categoryCombobox.setOpen(false)
                             }}
                           >
                             <Check
