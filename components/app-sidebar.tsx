@@ -1,196 +1,102 @@
 "use client"
 
-import * as React from "react"
-import { Sidebar, 
-    SidebarContent, 
-    SidebarGroup, 
-    SidebarGroupContent, 
-    SidebarHeader,
-    SidebarFooter,
-    SidebarMenu, 
-    SidebarMenuButton, 
-    SidebarMenuItem, 
-    useSidebar,
-    } from "@/components/ui/sidebar"
-import { CreditCard, FileBarChart, Home, LayoutDashboard, MapPinned, PanelLeft, TrendingUp } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
-import { cn } from "@/lib/utils"
-import { UserButton, useUser } from "@clerk/nextjs"
+import Link from "next/link"
+import { usePathname } from "next/navigation"
+import { UserButton } from "@clerk/nextjs"
+import { CreditCard, FileBarChart, Home, LayoutDashboard, MapPinned, TrendingUp } from "lucide-react"
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarHeader,
+  SidebarFooter,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarTrigger,
+  useSidebar,
+} from "@/components/ui/sidebar"
 
 const items = [
-    {
-      title: "Dashboard",
-      url: "/",
-      icon: Home,
-    },
-    {
-        title: "Accounts",
-        url: "/accounts",
-        icon: LayoutDashboard,
-    },
-    {
-        title: "Transactions",
-        url: "/transactions",
-        icon: CreditCard,
-    },
-    {
-        title: "Investments",
-        url: "/investments",
-        icon: TrendingUp,
-    },
-    {
-        title: "Reports",
-        url: "/reports/cash-flow",
-        icon: FileBarChart,
-    },
-    {
-        title: "Trips",
-        url: "/trips",
-        icon: MapPinned,
-    },
-  ]
+  { title: "Dashboard", url: "/", match: "/dashboard", icon: Home },
+  { title: "Accounts", url: "/accounts", match: "/accounts", icon: LayoutDashboard },
+  { title: "Transactions", url: "/transactions", match: "/transactions", icon: CreditCard },
+  { title: "Investments", url: "/investments", match: "/investments", icon: TrendingUp },
+  { title: "Reports", url: "/reports/cash-flow", match: "/reports", icon: FileBarChart },
+  { title: "Trips", url: "/trips", match: "/trips", icon: MapPinned },
+]
 
-  export function AppSidebar() {
-    const { toggleSidebar, open } = useSidebar()
-    const [isHovered, setIsHovered] = React.useState(false)
-    const { user } = useUser()
-    const userButtonRef = React.useRef<HTMLDivElement>(null)
+export function AppSidebar() {
+  const pathname = usePathname()
+  const { open, isMobile, setOpenMobile } = useSidebar()
+  const expanded = isMobile || open
 
-    const handleFooterClick = () => {
-      const button = userButtonRef.current?.querySelector('button');
-      if (button) {
-        button.click();
-      }
-    }
-
-    return (
-      <Sidebar collapsible="icon">
-        <SidebarHeader className={cn("px-3 py-4", !open && "flex items-center justify-center")}>
-          {open ? (
-            <div className="flex items-center justify-between w-full">
-              <span 
-                className="text-2xl font-bold tracking-tight text-primary"
-                style={{ fontFamily: "'Arvo', serif" }}
-              >
-                Grov
-              </span>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    data-sidebar="trigger"
-                    variant="ghost"
-                    size="icon"
-                    className="size-7"
-                    onClick={toggleSidebar}
-                  >
-                    <PanelLeft className="size-5" />
-                    <span className="sr-only">Close Sidebar</span>
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="right" align="center">
-                  Close Sidebar
-                </TooltipContent>
-              </Tooltip>
-            </div>
-          ) : (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  data-sidebar="trigger"
-                  variant="ghost"
-                  size="icon"
-                  className="size-9 relative"
-                  onClick={toggleSidebar}
-                  onMouseEnter={() => setIsHovered(true)}
-                  onMouseLeave={() => setIsHovered(false)}
-                >
-                  <span
-                    className={cn(
-                      "text-2xl font-bold text-primary transition-all duration-200 absolute",
-                      isHovered ? "opacity-0 scale-75" : "opacity-100 scale-100"
-                    )}
-                    style={{ fontFamily: "'Arvo', serif" }}
-                  >
-                    G
-                  </span>
-                  <PanelLeft
-                    className={cn(
-                      "size-5 transition-all duration-200 absolute",
-                      isHovered ? "opacity-100 scale-100" : "opacity-0 scale-75"
-                    )}
-                  />
-                  <span className="sr-only">Open Sidebar</span>
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="right" align="center">
-                Open Sidebar
-              </TooltipContent>
-            </Tooltip>
+  return (
+    <Sidebar collapsible="icon">
+      <SidebarHeader className="h-20 justify-center px-3">
+        <div className="flex items-center justify-between gap-2 group-data-[collapsible=icon]:justify-center">
+          {expanded && (
+            <span className="grov-wordmark px-2 text-[1.75rem] text-sidebar-primary">
+              Grov
+            </span>
           )}
-        </SidebarHeader>
-        <SidebarContent>
-          <SidebarGroup>
-            {open && <div className="mb-4" />}
-            <SidebarGroupContent>
-              <SidebarMenu>
-                {items.map((item) => (
-                  <SidebarMenuItem key={item.title}>
-                    <SidebarMenuButton 
-                      asChild
-                      className="group relative flex items-center gap-4 rounded-lg px-4 py-3.5 text-base font-medium"
-                    >
-                      <a 
-                        href={item.url}
-                        className="flex items-center gap-4 w-full"
+          <SidebarTrigger className="size-10 shrink-0" />
+        </div>
+      </SidebarHeader>
+      <SidebarContent>
+        <SidebarGroup className="px-3 pt-1">
+          <SidebarGroupContent>
+            <nav id="workspace-navigation" aria-label="Main navigation">
+              <SidebarMenu className="gap-1">
+                {items.map((item) => {
+                  const isActive = pathname === item.url || pathname === item.match || pathname.startsWith(`${item.match}/`)
+
+                  return (
+                    <SidebarMenuItem key={item.title}>
+                      <SidebarMenuButton
+                        asChild
+                        isActive={isActive}
+                        tooltip={item.title}
+                        className="h-11 gap-3 rounded-lg px-3 text-sm font-medium group-data-[collapsible=icon]:size-10! group-data-[collapsible=icon]:p-3! md:h-10 data-[active=true]:shadow-[inset_3px_0_0_var(--sidebar-primary)]"
                       >
-                        <item.icon className="h-6 w-6 shrink-0 transition-transform" />
-                        <span className="truncate">{item.title}</span>
-                      </a>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
+                        <Link
+                          href={item.url}
+                          aria-current={isActive ? "page" : undefined}
+                          aria-label={item.title}
+                          onNavigate={() => setOpenMobile(false)}
+                        >
+                          <item.icon aria-hidden="true" className="size-4 shrink-0" />
+                          <span>{item.title}</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  )
+                })}
               </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        </SidebarContent>
-        <SidebarFooter className="p-0 border-t">
-          {open ? (
-            <div 
-              className="flex items-center gap-2.5 p-3 hover:bg-accent cursor-pointer transition-colors relative"
-              onClick={handleFooterClick}
-            >
-              <div ref={userButtonRef} className="pointer-events-none">
-                <UserButton 
-                  appearance={{
-                    elements: {
-                      avatarBox: "w-8 h-8"
-                    }
-                  }}
-                />
-              </div>
-              <div className="flex flex-col flex-1 min-w-0">
-                <span className="text-sm font-medium truncate">
-                  {user?.fullName || user?.firstName || "My Account"}
-                </span>
-                <span className="text-xs text-muted-foreground truncate">
-                  {user?.primaryEmailAddress?.emailAddress}
-                </span>
-              </div>
-            </div>
-          ) : (
-            <div className="flex items-center justify-center p-3">
-              <UserButton 
-                appearance={{
-                  elements: {
-                    avatarBox: "w-7 h-7"
-                  }
-                }}
-              />
-            </div>
-          )}
-        </SidebarFooter>
-      </Sidebar>
-    )
-  }
-  
+            </nav>
+          </SidebarGroupContent>
+        </SidebarGroup>
+      </SidebarContent>
+      <SidebarFooter className="gap-3 border-t border-sidebar-border p-3">
+        {expanded && (
+          <p className="px-2 text-[11px] font-medium tracking-wide text-muted-foreground">
+            YOUR WORKSPACE
+          </p>
+        )}
+        <UserButton
+          showName={expanded}
+          appearance={{
+            elements: {
+              rootBox: "w-full",
+              userButtonBox: "min-w-0 flex-row-reverse gap-2.5",
+              userButtonTrigger: "w-full min-h-10 justify-start rounded-lg p-1.5 hover:bg-sidebar-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
+              userButtonOuterIdentifier: "min-w-0 truncate text-sm font-medium text-sidebar-foreground",
+              avatarBox: "size-7 shrink-0",
+            },
+          }}
+        />
+      </SidebarFooter>
+    </Sidebar>
+  )
+}
