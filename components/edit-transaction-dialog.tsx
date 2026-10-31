@@ -8,11 +8,11 @@ import {
   Dialog,
   DialogContent,
   DialogHeader,
+  DialogDescription,
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Calendar } from "@/components/ui/calendar"
 import {
   Select,
   SelectContent,
@@ -40,8 +40,7 @@ import {
   normalizeCalendarDate,
   toLocalDateString,
 } from "@/lib/utils"
-import { CalendarIcon, Check, ChevronsUpDown, MinusCircle, PlusCircle, Trash2, ArrowRightLeft, Plus, ChevronDown, ChevronUp, Loader2 } from "lucide-react"
-import { format } from "date-fns"
+import { Check, ChevronsUpDown, MinusCircle, PlusCircle, Trash2, ArrowRightLeft, Plus, ChevronDown, ChevronUp } from "lucide-react"
 import { type Account } from "@/lib/accounts"
 import { Transaction } from "@/lib/types"
 import { updateTransaction } from "@/lib/transactions"
@@ -49,6 +48,9 @@ import { getDeductionsByTransactionId } from "@/lib/deductions"
 import { type Category } from "@/lib/categories"
 import { useDataContext } from "@/app/data-context"
 import { useComboboxSearch } from "@/hooks/use-combobox-search"
+import { TransactionDateField, useTransactionDate } from "@/components/transaction-editor/date-field"
+import { EditorFooter, submitOnShortcut, useEditorFocus } from "@/components/transaction-editor/editor-controls"
+import { reconcileSavedTransaction } from "@/lib/ledger/saved-transaction"
 import { PAYROLL_DEDUCTION_LABELS } from "@/lib/payroll-deductions"
 
 interface EditTransactionDialogProps {
@@ -75,8 +77,8 @@ export function EditTransactionDialog({
   const [displayAmount, setDisplayAmount] = useState("$")
   const [merchant, setMerchant] = useState("")
   const merchantCombobox = useComboboxSearch({ search: merchant, onSearchChange: setMerchant })
-  const [date, setDate] = useState<Date>(() => normalizeCalendarDate(new Date()))
-  const [dateOpen, setDateOpen] = useState(false)
+  const dateField = useTransactionDate(normalizeCalendarDate(new Date()))
+  const applyDate = dateField.apply
   const [accountTypeId, setAccountTypeId] = useState("")
   const accountCombobox = useComboboxSearch()
   const [toAccountTypeId, setToAccountTypeId] = useState("")
@@ -90,6 +92,9 @@ export function EditTransactionDialog({
   const [deductions, setDeductions] = useState<{ label: string; amount: string; displayAmount: string; targetAccountId: string }[]>([])
   const [formErrors, setFormErrors] = useState<Record<string, string>>({})
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const submitting = React.useRef(false)
+  const [saveError, setSaveError] = useState("")
+  const editorFocus = useEditorFocus()
 
   const { merchants, addMerchant } = useDataContext()
   const merchantNames = useMemo(() => merchants.map((m) => m.name), [merchants])
@@ -141,15 +146,15 @@ export function EditTransactionDialog({
     return net + deductionTotal
   }, [amount, deductionTotal])
 
-  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (open && transaction) {
+      setSaveError("")
       setFormErrors({})
       setTransactionType(transaction.transaction_type)
       setAmount(transaction.amount.toString())
       setDisplayAmount(`$${transaction.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`)
       setMerchant(transaction.merchant)
-      setDate(normalizeCalendarDate(transaction.date))
+      applyDate(transaction.date)
       setAccountTypeId(transaction.account_type_id != null ? transaction.account_type_id.toString() : "")
       setToAccountTypeId(transaction.to_account_type_id != null ? String(transaction.to_account_type_id) : "")
       setCategory(transaction.category)
@@ -161,41 +166,40 @@ export function EditTransactionDialog({
         setSpendingAmount("")
         setDisplaySpendingAmount("$")
       }
-      if (transaction.transaction_type === "incoming" && transaction.id) {
-        getDeductionsByTransactionId(transaction.id)
-          .then((deds) => {
-            if (deds.length > 0) {
-              setDeductions(
-                deds.map((d) => ({
-                  label: d.label,
-                  amount: String(d.amount),
-                  displayAmount: `$${Number(d.amount).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
-                  targetAccountId: d.target_account_id != null ? String(d.target_account_id) : "",
-                }))
-              )
-              setDeductionsOpen(true)
-            } else {
-              setDeductions([])
-              setDeductionsOpen(false)
-            }
-          })
-          .catch(() => {
-            setDeductions([])
-            setDeductionsOpen(false)
-          })
-      } else {
-        setDeductions([])
-        setDeductionsOpen(false)
-      }
     }
-  }, [open, transaction])
-  /* eslint-enable react-hooks/set-state-in-effect */
+  }, [open, transaction, applyDate])
+
+  const [deductionsLoading, setDeductionsLoading] = useState(false)
+  const [deductionsError, setDeductionsError] = useState(false)
+  const [deductionsRetry, setDeductionsRetry] = useState(0)
+  useEffect(() => {
+    if (!open || !transaction) return
+    let cancelled = false
+    // Loading is tied to the selected record; stale requests must not overwrite a draft.
+    setDeductions([])
+    setDeductionsOpen(false)
+    setDeductionsError(false)
+    setDeductionsLoading(transaction.transaction_type === "incoming")
+    if (transaction.transaction_type === "incoming" && transaction.id) {
+      getDeductionsByTransactionId(transaction.id).then(deds => {
+        if (cancelled) return
+        setDeductions(deds.map(d => ({ label: d.label, amount: String(d.amount), displayAmount: `$${Number(d.amount).toFixed(2)}`, targetAccountId: d.target_account_id == null ? "" : String(d.target_account_id) })))
+        setDeductionsOpen(deds.length > 0)
+      }).catch(() => { if (!cancelled) setDeductionsError(true) })
+        .finally(() => { if (!cancelled) setDeductionsLoading(false) })
+    }
+    return () => { cancelled = true }
+  }, [open, transaction, deductionsRetry])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (submitting.current) return
+    const submittedDate = dateField.commit()
+    if (!submittedDate) return
+    setSaveError("")
     setFormErrors({})
 
-    if (!transaction?.id) return
+    if (!transaction?.id || deductionsLoading || deductionsError) return
 
     const numAmount = parseFloat(amount)
     if (isNaN(numAmount) || numAmount <= 0) {
@@ -212,7 +216,7 @@ export function EditTransactionDialog({
         setFormErrors((prev) => ({ ...prev, toAccount: "From and To accounts must be different." }))
         return
       }
-    } else if ((transactionType === "outgoing" || transactionType === "incoming") && !accountTypeId) {
+    } else if ((transactionType === "outgoing" || transactionType === "incoming") && !accountTypeId && transaction.affects_balance !== false) {
       setFormErrors((prev) => ({ ...prev, account: "Please select an account." }))
       return
     }
@@ -254,14 +258,20 @@ export function EditTransactionDialog({
       transaction_type: transactionType,
       incoming_subtype:
         transactionType === "incoming"
-          ? getDefaultIncomingSubtypeForCategory(category)
+          ? (transaction.transaction_type === "incoming" && category === transaction.category
+            ? transaction.incoming_subtype ?? getDefaultIncomingSubtypeForCategory(category)
+            : getDefaultIncomingSubtypeForCategory(category))
           : null,
       amount: numAmount,
       merchant: merchantValue,
-      date,
+      date: submittedDate,
       account_type_id: accountTypeId || null,
       category: transactionType === "transfer" ? (category || "transfer") : category,
       notes,
+      affects_balance: transaction.affects_balance,
+      trip_id: transaction.trip_id,
+      trip_entry_id: transaction.trip_entry_id,
+      source_type: transaction.source_type,
       spending_amount: transactionType === "outgoing" ? parsedSpendingAmount ?? null : null,
     }
     if (transactionType === "transfer") {
@@ -271,11 +281,9 @@ export function EditTransactionDialog({
     }
     updateData.deductions = parsedDeductions
 
-    onTransactionUpdated(transactionId, updateData)
-
     const serverUpdateData: Parameters<typeof updateTransaction>[1] = {
       ...updateData,
-      date: toLocalDateString(date),
+      date: toLocalDateString(submittedDate),
     }
 
     const shouldPersistMerchant =
@@ -283,21 +291,26 @@ export function EditTransactionDialog({
       merchantValue.length > 0 &&
       !merchantNames.some((m) => m.toLowerCase() === merchantValue.toLowerCase())
 
+    submitting.current = true
     setIsSubmitting(true)
     try {
       if (shouldPersistMerchant) {
         await addMerchant(merchantValue)
       }
-      await updateTransaction(transactionId, serverUpdateData)
+      const result = await updateTransaction(transactionId, serverUpdateData)
+      onTransactionUpdated(transactionId, reconcileSavedTransaction({ ...transaction, ...updateData }, result))
+      toast.success("Transaction saved")
       onOpenChange(false)
       onAfterSave?.()
     } catch (error) {
+      setSaveError("Could not save. Your draft is intact; please try again.")
       console.error("Failed to update transaction:", error)
       toast.error("Failed to update transaction. Please try again.", {
         duration: 5000,
         position: "top-right",
       })
     } finally {
+      submitting.current = false
       setIsSubmitting(false)
     }
   }
@@ -325,20 +338,24 @@ export function EditTransactionDialog({
 
   return (
     <>
-      <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-[600px] max-h-[90vh] overflow-y-auto overscroll-contain shadow-2xl">
+      <Dialog open={open} onOpenChange={(next) => { if (!submitting.current) onOpenChange(next) }}>
+        <DialogContent {...editorFocus} className="sm:max-w-[600px] max-h-[90dvh] overflow-y-auto overscroll-contain">
           <DialogHeader>
             <DialogTitle>Edit transaction</DialogTitle>
+          <DialogDescription>Keep your ledger up to date. All amounts are in dollars.</DialogDescription>
           </DialogHeader>
 
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Transaction Type Toggle */}
+          <form onSubmit={handleSubmit} onKeyDown={submitOnShortcut} className="space-y-6">
+            {deductionsLoading && <p role="status" className="text-sm text-muted-foreground">Loading payroll deductions…</p>}
+            {deductionsError && <div role="alert" className="text-sm text-destructive">Could not load payroll deductions. Retry before saving to keep existing deductions safe. <Button type="button" variant="outline" size="sm" onClick={() => setDeductionsRetry(value => value + 1)}>Retry deductions</Button></div>}
+            <fieldset disabled={isSubmitting || deductionsLoading || deductionsError} className="min-w-0 space-y-5">
+          {/* Transaction Type Toggle */}
             <div className="flex gap-2">
               <Button
                 type="button"
                 variant={transactionType === "outgoing" ? "default" : "outline"}
                 className={cn(
-                  "flex-1",
+                  "min-w-0 flex-1 px-2 text-xs sm:text-sm",
                   transactionType === "outgoing" 
                     ? "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground" 
                     : "hover:bg-muted hover:text-foreground"
@@ -352,7 +369,7 @@ export function EditTransactionDialog({
                 type="button"
                 variant={transactionType === "incoming" ? "default" : "outline"}
                 className={cn(
-                  "flex-1",
+                  "min-w-0 flex-1 px-2 text-xs sm:text-sm",
                   transactionType === "incoming" 
                     ? "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground" 
                     : "hover:bg-muted hover:text-foreground"
@@ -370,7 +387,7 @@ export function EditTransactionDialog({
                 type="button"
                 variant={transactionType === "transfer" ? "default" : "outline"}
                 className={cn(
-                  "flex-1",
+                  "min-w-0 flex-1 px-2 text-xs sm:text-sm",
                   transactionType === "transfer" 
                     ? "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground" 
                     : "hover:bg-muted hover:text-foreground"
@@ -599,6 +616,8 @@ export function EditTransactionDialog({
               <Popover open={merchantCombobox.open} onOpenChange={merchantCombobox.setOpen}>
                 <PopoverTrigger asChild>
                   <Button
+                    id="merchant"
+                    type="button"
                     variant="outline"
                     role="combobox"
                     aria-expanded={merchantCombobox.open}
@@ -621,8 +640,6 @@ export function EditTransactionDialog({
                       {isCustomMerchant && (
                         <CommandItem
                           onSelect={() => {
-                            // Persist the custom merchant to the database
-                            addMerchant(merchant).catch(console.error)
                             merchantCombobox.setOpen(false)
                           }}
                         >
@@ -657,43 +674,15 @@ export function EditTransactionDialog({
               {formErrors.account ? <p className="text-sm text-destructive">{formErrors.account}</p> : null}
             </div>
 
-            {/* Date */}
-            <div className="space-y-2">
-              <Label>Date</Label>
-              <Popover open={dateOpen} onOpenChange={setDateOpen}>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className={cn(
-                      "w-full justify-start text-left font-normal",
-                      !date && "text-muted-foreground"
-                    )}
-                  >
-                    <CalendarIcon className="mr-0.5 h-4 w-4" />
-                    {date ? format(date, "MMMM dd, yyyy") : <span>Pick a date</span>}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={date}
-                    onSelect={(newDate) => {
-                      if (newDate) {
-                        setDate(normalizeCalendarDate(newDate))
-                        setDateOpen(false)
-                      }
-                    }}
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
+          <TransactionDateField value={dateField} />
 
-            {/* From account / Account */}
             <div className="space-y-2">
               <Label htmlFor="account">{transactionType === "transfer" ? "From account" : "Account"}</Label>
               <Popover open={accountCombobox.open} onOpenChange={accountCombobox.setOpen}>
                 <PopoverTrigger asChild>
                   <Button
+                    id="account"
+                    type="button"
                     variant="outline"
                     role="combobox"
                     aria-expanded={accountCombobox.open}
@@ -749,10 +738,12 @@ export function EditTransactionDialog({
             {/* To account (transfer only) */}
             {transactionType === "transfer" ? (
               <div className="space-y-2">
-                <Label>To account</Label>
+                <Label htmlFor="to-account">To account</Label>
                 <Popover open={toAccountCombobox.open} onOpenChange={toAccountCombobox.setOpen}>
                   <PopoverTrigger asChild>
                     <Button
+                    type="button"
+                    id="to-account"
                       variant="outline"
                       role="combobox"
                       aria-expanded={toAccountCombobox.open}
@@ -809,6 +800,8 @@ export function EditTransactionDialog({
               <Popover open={categoryCombobox.open} onOpenChange={categoryCombobox.setOpen}>
                 <PopoverTrigger asChild>
                   <Button
+                    id="category"
+                    type="button"
                     variant="outline"
                     role="combobox"
                     aria-expanded={categoryCombobox.open}
@@ -877,20 +870,9 @@ export function EditTransactionDialog({
               />
             </div>
 
-            {/* Action Buttons */}
-            <div className="flex justify-end">
-              <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Saving…
-                  </>
-                ) : (
-                  "Update transaction"
-                )}
-              </Button>
-            </div>
-          </form>
+          </fieldset>
+          <EditorFooter pending={isSubmitting} disabled={deductionsLoading || deductionsError} error={saveError} />
+        </form>
         </DialogContent>
       </Dialog>
     </>

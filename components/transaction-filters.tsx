@@ -1,35 +1,16 @@
 "use client"
 
 import * as React from "react"
-import { TransactionFilters } from "@/lib/types"
+import { Search, SlidersHorizontal, X } from "lucide-react"
+import type { TransactionFilters } from "@/lib/types"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover"
-import { Calendar } from "@/components/ui/calendar"
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command"
-import { Account } from "@/lib/accounts"
-import { Category } from "@/lib/categories"
-import { CalendarIcon, Check, ChevronsUpDown, RotateCcw } from "lucide-react"
-import { categoryNameToValue, cn } from "@/lib/utils"
+import type { Account } from "@/lib/accounts"
+import type { Category } from "@/lib/categories"
+import { categoryNameToValue, toLocalDateString } from "@/lib/utils"
+import { defaultFilters } from "@/lib/ledger/filters"
+import { parseShortcutDateInput } from "@/lib/ledger/date-input"
 
 interface TransactionFiltersProps {
   filters: TransactionFilters
@@ -37,260 +18,298 @@ interface TransactionFiltersProps {
   accountTypes: Account[]
   categories: Category[]
 }
+const selectClass =
+  "h-9 w-full min-w-0 rounded-md border bg-background px-3 text-sm focus-visible:outline-2 focus-visible:outline-ring"
 
-function formatDate(date: Date | undefined) {
-  if (!date) return ""
-  const day = String(date.getDate()).padStart(2, "0")
-  const month = String(date.getMonth() + 1).padStart(2, "0")
-  const year = String(date.getFullYear()).slice(-2)
-  return `${day}/${month}/${year}`
-}
-
-export const TransactionFiltersPanel = React.memo(function TransactionFiltersPanel({
-  filters,
-  onFiltersChange,
-  accountTypes,
-  categories,
-}: TransactionFiltersProps) {
-  const [categoryOpen, setCategoryOpen] = React.useState(false)
-
-  const handleSortChange = (value: string) => {
-    onFiltersChange({
-      ...filters,
-      sortBy: value as "date" | "amount" | "merchant",
-    })
+export const TransactionFiltersPanel = React.memo(
+  function TransactionFiltersPanel({
+    filters,
+    onFiltersChange,
+    accountTypes,
+    categories,
+  }: TransactionFiltersProps) {
+    const update = (patch: Partial<TransactionFilters>) =>
+      onFiltersChange({ ...filters, ...patch })
+    return (
+      <div className="grid grid-cols-1 gap-4 border-t bg-muted/20 p-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="space-y-1.5">
+          <Label htmlFor="filter-account">Account</Label>
+          <select
+            id="filter-account"
+            className={selectClass}
+            value={filters.account_types[0] ?? "all"}
+            onChange={(e) =>
+              update({
+                account_types: e.target.value === "all" ? [] : [e.target.value],
+              })
+            }
+          >
+            <option value="all">All accounts</option>
+            <option value="__unassigned__">Unassigned</option>
+            {accountTypes
+              .filter((a) => a.id != null)
+              .map((a) => (
+                <option key={a.id} value={String(a.id)}>
+                  {a.account_name}
+                </option>
+              ))}
+          </select>
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="filter-category">Category</Label>
+          <select
+            id="filter-category"
+            className={selectClass}
+            value={filters.categories[0] ?? "all"}
+            onChange={(e) =>
+              update({
+                categories: e.target.value === "all" ? [] : [e.target.value],
+              })
+            }
+          >
+            <option value="all">All categories</option>
+            {categories.map((c) => (
+              <option key={c.id ?? c.name} value={categoryNameToValue(c.name)}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="filter-from">From date</Label>
+          <Input
+            id="filter-from"
+            type="date"
+            className="h-9"
+            value={
+              filters.dateStart ? toLocalDateString(filters.dateStart) : ""
+            }
+            onChange={(e) =>
+              update({
+                dateStart: e.target.value
+                  ? (parseShortcutDateInput(e.target.value, new Date()) ??
+                    undefined)
+                  : undefined,
+              })
+            }
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="filter-to">To date</Label>
+          <Input
+            id="filter-to"
+            type="date"
+            className="h-9"
+            value={filters.dateEnd ? toLocalDateString(filters.dateEnd) : ""}
+            onChange={(e) =>
+              update({
+                dateEnd: e.target.value
+                  ? (parseShortcutDateInput(e.target.value, new Date()) ??
+                    undefined)
+                  : undefined,
+              })
+            }
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="filter-min">Minimum amount</Label>
+          <Input
+            id="filter-min"
+            type="number"
+            min="0"
+            step="0.01"
+            className="h-9"
+            placeholder="No minimum"
+            value={filters.amountMin ?? ""}
+            onChange={(e) =>
+              update({
+                amountMin:
+                  e.target.value === ""
+                    ? undefined
+                    : Math.max(0, Number(e.target.value)),
+              })
+            }
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="filter-max">Maximum amount</Label>
+          <Input
+            id="filter-max"
+            type="number"
+            min="0"
+            step="0.01"
+            className="h-9"
+            placeholder="No maximum"
+            value={filters.amountMax ?? ""}
+            onChange={(e) =>
+              update({
+                amountMax:
+                  e.target.value === ""
+                    ? undefined
+                    : Math.max(0, Number(e.target.value)),
+              })
+            }
+          />
+        </div>
+        <p className="self-end text-xs text-muted-foreground sm:col-span-2">
+          Amounts filter the full transaction total. Spending summaries use your
+          share.
+        </p>
+      </div>
+    )
   }
+)
 
-  const resetFilters = () => {
-    onFiltersChange({
-      ...filters,
-      search: "",
-      dateStart: undefined,
-      dateEnd: undefined,
-      account_types: [],
-      categories: [],
+export function TransactionToolbar(props: TransactionFiltersProps) {
+  const { filters, onFiltersChange, accountTypes, categories } = props
+  const [expanded, setExpanded] = React.useState(false)
+  const update = (patch: Partial<TransactionFilters>) =>
+    onFiltersChange({ ...filters, ...patch })
+  const chips: { key: string; label: string; remove: () => void }[] = []
+  if (filters.search)
+    chips.push({
+      key: "q",
+      label: `Search: ${filters.search}`,
+      remove: () => update({ search: "" }),
     })
-  }
-
-  const activeFilterCount =
-    (filters.search ? 1 : 0) +
-    (filters.dateStart ? 1 : 0) +
-    (filters.dateEnd ? 1 : 0) +
-    (filters.account_types.length > 0 ? 1 : 0) +
-    (filters.categories.length > 0 ? 1 : 0)
-  const selectedCategoryValue = filters.categories.length > 0 ? filters.categories[0] : "all"
-  const selectedCategory = categories.find(
-    (category) => categoryNameToValue(category.name) === selectedCategoryValue
+  filters.account_types.forEach((id) =>
+    chips.push({
+      key: `account-${id}`,
+      label:
+        id === "__unassigned__"
+          ? "Unassigned"
+          : (accountTypes.find((a) => String(a.id) === id)?.account_name ??
+            "Account"),
+      remove: () =>
+        update({
+          account_types: filters.account_types.filter((value) => value !== id),
+        }),
+    })
   )
+  filters.categories.forEach((value) =>
+    chips.push({
+      key: `category-${value}`,
+      label:
+        categories.find((c) => categoryNameToValue(c.name) === value)?.name ??
+        value,
+      remove: () =>
+        update({ categories: filters.categories.filter((c) => c !== value) }),
+    })
+  )
+  if (filters.dateStart)
+    chips.push({
+      key: "from",
+      label: `From ${toLocalDateString(filters.dateStart)}`,
+      remove: () => update({ dateStart: undefined }),
+    })
+  if (filters.dateEnd)
+    chips.push({
+      key: "to",
+      label: `To ${toLocalDateString(filters.dateEnd)}`,
+      remove: () => update({ dateEnd: undefined }),
+    })
+  if (filters.amountMin !== undefined)
+    chips.push({
+      key: "min",
+      label: `Min $${filters.amountMin}`,
+      remove: () => update({ amountMin: undefined }),
+    })
+  if (filters.amountMax !== undefined)
+    chips.push({
+      key: "max",
+      label: `Max $${filters.amountMax}`,
+      remove: () => update({ amountMax: undefined }),
+    })
 
   return (
-    <div className="space-y-4 p-4">
-      <div className="flex items-center justify-between">
-        <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-          Filters
-        </span>
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          className="h-7 px-2 text-xs text-muted-foreground"
-          onClick={resetFilters}
-          disabled={activeFilterCount === 0}
-        >
-          <RotateCcw className="mr-1 h-3.5 w-3.5" />
-          Reset
-        </Button>
-      </div>
-
-      <div className="space-y-1.5">
-        <Label className="text-sm">Search</Label>
-        <Input
-          placeholder="Search merchant, category, or notes…"
-          value={filters.search}
-          onChange={(e) => {
-            onFiltersChange({
-              ...filters,
-              search: e.target.value,
-            })
-          }}
-          className="h-9"
-        />
-      </div>
-
-      <div className="space-y-1.5">
-        <Label className="text-sm">Date range</Label>
-        <div className="grid grid-cols-2 gap-2">
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button
-                variant="outline"
-                className={cn(
-                  "h-9 justify-start text-left font-normal text-sm",
-                  !filters.dateStart && "text-muted-foreground"
-                )}
-              >
-                <CalendarIcon className="mr-2 h-4 w-4" />
-                {filters.dateStart ? formatDate(filters.dateStart) : "Start"}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
-              <Calendar
-                mode="single"
-                selected={filters.dateStart}
-                onSelect={(date) => {
-                  onFiltersChange({
-                    ...filters,
-                    dateStart: date,
-                  })
-                }}
-              />
-            </PopoverContent>
-          </Popover>
-
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button
-                variant="outline"
-                className={cn(
-                  "h-9 justify-start text-left font-normal text-sm",
-                  !filters.dateEnd && "text-muted-foreground"
-                )}
-              >
-                <CalendarIcon className="mr-2 h-4 w-4" />
-                {filters.dateEnd ? formatDate(filters.dateEnd) : "End"}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
-              <Calendar
-                mode="single"
-                selected={filters.dateEnd}
-                onSelect={(date) => {
-                  onFiltersChange({
-                    ...filters,
-                    dateEnd: date,
-                  })
-                }}
-              />
-            </PopoverContent>
-          </Popover>
+    <section
+      aria-label="Filter transactions"
+      className="min-w-0 rounded-xl border bg-background"
+    >
+      <div className="flex flex-wrap items-center gap-2 p-3">
+        <div className="relative min-w-48 flex-1">
+          <Search
+            aria-hidden="true"
+            className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-muted-foreground"
+          />
+          <Input
+            aria-label="Search transactions"
+            type="search"
+            className="h-9 pl-9"
+            placeholder="Search merchant, category, or notes"
+            value={filters.search}
+            onChange={(e) => update({ search: e.target.value })}
+          />
+        </div>
+        <div className="flex items-center gap-2">
+          <select
+            aria-label="Sort transactions"
+            className={`${selectClass} w-auto`}
+            value={`${filters.sortBy}-${filters.sortOrder}`}
+            onChange={(e) => {
+              const [sortBy, sortOrder] = e.target.value.split("-") as [
+                TransactionFilters["sortBy"],
+                TransactionFilters["sortOrder"],
+              ]
+              update({ sortBy, sortOrder })
+            }}
+          >
+            <option value="date-desc">Newest first</option>
+            <option value="date-asc">Oldest first</option>
+            <option value="amount-desc">Highest amount</option>
+            <option value="amount-asc">Lowest amount</option>
+            <option value="merchant-asc">Merchant A–Z</option>
+            <option value="merchant-desc">Merchant Z–A</option>
+          </select>
+          <Button
+            variant={expanded ? "secondary" : "outline"}
+            size="sm"
+            aria-expanded={expanded}
+            aria-controls="ledger-advanced-filters"
+            onClick={() => setExpanded((value) => !value)}
+          >
+            <SlidersHorizontal className="h-4 w-4" />
+            Filters{chips.length > 0 ? ` (${chips.length})` : ""}
+          </Button>
         </div>
       </div>
-
-      <div className="space-y-1.5">
-        <Label className="text-sm">Sort by</Label>
-        <Select value={filters.sortBy} onValueChange={handleSortChange}>
-          <SelectTrigger className="h-9">
-            <SelectValue placeholder="Sort" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="date">Date (new to old)</SelectItem>
-            <SelectItem value="amount">Amount (high to low)</SelectItem>
-            <SelectItem value="merchant">Merchant (A to Z)</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-
-      <div className="space-y-1.5">
-        <Label className="text-sm">Account</Label>
-        <Select
-          value={filters.account_types.length > 0 ? filters.account_types[0] : "all"}
-          onValueChange={(value) =>
-            onFiltersChange({
-              ...filters,
-              account_types: value === "all" ? [] : [value],
-            })
-          }
+      {chips.length > 0 && (
+        <div
+          className="flex flex-wrap items-center gap-2 px-3 pb-3"
+          aria-label="Active filters"
         >
-          <SelectTrigger className="h-9">
-            <SelectValue placeholder="All accounts" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All accounts</SelectItem>
-            <SelectItem value="__unassigned__">Unassigned</SelectItem>
-            {accountTypes.filter((a) => a.id != null).map((account) => (
-              <SelectItem key={account.id} value={account.id!.toString()}>
-                {account.account_name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      <div className="space-y-1.5">
-        <Label className="text-sm">Category</Label>
-        <Popover open={categoryOpen} onOpenChange={setCategoryOpen}>
-          <PopoverTrigger asChild>
-            <Button
-              variant="outline"
-              role="combobox"
-              aria-expanded={categoryOpen}
-              className="h-9 w-full justify-between font-normal"
+          {chips.map((chip) => (
+            <button
+              key={chip.key}
+              type="button"
+              onClick={chip.remove}
+              aria-label={`Remove ${chip.label}`}
+              className="inline-flex max-w-full items-center gap-1.5 rounded-full border bg-muted/30 px-2.5 py-1 text-xs hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring"
             >
-              {selectedCategory ? (
-                <span className="truncate">
-                  {selectedCategory.emoji} {selectedCategory.name}
-                </span>
-              ) : (
-                "All categories"
-              )}
-              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-(--radix-popover-trigger-width) p-0" align="start">
-            <Command>
-              <CommandInput placeholder="Search categories…" />
-              <CommandList>
-                <CommandEmpty>No category found.</CommandEmpty>
-                <CommandGroup>
-                  <CommandItem
-                    value="all categories"
-                    onSelect={() => {
-                      onFiltersChange({
-                        ...filters,
-                        categories: [],
-                      })
-                      setCategoryOpen(false)
-                    }}
-                  >
-                    <Check
-                      className={cn(
-                        "mr-2 h-4 w-4",
-                        selectedCategoryValue === "all" ? "opacity-100" : "opacity-0"
-                      )}
-                    />
-                    All categories
-                  </CommandItem>
-                  {categories.map((category) => {
-                    const normalized = categoryNameToValue(category.name)
-                    return (
-                      <CommandItem
-                        key={category.id ?? category.name}
-                        value={`${category.name} ${category.emoji}`}
-                        onSelect={() => {
-                          onFiltersChange({
-                            ...filters,
-                            categories: [normalized],
-                          })
-                          setCategoryOpen(false)
-                        }}
-                      >
-                        <Check
-                          className={cn(
-                            "mr-2 h-4 w-4",
-                            selectedCategoryValue === normalized ? "opacity-100" : "opacity-0"
-                          )}
-                        />
-                        <span className="mr-2">{category.emoji}</span>
-                        <span className="truncate">{category.name}</span>
-                      </CommandItem>
-                    )
-                  })}
-                </CommandGroup>
-              </CommandList>
-            </Command>
-          </PopoverContent>
-        </Popover>
-      </div>
-    </div>
+              <span className="truncate">{chip.label}</span>
+              <X className="h-3 w-3 shrink-0" />
+            </button>
+          ))}
+          <button
+            type="button"
+            className="px-2 py-1 text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground"
+            onClick={() =>
+              onFiltersChange({
+                ...defaultFilters,
+                sortBy: filters.sortBy,
+                sortOrder: filters.sortOrder,
+              })
+            }
+          >
+            Clear filters
+          </button>
+        </div>
+      )}
+      {expanded && (
+        <div id="ledger-advanced-filters">
+          <TransactionFiltersPanel {...props} />
+        </div>
+      )}
+    </section>
   )
-})
+}

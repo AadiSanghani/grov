@@ -3,7 +3,7 @@
 import * as React from "react"
 import { useState } from "react"
 import { format } from "date-fns"
-import { Copy, EllipsisVertical, FileText, Plus, Trash2 } from "lucide-react"
+import { Copy, EllipsisVertical, Loader2, FileText, Plus, Trash2 } from "lucide-react"
 
 import { Transaction } from "@/lib/types"
 import {
@@ -31,6 +31,7 @@ type AmountColorMode = "semantic-minimal" | "strict-semantic" | "monochrome"
 
 interface TransactionListProps {
   transactions: Transaction[]
+  pendingIds?: ReadonlySet<string>
   categories: Category[]
   accounts?: Account[]
   density?: Density
@@ -118,6 +119,7 @@ function getDayNetClass(total: number) {
 
 export const TransactionList = React.memo(function TransactionList({
   transactions,
+  pendingIds,
   categories,
   accounts = [],
   density = "balanced",
@@ -224,8 +226,9 @@ export const TransactionList = React.memo(function TransactionList({
             </div>
           </header>
 
-          <div className="space-y-1">
+          <div className="divide-y divide-border/50">
             {dayTransactions.map((transaction) => {
+              const pending = Boolean(transaction.id && pendingIds?.has(transaction.id))
               const isTransfer = transaction.transaction_type === "transfer"
               const isReimbursement = isReimbursementTransaction(transaction)
               const categoryInfo = findCategoryByValue(categories, transaction.category)
@@ -243,14 +246,15 @@ export const TransactionList = React.memo(function TransactionList({
                 <div
                   key={transaction.id}
                   className={cn(
-                    "flex items-stretch rounded-lg border border-transparent transition-colors hover:border-border hover:bg-muted/30",
+                    "flex items-stretch rounded-md border border-transparent transition-colors hover:bg-muted/40",
                     densityClassMap[density]
                   )}
                 >
                   <button
                     type="button"
+                    disabled={pending}
                     onClick={() => onTransactionClick(transaction)}
-                    className={cn("grid flex-1 grid-cols-1 gap-2 px-3 text-left md:items-start", ROW_GRID_TEMPLATE)}
+                    className={cn("grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)_auto] gap-2 px-3 text-left outline-offset-2 focus-visible:outline-2 focus-visible:outline-ring md:items-start", ROW_GRID_TEMPLATE)}
                   >
                     <div className="min-w-0">
                       <p className="truncate text-[15px] font-medium leading-6">
@@ -315,7 +319,7 @@ export const TransactionList = React.memo(function TransactionList({
                       )}
                     </div>
 
-                    <div className={cn("text-left md:text-right", ROW_AMOUNT_COLUMN_WIDTH)}>
+                    <div className="text-right md:w-[10.5rem]">
                       <p className={cn("text-sm font-semibold tabular-nums", amountTone)}>
                         {amountData.sign}${formatMoney(amountData.value)}
                       </p>
@@ -343,9 +347,10 @@ export const TransactionList = React.memo(function TransactionList({
                           size="icon"
                           className="h-8 w-8 text-muted-foreground hover:text-foreground"
                           onClick={(e) => e.stopPropagation()}
-                          aria-label="Transaction actions"
+                          disabled={pending}
+                          aria-label={pending ? "Saving transaction" : "Transaction actions"}
                         >
-                          <EllipsisVertical className="h-4 w-4" />
+                          {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <EllipsisVertical className="h-4 w-4" />}
                         </Button>
                       </PopoverTrigger>
                       <PopoverContent align="end" className="w-40 p-1">
