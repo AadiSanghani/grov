@@ -37,6 +37,7 @@
     "yahoo-finance2": "^3.13.0"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.14",
     "@tailwindcss/postcss": "^4",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.3",

@@ -139,7 +139,7 @@ test('recent activity filters the authenticated user and limits in the database 
   recentTransactionsQuery(query, 'user-test')
   assert.deepEqual(calls, [
     ['from', 'transactions'], ['select', '*'], ['eq', 'user_id', 'user-test'],
-    ['order', 'date', { ascending: false }], ['order', 'created_at', { ascending: false }],
+    ['order', 'date', { ascending: false, nullsFirst: false }], ['order', 'created_at', { ascending: false, nullsFirst: false }],
     ['order', 'id', { ascending: false }], ['limit', 10],
   ])
 })
@@ -191,6 +191,6 @@ test('the real Supabase builder sends the bounded user-scoped recent activity qu
   assert.equal(error, null)
   assert.equal(sentUrl.pathname, '/rest/v1/transactions')
   assert.equal(sentUrl.searchParams.get('user_id'), 'eq.user-test')
-  assert.equal(sentUrl.searchParams.get('order'), 'date.desc,created_at.desc,id.desc')
+  assert.equal(sentUrl.searchParams.get('order'), 'date.desc.nullslast,created_at.desc.nullslast,id.desc')
   assert.equal(sentUrl.searchParams.get('limit'), '10')
 })

@@ -68,6 +68,12 @@ npm run lint    # ESLint
 
 SQL migrations live under [`supabase/migrations/`](supabase/migrations/). Apply them to your Supabase database (CLI, dashboard SQL, or CI) so the app schema matches the code.
 
+The paginated transaction ledger requires `20261031192259_transaction_ledger_pagination.sql` before deploying the app. It adds user/date and user/account/date indexes and the `get_transaction_ledger` read RPC. The RPC runs with the caller's permissions, uses the Clerk JWT subject, and retains transaction RLS. It returns up to 50 rows per request while computing count and financial summaries over all matching transactions in the same database statement.
+
+Filters and sorting run in Postgres. Search is debounced by 250 ms; changing a filter resets to page one. Pages are stored in the URL for Back/Forward navigation. Offset pagination supports direct page links; very deep pages still scan skipped matching rows. Concurrent inserts/deletes between page requests can shift page boundaries; each individual page and its totals share one statement snapshot.
+
+`npm test` includes an isolated PGlite database test of the migration, pagination beyond 1,000 rows, literal searches, financial summaries, index availability, and RLS. It does not connect to or modify the hosted database. The migration has to be applied by the database owner before live pagination browser verification.
+
 Supabase is accessed from the server using a client that passes the Clerk session token (`ssr/client.ts`), so RLS policies should key off the same user identity your migrations expect (e.g. JWT `sub`).
 
 ## Project layout (high level)

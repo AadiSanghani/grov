@@ -15,12 +15,12 @@ import { getAccounts, type Account } from "@/lib/accounts"
 import {
   deleteTransaction,
   duplicateTransaction,
-  getTransactions,
+  getTransactionPage,
 } from "@/lib/transactions"
 import { getCategories, type Category } from "@/lib/categories"
 import { trackEvent } from "@/lib/telemetry"
 import { toLocalDateString } from "@/lib/utils"
-import { filterTransactions } from "@/lib/ledger/filters"
+import { ledgerRequest, type LedgerPage } from "@/lib/ledger/pagination"
 import { shouldOpenTransaction } from "@/lib/ledger/keyboard"
 import { useLedgerFilters } from "@/hooks/use-ledger-filters"
 
@@ -36,7 +36,16 @@ export default function Transactions() {
   const [loaded, setLoaded] = useState(false)
   const [error, setError] = useState("")
   const [density, setDensity] = useState<"compact" | "comfortable">("compact")
-  const [filters, setFilters] = useLedgerFilters()
+  const [filters, setFilters, pagination] = useLedgerFilters()
+  const [result, setResult] = useState<LedgerPage | null>(null)
+  const [resultKey, setResultKey] = useState("")
+  const requestKey = useMemo(
+    () => JSON.stringify(ledgerRequest(filters, pagination.page)),
+    [filters, pagination.page]
+  )
+  const previousSearch = useRef(filters.search)
+  const pageStatus = useRef<HTMLParagraphElement>(null)
+  const restorePageFocus = useRef(false)
   const referenceDataLoaded = useRef(false)
   const request = useRef(0)
   const pendingActions = useRef(new Set<string>())
@@ -47,14 +56,16 @@ export default function Transactions() {
     setLoading(true)
     setError("")
     try {
-      const [rows, reference] = await Promise.all([
-        getTransactions(),
+      const [data, reference] = await Promise.all([
+        getTransactionPage(filters, pagination.page),
         referenceDataLoaded.current
           ? Promise.resolve(null)
           : Promise.all([getAccounts(), getCategories()]),
       ])
       if (version !== request.current) return
-      setTransactions(rows ?? [])
+      setTransactions(data.transactions)
+      setResult(data)
+      setResultKey(requestKey)
       if (reference) {
         setAccounts(reference[0] ?? [])
         setCategories(reference[1] ?? [])
@@ -67,32 +78,52 @@ export default function Transactions() {
     } finally {
       if (version === request.current) setLoading(false)
     }
-  }, [])
+  }, [filters, pagination.page, requestKey])
 
   useEffect(() => {
-    void loadData()
-    // Invalidate in-flight responses on unmount, including Strict Mode's cleanup.
-    return () => {
-      invalidateRequests()
-    }
-    function invalidateRequests() {
+    const delay = previousSearch.current !== filters.search ? 250 : 0
+    previousSearch.current = filters.search
+    const timer = window.setTimeout(() => void loadData(), delay)
+    const invalidateRequests = () => {
       request.current++
     }
-  }, [loadData])
+    return () => {
+      window.clearTimeout(timer)
+      invalidateRequests()
+    }
+  }, [filters.search, loadData])
   const tracked = useRef(false)
   useEffect(() => {
     if (loaded && !tracked.current) {
       tracked.current = true
       trackEvent("transactions_view_loaded", {
-        totalTransactions: transactions.length,
+        totalTransactions: result?.totalCount ?? 0,
       })
     }
-  }, [loaded, transactions.length])
+  }, [loaded, result?.totalCount])
 
-  const rows = useMemo(
-    () => filterTransactions(transactions, filters),
-    [transactions, filters]
+  const rows = transactions
+  const updating = loading || (loaded && resultKey !== requestKey && !error)
+  const totalPages = Math.max(
+    1,
+    Math.ceil((result?.totalCount ?? 0) / (result?.pageSize ?? 50))
   )
+  useEffect(() => {
+    if (!restorePageFocus.current) return
+    restorePageFocus.current = false
+    if (
+      document.activeElement === document.body ||
+      document.activeElement?.closest('nav[aria-label="Transaction pages"]')
+    ) {
+      pageStatus.current?.focus({ preventScroll: true })
+    }
+  }, [resultKey])
+  const goToPage = (page: number) => {
+    restorePageFocus.current = !!document.activeElement?.closest(
+      'nav[aria-label="Transaction pages"]'
+    )
+    pagination.setPage(page)
+  }
   const openAdd = useCallback((date?: Date, source = "header") => {
     const nextDate = date ?? new Date()
     setQuickCreateDate(nextDate)
@@ -113,9 +144,6 @@ export default function Transactions() {
     return () => window.removeEventListener("keydown", keydown)
   }, [loaded, openAdd, isAddOpen, isEditOpen])
 
-  const handleCreated = useCallback((data: Transaction) => {
-    setTransactions((previous) => [data, ...previous])
-  }, [])
   const handleUpdated = useCallback(
     (id: string, data: Partial<Transaction>) => {
       setTransactions((previous) =>
@@ -224,18 +252,22 @@ export default function Transactions() {
             accountTypes={accounts}
             categories={categories}
           />
-          <TransactionSummary transactions={rows} strip />
+          <TransactionSummary
+            transactions={rows}
+            metrics={result?.summary}
+            strip
+          />
           <section
             aria-label="Transaction ledger"
-            aria-busy={loading}
+            aria-busy={updating}
             className="min-w-0 rounded-xl border bg-background"
           >
             <div className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3">
               <p className="text-sm text-muted-foreground">
                 <span className="font-medium tabular-nums text-foreground">
-                  {rows.length.toLocaleString()}
+                  {result?.totalCount.toLocaleString()}
                 </span>{" "}
-                transactions{loading ? " · Refreshing…" : ""}
+                transactions{updating ? " · Updating results…" : ""}
               </p>
               <div className="flex items-center gap-2">
                 <label htmlFor="ledger-density" className="sr-only">
@@ -256,15 +288,54 @@ export default function Transactions() {
                   variant="ghost"
                   size="icon"
                   aria-label="Refresh transactions"
-                  disabled={loading}
+                  disabled={updating}
                   onClick={() => void loadData()}
                 >
                   <RefreshCw
-                    className={`h-4 w-4 ${loading ? "animate-spin" : ""}`}
+                    className={`h-4 w-4 ${updating ? "animate-spin" : ""}`}
                   />
                 </Button>
               </div>
             </div>
+            <nav
+              aria-label="Transaction pages"
+              className="flex flex-wrap items-center justify-between gap-3 border-t px-4 py-3"
+            >
+              <p
+                id="ledger-page-status"
+                ref={pageStatus}
+                role="status"
+                tabIndex={-1}
+                className="text-xs tabular-nums text-muted-foreground focus-visible:outline-2 focus-visible:outline-ring"
+              >
+                {result && result.totalCount > 0
+                  ? `${((result.page - 1) * result.pageSize + 1).toLocaleString()}–${((result.page - 1) * result.pageSize + rows.length).toLocaleString()} of ${result.totalCount.toLocaleString()}`
+                  : "0 transactions"}
+                {` · Page ${result?.page ?? 1} of ${totalPages}`}
+              </p>
+              <div className="flex gap-2">
+                <Button
+                  aria-label="Previous page"
+                  className="h-11 sm:h-8"
+                  variant="outline"
+                  size="sm"
+                  disabled={updating || resultKey !== requestKey || !result || result.page <= 1}
+                  onClick={() => goToPage((result?.page ?? 1) - 1)}
+                >
+                  Previous
+                </Button>
+                <Button
+                  aria-label="Next page"
+                  className="h-11 sm:h-8"
+                  variant="outline"
+                  size="sm"
+                  disabled={updating || resultKey !== requestKey || !result || result.page >= totalPages}
+                  onClick={() => goToPage((result?.page ?? 1) + 1)}
+                >
+                  Next
+                </Button>
+              </div>
+            </nav>
             <div className="p-2 sm:p-3">
               <TransactionList
                 transactions={rows}
@@ -272,6 +343,7 @@ export default function Transactions() {
                 categories={categories}
                 accounts={accounts}
                 density={density}
+                pageSubtotals={(result?.totalCount ?? 0) > rows.length}
                 onTransactionClick={handleClick}
                 onDuplicateTransaction={handleDuplicate}
                 onDeleteTransaction={handleDelete}
@@ -284,7 +356,6 @@ export default function Transactions() {
       <AddTransactionDialog
         open={isAddOpen}
         onOpenChange={setIsAddOpen}
-        onTransactionCreated={handleCreated}
         onAfterSave={loadData}
         accounts={accounts}
         categories={categories}

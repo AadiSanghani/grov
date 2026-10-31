@@ -6,6 +6,8 @@ import { recentTransactionsQuery } from './transaction-reads'
 import { Transaction } from './types'
 import { createDeductions, deleteDeductionsByTransactionId, getDeductionsByTransactionId } from './deductions'
 import { normalizeIncomingSubtype, parseLocalDate, toDateOnlyString } from './utils'
+import { ledgerRequest, type LedgerPage } from './ledger/pagination'
+import type { TransactionFilters } from './types'
 
 interface TransactionRow {
   id?: string | number
@@ -71,6 +73,17 @@ export async function getRecentTransactions(): Promise<Transaction[]> {
   const { data, error } = await recentTransactionsQuery(supabase, userId)
   if (error) throw error
   return (data ?? []).map(mapTransactionForClient)
+}
+
+export async function getTransactionPage(filters: TransactionFilters, page = 1): Promise<LedgerPage> {
+  await requireUserId()
+  const supabase = createServerSupabaseClient()
+  const { data, error } = await supabase.rpc('get_transaction_ledger', ledgerRequest(filters, page))
+  if (error) throw error
+  if (!data || !Array.isArray(data.transactions) || !data.summary) {
+    throw new Error('Invalid transaction ledger response')
+  }
+  return { ...data, transactions: data.transactions.map(mapTransactionForClient) }
 }
 
 export async function getTransactionsInRange(startDate: string, endDate: string) {
