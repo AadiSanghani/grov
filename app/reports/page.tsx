@@ -1,5 +1,5 @@
-import { redirect } from "next/navigation"
+import { ReportsOverview } from "@/components/reports/overview"
 
 export default function ReportsPage() {
-  redirect("/reports/cash-flow")
+  return <ReportsOverview />
 }

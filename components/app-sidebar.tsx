@@ -23,7 +23,7 @@ const items = [
   { title: "Accounts", url: "/accounts", match: "/accounts", icon: LayoutDashboard },
   { title: "Transactions", url: "/transactions", match: "/transactions", icon: CreditCard },
   { title: "Investments", url: "/investments", match: "/investments", icon: TrendingUp },
-  { title: "Reports", url: "/reports/cash-flow", match: "/reports", icon: FileBarChart },
+  { title: "Reports", url: "/reports", match: "/reports", icon: FileBarChart },
   { title: "Trips", url: "/trips", match: "/trips", icon: MapPinned },
 ]
 

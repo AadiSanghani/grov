@@ -14,9 +14,7 @@ export const TIMELINE_OPTIONS = [
 
 export function getReportsDateRange(timeline: string): { startDate: string; endDate: string } {
   const today = new Date()
-  const tomorrow = new Date(today)
-  tomorrow.setDate(tomorrow.getDate() + 1)
-  const endDate = format(tomorrow, "yyyy-MM-dd")
+  const endDate = format(today, "yyyy-MM-dd")
 
   switch (timeline) {
     case "month-to-date":
