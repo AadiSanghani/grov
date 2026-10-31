@@ -14,7 +14,6 @@ import type { Transaction } from "@/lib/types"
 import { getAccounts, type Account } from "@/lib/accounts"
 import {
   deleteTransaction,
-  duplicateTransaction,
   getTransactionPage,
 } from "@/lib/transactions"
 import { getCategories, type Category } from "@/lib/categories"
@@ -29,6 +28,7 @@ export default function Transactions() {
   const [isEditOpen, setIsEditOpen] = useState(false)
   const [quickCreateDate, setQuickCreateDate] = useState(() => new Date())
   const [selected, setSelected] = useState<Transaction | null>(null)
+  const [duplicateFrom, setDuplicateFrom] = useState<Transaction | null>(null)
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [accounts, setAccounts] = useState<Account[]>([])
   const [categories, setCategories] = useState<Category[]>([])
@@ -157,24 +157,18 @@ export default function Transactions() {
     setIsEditOpen(true)
   }, [])
   const mutate = useCallback(
-    async (transaction: Transaction, action: "delete" | "duplicate") => {
+    async (transaction: Transaction) => {
       if (!transaction.id || pendingActions.current.has(transaction.id)) return
       const id = transaction.id
       pendingActions.current.add(id)
       setPendingIds(new Set(pendingActions.current))
       try {
-        if (action === "delete") {
-          await deleteTransaction(id)
-          setTransactions((previous) => previous.filter((row) => row.id !== id))
-        } else {
-          await duplicateTransaction(id, toLocalDateString(new Date()))
-        }
-        toast.success(
-          action === "delete" ? "Transaction deleted" : "Transaction duplicated"
-        )
+        await deleteTransaction(id)
+        setTransactions((previous) => previous.filter((row) => row.id !== id))
+        toast.success("Transaction deleted")
         await loadData()
       } catch {
-        toast.error(`Could not ${action} transaction. Please try again.`)
+        toast.error("Could not delete transaction. Please try again.")
       } finally {
         pendingActions.current.delete(id)
         setPendingIds(new Set(pendingActions.current))
@@ -184,15 +178,16 @@ export default function Transactions() {
   )
   const handleDelete = useCallback(
     (transaction: Transaction) => {
-      void mutate(transaction, "delete")
+      void mutate(transaction)
     },
     [mutate]
   )
   const handleDuplicate = useCallback(
     (transaction: Transaction) => {
-      void mutate(transaction, "duplicate")
+      setDuplicateFrom(transaction)
+      setIsAddOpen(true)
     },
-    [mutate]
+    []
   )
 
   return (
@@ -355,11 +350,15 @@ export default function Transactions() {
       ) : null}
       <AddTransactionDialog
         open={isAddOpen}
-        onOpenChange={setIsAddOpen}
+        onOpenChange={(open) => {
+          setIsAddOpen(open)
+          if (!open) setDuplicateFrom(null)
+        }}
         onAfterSave={loadData}
         accounts={accounts}
         categories={categories}
         defaultDate={quickCreateDate}
+        duplicateFrom={duplicateFrom}
       />
       <EditTransactionDialog
         open={isEditOpen}

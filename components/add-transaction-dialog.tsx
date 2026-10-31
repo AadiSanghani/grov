@@ -74,6 +74,7 @@ interface AddTransactionDialogProps {
   accounts: Account[]
   categories: Category[]
   defaultDate?: Date
+  duplicateFrom?: Transaction | null
 }
 
 export function AddTransactionDialog({
@@ -84,6 +85,7 @@ export function AddTransactionDialog({
   accounts,
   categories,
   defaultDate,
+  duplicateFrom,
 }: AddTransactionDialogProps) {
   const resolvedDefaultDate = useMemo(
     () => normalizeCalendarDate(defaultDate ?? new Date()),
@@ -182,9 +184,23 @@ export function AddTransactionDialog({
 
   React.useEffect(() => {
     if (open) {
-      applyDate(resolvedDefaultDate)
+      if (duplicateFrom) {
+        setTransactionType(duplicateFrom.transaction_type)
+        setAmount(String(duplicateFrom.amount))
+        setDisplayAmount(`$${duplicateFrom.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`)
+        setMerchant(duplicateFrom.merchant)
+        setAccountTypeId(duplicateFrom.account_type_id == null ? "" : String(duplicateFrom.account_type_id))
+        setToAccountTypeId(duplicateFrom.to_account_type_id == null ? "" : String(duplicateFrom.to_account_type_id))
+        setCategory(duplicateFrom.category ?? "")
+        setNotes(duplicateFrom.notes ?? "")
+        setSpendingAmount(duplicateFrom.spending_amount == null ? "" : String(duplicateFrom.spending_amount))
+        setDisplaySpendingAmount(duplicateFrom.spending_amount == null ? "$" : `$${Number(duplicateFrom.spending_amount).toFixed(2)}`)
+        applyDate(resolvedDefaultDate)
+      } else {
+        applyDate(resolvedDefaultDate)
+      }
     }
-  }, [applyDate, open, resolvedDefaultDate])
+  }, [applyDate, open, resolvedDefaultDate, duplicateFrom])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
