@@ -81,7 +81,7 @@ function ReportsDateSelect() {
   return (
     <div className="flex flex-wrap items-center gap-2">
       <Select value={timeline} onValueChange={setTimeline}>
-        <SelectTrigger aria-label="Report period" className="h-9 min-w-[180px] text-sm font-normal">
+        <SelectTrigger aria-label="Report period" className="h-9 w-[180px] text-sm font-normal">
           <SelectValue placeholder="Select range" />
         </SelectTrigger>
         <SelectContent>
@@ -135,9 +135,11 @@ function ReportsDateSelect() {
           </PopoverContent>
         </Popover>
       )}
-      <span className="text-xs text-muted-foreground tabular-nums">
-        {format(parseISO(startDate), "MMM d, yyyy")} – {format(parseISO(endDate), "MMM d, yyyy")}
-      </span>
+      {timeline !== "custom" && (
+        <span className="text-xs text-muted-foreground tabular-nums">
+          {format(parseISO(startDate), "MMM d, yyyy")} – {format(parseISO(endDate), "MMM d, yyyy")}
+        </span>
+      )}
     </div>
   )
 }
