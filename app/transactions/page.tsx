@@ -104,14 +104,14 @@ export default function Transactions() {
   }, [])
   useEffect(() => {
     const keydown = (event: KeyboardEvent) => {
-      if (!isAddOpen && !isEditOpen && shouldOpenTransaction(event)) {
+      if (loaded && !isAddOpen && !isEditOpen && shouldOpenTransaction(event)) {
         event.preventDefault()
         openAdd(undefined, "keyboard")
       }
     }
     window.addEventListener("keydown", keydown)
     return () => window.removeEventListener("keydown", keydown)
-  }, [openAdd, isAddOpen, isEditOpen])
+  }, [loaded, openAdd, isAddOpen, isEditOpen])
 
   const handleCreated = useCallback((data: Transaction) => {
     setTransactions((previous) => [data, ...previous])

@@ -35,7 +35,8 @@ vi.mock("@/components/page-layout", () => ({
   ),
 }))
 vi.mock("@/components/add-transaction-dialog", () => ({
-  AddTransactionDialog: () => null,
+  AddTransactionDialog: ({ open }: { open: boolean }) =>
+    open ? <div role="dialog" aria-label="Add transaction" /> : null,
 }))
 vi.mock("@/components/edit-transaction-dialog", () => ({
   EditTransactionDialog: () => null,
@@ -59,6 +60,17 @@ beforeEach(() => {
 })
 
 describe("ledger loading and mutations", () => {
+  it("enables the N shortcut only after the editor reference data loads", async () => {
+    let resolve!: (rows: Transaction[]) => void
+    actions.get.mockReturnValueOnce(new Promise<Transaction[]>(yes => { resolve = yes }))
+    render(<Transactions />)
+    fireEvent.keyDown(window, { key: "n" })
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument()
+    await act(async () => resolve([transaction]))
+    fireEvent.keyDown(window, { key: "n" })
+    expect(screen.getByRole("dialog", { name: "Add transaction" })).toBeInTheDocument()
+  })
+
   it("shows an initial skeleton, an actual error and a working retry", async () => {
     let reject!: (error: Error) => void
     actions.get
