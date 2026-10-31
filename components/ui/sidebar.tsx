@@ -6,6 +6,7 @@ import { cva, type VariantProps } from "class-variance-authority"
 import { PanelLeftIcon } from "lucide-react"
 
 import { useIsMobile } from "@/hooks/use-mobile"
+import { SIDEBAR_COOKIE_NAME, SIDEBAR_COOKIE_MAX_AGE } from "@/components/sidebar-preferences"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -25,11 +26,9 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 
-const SIDEBAR_COOKIE_NAME = "sidebar_state"
-const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7
-const SIDEBAR_WIDTH = "16rem"
-const SIDEBAR_WIDTH_MOBILE = "18rem"
-const SIDEBAR_WIDTH_ICON = "3rem"
+const SIDEBAR_WIDTH = "14rem"
+const SIDEBAR_WIDTH_MOBILE = "min(18rem, calc(100vw - 2rem))"
+const SIDEBAR_WIDTH_ICON = "4rem"
 const SIDEBAR_KEYBOARD_SHORTCUT = "b"
 
 type SidebarContextProps = {
@@ -83,7 +82,7 @@ function SidebarProvider({
       }
 
       // This sets the cookie to keep the sidebar state.
-      document.cookie = `${SIDEBAR_COOKIE_NAME}=${openState}; path=/; max-age=${SIDEBAR_COOKIE_MAX_AGE}`
+      document.cookie = `${SIDEBAR_COOKIE_NAME}=${openState}; path=/; max-age=${SIDEBAR_COOKIE_MAX_AGE}; SameSite=Lax`
     },
     [setOpenProp, open]
   )
@@ -94,8 +93,20 @@ function SidebarProvider({
 
   React.useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
+      // Let editors, IME input, held keys, and other shortcut handlers win.
+      const target = event.composedPath()[0]
+      const isEditing = target instanceof HTMLElement && (
+        target.isContentEditable ||
+        target.closest('input, textarea, select, [role="textbox"], [role="combobox"]')
+      )
       if (
-        event.key === SIDEBAR_KEYBOARD_SHORTCUT &&
+        !event.defaultPrevented &&
+        !event.repeat &&
+        !event.isComposing &&
+        !isEditing &&
+        !event.altKey &&
+        !event.shiftKey &&
+        event.key.toLowerCase() === SIDEBAR_KEYBOARD_SHORTCUT &&
         (event.metaKey || event.ctrlKey)
       ) {
         event.preventDefault()
@@ -185,7 +196,16 @@ function Sidebar({
           data-sidebar="sidebar"
           data-slot="sidebar"
           data-mobile="true"
-          className="bg-sidebar text-sidebar-foreground w-(--sidebar-width) p-0 [&>button]:hidden"
+          className="bg-sidebar text-sidebar-foreground w-(--sidebar-width) max-w-[calc(100vw-2rem)] gap-0 p-0 [&>button]:hidden"
+          onCloseAutoFocus={(event) => {
+            // The visible trigger lives outside the Sheet, so restore focus
+            // explicitly for Escape, backdrop dismissal, and route selection.
+            const trigger = document.getElementById("mobile-navigation-trigger")
+            if (trigger) {
+              event.preventDefault()
+              trigger.focus()
+            }
+          }}
           style={
             {
               "--sidebar-width": SIDEBAR_WIDTH_MOBILE,
@@ -194,8 +214,8 @@ function Sidebar({
           side={side}
         >
           <SheetHeader className="sr-only">
-            <SheetTitle>Sidebar</SheetTitle>
-            <SheetDescription>Displays the mobile sidebar.</SheetDescription>
+            <SheetTitle>Navigation</SheetTitle>
+            <SheetDescription>Navigate your Grov workspace.</SheetDescription>
           </SheetHeader>
           <div className="flex h-full w-full flex-col">{children}</div>
         </SheetContent>
@@ -256,10 +276,16 @@ function SidebarTrigger({
   onClick,
   ...props
 }: React.ComponentProps<typeof Button>) {
-  const { toggleSidebar } = useSidebar()
+  const { toggleSidebar, isMobile, openMobile, open } = useSidebar()
+  const expanded = isMobile ? openMobile : open
 
   return (
     <Button
+      type="button"
+      aria-controls="workspace-navigation"
+      aria-expanded={expanded}
+      aria-label={expanded ? "Close navigation" : "Open navigation"}
+      title={expanded ? "Close navigation (⌘/Ctrl+B)" : "Open navigation (⌘/Ctrl+B)"}
       data-sidebar="trigger"
       data-slot="sidebar-trigger"
       variant="ghost"
@@ -267,12 +293,12 @@ function SidebarTrigger({
       className={cn("size-7", className)}
       onClick={(event) => {
         onClick?.(event)
-        toggleSidebar()
+        if (!event.defaultPrevented) toggleSidebar()
       }}
       {...props}
     >
-      <PanelLeftIcon />
-      <span className="sr-only">Toggle Sidebar</span>
+      <PanelLeftIcon aria-hidden="true" />
+      <span className="sr-only">Toggle navigation</span>
     </Button>
   )
 }
@@ -604,10 +630,8 @@ function SidebarMenuSkeleton({
 }: React.ComponentProps<"div"> & {
   showIcon?: boolean
 }) {
-  // Random width between 50 to 90%.
-  const width = React.useMemo(() => {
-    return `${Math.floor(Math.random() * 40) + 50}%`
-  }, [])
+  // Stable across server rendering and hydration.
+  const width = "70%"
 
   return (
     <div
