@@ -448,8 +448,30 @@ export async function getTripTransactions(
 export async function getTripMetrics(
   tripId: string | number
 ): Promise<TripMetrics> {
-  const trip = await getTripById(tripId)
-  const transactions = await getTripTransactions(tripId)
+  return (await getTripDetail(tripId)).metrics
+}
+
+/** One read bundle for detail + metrics; no cross-user or cross-request cache. */
+export async function getTripDetail(tripId: string | number): Promise<{
+  trip: Trip
+  transactions: Transaction[]
+  metrics: TripMetrics
+}> {
+  const supabase = createServerSupabaseClient()
+  const { userId } = await auth()
+  if (!userId) throw new Error('User not authenticated')
+  const numericTripId = toNumericTripId(tripId)
+
+  // The scoped trip read also verifies ownership; do not read it a second time.
+  const [trip, links] = await Promise.all([
+    getTripById(numericTripId),
+    getTripLinkRows(supabase, userId, numericTripId),
+  ])
+  const transactions = await getTransactionsByIds(supabase, userId, links.map((link) => link.transaction_id))
+  return { trip, transactions, metrics: buildTripMetrics(trip, transactions) }
+}
+
+function buildTripMetrics(trip: Trip, transactions: Transaction[]): TripMetrics {
   const summary = buildSummaryMetrics(trip, transactions)
 
   const outgoing = transactions.filter((tx) => tx.transaction_type === 'outgoing')

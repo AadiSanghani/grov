@@ -2,6 +2,7 @@
 
 import { createServerSupabaseClient } from '@/ssr/client'
 import { auth } from '@clerk/nextjs/server'
+import { recentTransactionsQuery } from './transaction-reads'
 import { Transaction } from './types'
 import { createDeductions, deleteDeductionsByTransactionId, getDeductionsByTransactionId } from './deductions'
 import { normalizeIncomingSubtype, parseLocalDate, toDateOnlyString } from './utils'
@@ -62,6 +63,14 @@ export async function getTransactions() {
   const { data, error } = await supabase.from('transactions').select('*').eq('user_id', userId).order('date', { ascending: false })
   if (error) throw error
   return data?.map(mapTransactionForClient) as Transaction[]
+}
+
+export async function getRecentTransactions(): Promise<Transaction[]> {
+  const supabase = createServerSupabaseClient()
+  const userId = await requireUserId()
+  const { data, error } = await recentTransactionsQuery(supabase, userId)
+  if (error) throw error
+  return (data ?? []).map(mapTransactionForClient)
 }
 
 export async function getTransactionsInRange(startDate: string, endDate: string) {

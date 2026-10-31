@@ -1,5 +1,7 @@
 'use server'
 
+import { createNetWorthSweep, type BalanceHistoryRow } from './net-worth-history'
+import { readPages } from './read-pages'
 import { createServerSupabaseClient } from '@/ssr/client'
 import { auth } from '@clerk/nextjs/server'
 import { eachDayOfInterval, eachMonthOfInterval, endOfMonth, format } from 'date-fns'
@@ -199,133 +201,30 @@ export async function getNetWorthHistory(
     throw new Error('User not authenticated')
   }
   
-  // Fetch accounts to get category mapping
-  const { data: accounts, error: accountsError } = await supabase
-    .from('account_types')
-    .select('id, category')
-    .eq('user_id', userId)
-  
-  if (accountsError) throw accountsError
-  
-  // Create a map of account_id -> category
-  const accountCategoryMap = new Map<number, string>()
-  for (const account of accounts || []) {
-    accountCategoryMap.set(account.id, account.category)
+  // Include archived accounts: their historical balances still contribute.
+  const accounts: Array<{ id: number; category: string }> = []
+  for await (const page of readPages<{ id: number; category: string }>((after, limit) => {
+    const query = supabase.from('account_types').select('id, category')
+      .eq('user_id', userId).order('id', { ascending: true }).limit(limit)
+    return after ? query.gt('id', after.id) : query
+  })) {
+    accounts.push(...page)
   }
-  
-  // Fetch ALL daily balances up to end date (need historical data for carry-forward)
-  const { data: balances, error: balancesError } = await supabase
-    .from('account_daily_balances')
-    .select('date, balance_amount, account_id')
-    .eq('user_id', userId)
-    .lte('date', endDate)
-    .order('date', { ascending: true })
-  
-  if (balancesError) throw balancesError
-  
-  if (!balances || balances.length === 0) {
-    return []
+
+  const sweep = createNetWorthSweep(accounts, startDate, endDate, granularity)
+  // Process bounded pages on the server; only chart points reach the browser.
+  // account_id + date is unique, including when a date crosses a page boundary.
+  for await (const page of readPages<BalanceHistoryRow>((after, limit) => {
+    const query = supabase.from('account_daily_balances').select('date, balance_amount, account_id')
+      .eq('user_id', userId).lte('date', endDate)
+      .order('date', { ascending: true }).order('account_id', { ascending: true }).limit(limit)
+    return after
+      ? query.or(`date.gt.${after.date},and(date.eq.${after.date},account_id.gt.${after.account_id})`)
+      : query
+  })) {
+    sweep.push(page)
   }
-  
-  // Build a map of account_id -> sorted list of {date, balance}
-  const accountBalanceHistory = new Map<number, { date: string; balance: number }[]>()
-  for (const record of balances) {
-    const list = accountBalanceHistory.get(record.account_id) || []
-    list.push({ date: record.date, balance: Number(record.balance_amount) })
-    accountBalanceHistory.set(record.account_id, list)
-  }
-  
-  // Helper to get the balance for an account on or before a given date
-  // Returns 0 if account didn't exist yet (no balance records on or before that date)
-  const getBalanceOnDate = (accountId: number, targetDate: string): number => {
-    const history = accountBalanceHistory.get(accountId)
-    if (!history || history.length === 0) return 0 // Account has no records, treat as 0
-    
-    // Find the most recent balance on or before targetDate
-    let result: number = 0 // Default to 0 if account didn't exist at this date
-    for (const entry of history) {
-      if (entry.date <= targetDate) {
-        result = entry.balance
-      } else {
-        break // History is sorted, so we can stop
-      }
-    }
-    return result
-  }
-  
-  // Get all unique dates within the requested range that have any data
-  const datesWithData = new Set<string>()
-  for (const record of balances) {
-    if (record.date >= startDate && record.date <= endDate) {
-      datesWithData.add(record.date)
-    }
-  }
-  
-  if (granularity === 'daily') {
-    // For each date with data, calculate net worth using carry-forward balances
-    const results: NetWorthDataPoint[] = []
-    
-    for (const date of Array.from(datesWithData).sort()) {
-      let totalAssets = 0
-      let totalLiabilities = 0
-      
-      // For each account, get the balance on or before this date (0 if account didn't exist)
-      for (const [accountId, category] of accountCategoryMap) {
-        const balance = getBalanceOnDate(accountId, date)
-        if (category === 'asset') {
-          totalAssets += balance
-        } else if (category === 'liability') {
-          totalLiabilities += balance
-        }
-      }
-      
-      results.push({
-        date,
-        total_assets: totalAssets,
-        total_liabilities: totalLiabilities,
-        net_worth: totalAssets - totalLiabilities
-      })
-    }
-    
-    return results
-  } else {
-    // Monthly net worth - get month-end snapshots
-    // Group dates by month and use the last date in each month
-    const monthLastDate = new Map<string, string>()
-    for (const date of datesWithData) {
-      const month = date.substring(0, 7)
-      const existing = monthLastDate.get(month)
-      if (!existing || date > existing) {
-        monthLastDate.set(month, date)
-      }
-    }
-    
-    const results: NetWorthDataPoint[] = []
-    
-    for (const [month, lastDate] of monthLastDate) {
-      let totalAssets = 0
-      let totalLiabilities = 0
-      
-      // For each account, get the balance on or before this date (0 if account didn't exist)
-      for (const [accountId, category] of accountCategoryMap) {
-        const balance = getBalanceOnDate(accountId, lastDate)
-        if (category === 'asset') {
-          totalAssets += balance
-        } else if (category === 'liability') {
-          totalLiabilities += balance
-        }
-      }
-      
-      results.push({
-        date: month,
-        total_assets: totalAssets,
-        total_liabilities: totalLiabilities,
-        net_worth: totalAssets - totalLiabilities
-      })
-    }
-    
-    return results.sort((a, b) => a.date.localeCompare(b.date))
-  }
+  return sweep.finish()
 }
 
 function roundTo2(value: number): number {
@@ -360,16 +259,16 @@ export async function getAccountGrowthHistory(
     throw new Error('User not authenticated')
   }
 
-  const { data: balances, error } = await supabase
-    .from('account_daily_balances')
-    .select('date, balance_amount')
-    .eq('user_id', userId)
-    .eq('account_id', accountId)
-    .lte('date', endDate)
-    .order('date', { ascending: true })
-
-  if (error) throw error
-  if (!balances || balances.length === 0) return []
+  const balances: Array<{ date: string; balance_amount: number | string }> = []
+  for await (const page of readPages<{ date: string; balance_amount: number | string }>((after, limit) => {
+    const query = supabase.from('account_daily_balances').select('date, balance_amount')
+      .eq('user_id', userId).eq('account_id', accountId).lte('date', endDate)
+      .order('date', { ascending: true }).limit(limit)
+    return after ? query.gt('date', after.date) : query
+  })) {
+    balances.push(...page)
+  }
+  if (balances.length === 0) return []
 
   const history = balances.map((row) => ({
     date: row.date,

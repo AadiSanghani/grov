@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { RefreshCw } from 'lucide-react'
 import Link from 'next/link'
 import { toast } from 'sonner'
@@ -59,8 +59,10 @@ function buildHoldingOverrideForm(holding: DerivedHolding): HoldingOverrideFormS
 
 export function InvestmentsDashboardShell() {
   const [range, setRange] = useState<InvestmentTimeRange>('1Y')
+  const currentRange = useRef(range)
   const [data, setData] = useState<InvestmentDashboardData | null>(null)
   const [loading, setLoading] = useState(true)
+  const requestId = useRef(0)
   const [error, setError] = useState<string | null>(null)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [isTradeDialogOpen, setIsTradeDialogOpen] = useState(false)
@@ -71,21 +73,28 @@ export function InvestmentsDashboardShell() {
   const [deletingTransaction, setDeletingTransaction] = useState<InvestmentTransaction | null>(null)
 
   const loadData = useCallback(async (selectedRange: InvestmentTimeRange) => {
+    const request = ++requestId.current
     try {
       setLoading(true)
       setError(null)
       const nextData = await getInvestmentDashboardData({ range: selectedRange })
+      if (request !== requestId.current) return false
       setData(nextData)
+      return true
     } catch (loadError) {
+      if (request !== requestId.current) return false
       console.error('Failed to load investments dashboard:', loadError)
       setError(loadError instanceof Error ? loadError.message : 'Failed to load investment dashboard data')
+      return false
     } finally {
-      setLoading(false)
+      if (request === requestId.current) setLoading(false)
     }
   }, [])
 
   useEffect(() => {
+    currentRange.current = range
     void loadData(range)
+    return () => { requestId.current += 1 }
   }, [range, loadData])
 
   const hasInvestmentAccount = useMemo(() => (data?.accounts.length ?? 0) > 0, [data])
@@ -113,7 +122,7 @@ export function InvestmentsDashboardShell() {
   }
 
   const refreshFromServer = async () => {
-    await loadData(range)
+    await loadData(currentRange.current)
   }
 
   const handleManualRefresh = async () => {
@@ -140,7 +149,7 @@ export function InvestmentsDashboardShell() {
       if (!response.ok) {
         throw new Error(result.error ?? 'Failed to refresh market data')
       }
-      await refreshFromServer()
+      if (!await loadData(currentRange.current)) return
 
       if (result.status === 'success' || result.status === 'partial') {
         toast.success(
@@ -240,6 +249,15 @@ export function InvestmentsDashboardShell() {
     )
   }
 
+  const refreshStatus = (
+    <div aria-busy={loading || isRefreshing} className="text-sm">
+      {(loading || isRefreshing) && <p role="status" className="text-muted-foreground">Updating investments… Showing previously loaded data.</p>}
+      {error && <p role="alert" className="text-destructive">{error} Showing previously loaded data.{' '}
+        <button className="underline" disabled={loading} onClick={() => void loadData(currentRange.current)}>Retry</button>
+      </p>}
+    </div>
+  )
+
   if (!hasInvestmentAccount) {
     return (
       <InvestmentsStateBlock
@@ -256,6 +274,7 @@ export function InvestmentsDashboardShell() {
   if (!data.has_data) {
     return (
       <>
+        {refreshStatus}
         <div className="flex items-center justify-end">
           <Button variant="outline" onClick={handleManualRefresh} disabled={isRefreshing}>
             <RefreshCw className={`mr-2 h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
@@ -281,6 +300,7 @@ export function InvestmentsDashboardShell() {
 
   return (
     <>
+      {refreshStatus}
       <div className="flex items-center justify-between gap-3">
         <div className="text-sm text-muted-foreground">
           {data.as_of ? `Quotes as of ${new Date(data.as_of).toLocaleString()}` : 'Using cached market data'}
@@ -300,7 +320,7 @@ export function InvestmentsDashboardShell() {
         portfolioSeries={data.portfolio_series}
         benchmarkSeries={data.benchmark_series}
         range={range}
-        onRangeChange={setRange}
+        onRangeChange={(nextRange) => { currentRange.current = nextRange; setRange(nextRange) }}
       />
 
       <div className="space-y-2">

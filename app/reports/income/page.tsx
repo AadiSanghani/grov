@@ -187,28 +187,35 @@ export default function IncomePage() {
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadedPeriod, setLoadedPeriod] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [retry, setRetry] = useState(0)
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
 
   useEffect(() => {
+    let active = true
     const fetchData = async () => {
       setLoading(true)
+      setError(null)
       try {
         const [txData, catData] = await Promise.all([
           getTransactionsInRange(startDate, endDate),
           getCategories(),
         ])
+        if (!active) return
         setTransactions(txData ?? [])
         setCategories((catData ?? []) as Category[])
+        setLoadedPeriod(`${startDate} to ${endDate}`)
       } catch (err) {
-        console.error("Failed to fetch data:", err)
-        setTransactions([])
-        setCategories([])
+        console.error("Failed to fetch report data:", err)
+        if (active) setError("Unable to load this period. Please try again.")
       } finally {
-        setLoading(false)
+        if (active) setLoading(false)
       }
     }
-    fetchData()
-  }, [startDate, endDate])
+    void fetchData()
+    return () => { active = false }
+  }, [startDate, endDate, retry])
 
   const incomingTransactions = useMemo(
     () =>
@@ -280,16 +287,25 @@ export default function IncomePage() {
       : { emoji: "📦", label: selectedCategory }
   }, [selectedCategory, categories, categoryIncomeData])
 
-  if (loading) {
-    return (
-      <div className="p-6">
-        <p className="text-muted-foreground">Loading…</p>
-      </div>
-    )
+  const status = (
+    <div className="text-sm">
+      {loading && <p role="status" className="text-muted-foreground">Updating report…</p>}
+      {(loading || error) && loadedPeriod && (
+        <p className="text-muted-foreground">Showing previously loaded data: {loadedPeriod}.</p>
+      )}
+      {error && <p role="alert" className="text-destructive">{error}{" "}
+        <button className="underline" onClick={() => setRetry((value) => value + 1)} disabled={loading}>Retry</button>
+      </p>}
+    </div>
+  )
+
+  if (!loadedPeriod) {
+    return <div className="p-6" aria-busy={loading}>{status}</div>
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 space-y-6" aria-busy={loading}>
+      {status}
       {/* Summary cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <Card>

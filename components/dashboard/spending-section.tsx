@@ -2,6 +2,7 @@ import { Suspense } from "react"
 
 import { getSpendingSeries, type SpendingRangeKey } from "@/lib/spending"
 import { SpendingCard } from "@/components/dashboard/spending-card"
+import { DashboardReadError } from "./read-error"
 
 type ResolvedSearchParams = Record<string, string | string[] | undefined>
 
@@ -38,22 +39,12 @@ async function SpendingSectionInner({
     : undefined
   const rangeKey = getRangeKeyFromSearchParams(resolvedSearchParams)
 
-  try {
-    const data = await getSpendingSeries(rangeKey)
-
-    return <SpendingCard rangeKey={rangeKey} data={data} />
-  } catch (error) {
+  const data = await getSpendingSeries(rangeKey).catch((error) => {
     console.error("Failed to load spending data for dashboard:", error)
-    return (
-      <SpendingCard
-        rangeKey={rangeKey}
-        data={{
-          rangeKey,
-          current: { label: "", total: 0, points: [] },
-        }}
-      />
-    )
-  }
+    return null
+  })
+  if (!data) return <DashboardReadError title="Spending" />
+  return <SpendingCard rangeKey={rangeKey} data={data} />
 }
 
 export function DashboardSpendingSection(
@@ -76,4 +67,3 @@ export function DashboardSpendingSection(
     </Suspense>
   )
 }
-
