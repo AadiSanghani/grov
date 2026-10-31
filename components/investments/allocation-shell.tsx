@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts'
 import Link from 'next/link'
 
@@ -143,24 +143,31 @@ function AllocationPieCard({ title, subtitle, rows }: { title: string; subtitle:
 export function InvestmentsAllocationShell() {
   const [data, setData] = useState<InvestmentAllocationData | null>(null)
   const [loading, setLoading] = useState(true)
+  const requestId = useRef(0)
   const [error, setError] = useState<string | null>(null)
 
   const loadData = useCallback(async () => {
+    const request = ++requestId.current
     try {
       setLoading(true)
       setError(null)
       const result = await getInvestmentAllocationData({ range: '1Y' })
+      if (request !== requestId.current) return false
       setData(result)
+      return true
     } catch (loadError) {
+      if (request !== requestId.current) return false
       console.error('Failed to load allocation data:', loadError)
       setError(loadError instanceof Error ? loadError.message : 'Failed to load allocation data')
+      return false
     } finally {
-      setLoading(false)
+      if (request === requestId.current) setLoading(false)
     }
   }, [])
 
   useEffect(() => {
     void loadData()
+    return () => { requestId.current += 1 }
   }, [loadData])
 
   const accountPie = useMemo(() => toAllocationPieData(data?.allocation_by_account ?? []), [data])
@@ -250,7 +257,11 @@ export function InvestmentsAllocationShell() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" aria-busy={loading}>
+      {loading && <p role="status" className="text-sm text-muted-foreground">Updating investments… Showing previously loaded data.</p>}
+      {error && <p role="alert" className="text-sm text-destructive">{error} Showing previously loaded data.{' '}
+        <button className="underline" disabled={loading} onClick={() => void loadData()}>Retry</button>
+      </p>}
       <div className="flex items-center justify-between gap-3">
         <div>
           <h2 className="text-xl font-semibold tracking-tight">Allocation Analytics</h2>
@@ -340,7 +351,6 @@ export function InvestmentsAllocationShell() {
         </CardContent>
       </Card>
 
-      {error ? <p className="text-sm text-destructive">{error}</p> : null}
     </div>
   )
 }

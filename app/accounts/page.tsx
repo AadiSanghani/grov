@@ -22,7 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Archive, ChevronDown, ChevronRight, Pencil, Plus } from 'lucide-react';
+import { Archive, ChevronDown, ChevronRight, Pencil, Plus, type LucideIcon } from 'lucide-react';
 import { accountIcons, CATEGORY_COLORS } from '@/lib/constants';
 import { getAccounts, deleteAccount } from '@/lib/accounts';
 import { toast } from 'sonner';
@@ -43,7 +43,7 @@ interface Account {
   name: string;
   subtype: string;
   balance: number;
-  icon: any;
+  icon: unknown;
   lastUpdated: string;
 }
 
@@ -104,15 +104,27 @@ export default function Accounts() {
   const [netWorthTimeline, setNetWorthTimeline] = useState<string>("month-to-date");
   const [netWorthData, setNetWorthData] = useState<NetWorthDataPoint[]>([]);
   const [loadingNetWorth, setLoadingNetWorth] = useState(true);
+  const [accountsLoaded, setAccountsLoaded] = useState(false);
+  const [accountsError, setAccountsError] = useState<string | null>(null);
+  const [accountsRetry, setAccountsRetry] = useState(0);
+  const [historyLoaded, setHistoryLoaded] = useState(false);
+  const [historyError, setHistoryError] = useState<string | null>(null);
+  const [historyRetry, setHistoryRetry] = useState(0);
+  const [loadedTimeline, setLoadedTimeline] = useState(netWorthTimeline);
 
-  // Fetch accounts on mount
+  // Start accounts and chart reads independently; do not display an initial $0.
   useEffect(() => {
-    const fetchAccounts = async () => {
-      const accountsData = await getAccounts();
-      setAccounts(transformAccountsFromApi(accountsData));
-    };
-    fetchAccounts();
-  }, []);
+    let active = true;
+    setAccountsError(null);
+    void getAccounts().then((rows) => {
+      if (!active) return;
+      setAccounts(transformAccountsFromApi(rows));
+      setAccountsLoaded(true);
+    }).catch(() => {
+      if (active) setAccountsError('Unable to load accounts. Please try again.');
+    });
+    return () => { active = false; };
+  }, [accountsRetry]);
 
   const handleDeleteAccount = async () => {
     if (!accountToDelete) return;
@@ -129,23 +141,29 @@ export default function Accounts() {
 
   // Fetch net worth history when timeline changes
   useEffect(() => {
+    let active = true;
     const fetchNetWorthHistory = async () => {
       setLoadingNetWorth(true);
+      setHistoryError(null);
       try {
         const { startDate, endDate, granularity } = getDateRange(netWorthTimeline);
         const data = await getNetWorthHistory(startDate, endDate, granularity);
+        if (!active) return;
         setNetWorthData(data);
+        setLoadedTimeline(netWorthTimeline);
+        setHistoryLoaded(true);
       } catch (error) {
         console.error('Failed to fetch net worth history:', error);
-        setNetWorthData([]);
+        if (active) setHistoryError('Unable to load net worth history. Please try again.');
       } finally {
-        setLoadingNetWorth(false);
+        if (active) setLoadingNetWorth(false);
       }
     };
-    fetchNetWorthHistory();
-  }, [netWorthTimeline]);
+    void fetchNetWorthHistory();
+    return () => { active = false; };
+  }, [netWorthTimeline, historyRetry]);
 
-  const isMonthOnlyTimeline = ['last-6-months', 'year-to-date', 'all-time'].includes(netWorthTimeline);
+  const isMonthOnlyTimeline = ['last-6-months', 'year-to-date', 'all-time'].includes(loadedTimeline);
 
   const chartData = useMemo(() => {
     return netWorthData.map(point => {
@@ -222,10 +240,6 @@ export default function Accounts() {
     return groups.filter((group) => group.accounts.length > 0)
   }, [accounts])
 
-  const getGroupTotal = (groupName: string) => {
-    return groupedAccounts[groupName]?.reduce((sum, acc) => sum + acc.balance, 0) || 0;
-  };
-
   const totalLiabilities = accounts
     .filter(a => LIABILITY_TYPES.includes(a.type))
     .reduce((sum, a) => sum + a.balance, 0);
@@ -239,6 +253,16 @@ export default function Accounts() {
   };
 
   const netWorthChartColor = currentNetWorth < 0 ? 'var(--destructive)' : 'var(--accent)';
+
+  if (!accountsLoaded) {
+    return (
+      <PageLayout title="Accounts" description="Manage accounts and track net worth over time.">
+        {accountsError ? <p role="alert">{accountsError}{' '}
+          <Button variant="outline" onClick={() => setAccountsRetry((value) => value + 1)}>Retry</Button>
+        </p> : <p role="status" aria-busy="true" className="text-muted-foreground">Loading accounts…</p>}
+      </PageLayout>
+    );
+  }
 
   return (
     <PageLayout
@@ -275,13 +299,18 @@ export default function Accounts() {
                 </Select>
             </div>
         </CardHeader>
-        <CardContent className="pt-6">
+        <CardContent className="pt-6" aria-busy={loadingNetWorth}>
+            {loadingNetWorth && historyLoaded && <p role="status" className="text-sm text-muted-foreground">Updating history… Showing the previous timeline.</p>}
+            {historyError && <p role="alert" className="text-sm text-destructive">{historyError}{' '}
+              {historyLoaded && 'Showing the previous timeline. '}
+              <button className="underline" disabled={loadingNetWorth} onClick={() => setHistoryRetry((value) => value + 1)}>Retry</button>
+            </p>}
             <div className="w-full h-[300px]">
-            {loadingNetWorth ? (
+            {loadingNetWorth && !historyLoaded ? (
               <div className="flex items-center justify-center h-full">
                 <p className="text-muted-foreground">Loading net worth history…</p>
               </div>
-            ) : chartData.length === 0 ? (
+            ) : historyError && !historyLoaded ? null : chartData.length === 0 ? (
               <div className="flex items-center justify-center h-full">
                 <p className="text-muted-foreground">No historical data available. Add transactions to see your net worth history.</p>
               </div>
@@ -404,7 +433,7 @@ export default function Accounts() {
                                 {!isCollapsed && (
                                     <div className="border-t">
                                         {group.accounts.map((account) => {
-                                            const IconComponent = account.icon;
+                                            const IconComponent = account.icon as LucideIcon;
                                             return (
                                             <div
                                                 key={account.id}
@@ -451,7 +480,7 @@ export default function Accounts() {
                 ) : (
                     <Card className="w-full">
                         <CardContent className="p-8 text-center text-muted-foreground">
-                            No accounts yet. Click "Add Account" to get started.
+                            No accounts yet. Click &quot;Add Account&quot; to get started.
                         </CardContent>
                     </Card>
                 )}

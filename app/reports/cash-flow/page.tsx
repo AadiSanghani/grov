@@ -19,50 +19,49 @@ function formatCurrency(amount: number) {
   }).format(amount)
 }
 
-function formatPeriodLabel(startDate: string, endDate: string) {
-  return `${startDate} to ${endDate}`
-}
-
 export default function CashFlowPage() {
   const { startDate, endDate } = useReportsContext()
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [accounts, setAccounts] = useState<Awaited<ReturnType<typeof getAccounts>>>([])
   const [deductionsMap, setDeductionsMap] = useState<DeductionsMap>({})
   const [loading, setLoading] = useState(true)
+  const [loadedPeriod, setLoadedPeriod] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [retry, setRetry] = useState(0)
 
   useEffect(() => {
+    let active = true
     const fetchData = async () => {
       setLoading(true)
+      setError(null)
       try {
         const [txData, accData] = await Promise.all([
           getTransactionsInRange(startDate, endDate),
           getAccounts({ includeArchived: true }),
         ])
         const txs = txData ?? []
-        setTransactions(txs)
-        setAccounts(accData ?? [])
-
-        // Fetch deductions for all incoming transactions
+        // Publish transactions and their payroll deductions together.
         const incomingIds = txs
           .filter((t) => t.transaction_type === "incoming" && t.id)
           .map((t) => t.id as string)
-        if (incomingIds.length > 0) {
-          const dedMap = await getDeductionsForTransactions(incomingIds)
-          setDeductionsMap(dedMap)
-        } else {
-          setDeductionsMap({})
-        }
+        const dedMap = incomingIds.length > 0
+          ? await getDeductionsForTransactions(incomingIds)
+          : {}
+        if (!active) return
+        setTransactions(txs)
+        setAccounts(accData ?? [])
+        setDeductionsMap(dedMap)
+        setLoadedPeriod(`${startDate} to ${endDate}`)
       } catch (err) {
-        console.error("Failed to fetch data:", err)
-        setTransactions([])
-        setAccounts([])
-        setDeductionsMap({})
+        console.error("Failed to fetch report data:", err)
+        if (active) setError("Unable to load this period. Please try again.")
       } finally {
-        setLoading(false)
+        if (active) setLoading(false)
       }
     }
-    fetchData()
-  }, [startDate, endDate])
+    void fetchData()
+    return () => { active = false }
+  }, [startDate, endDate, retry])
 
   const accountsMap: AccountMap = useMemo(() => {
     const map: AccountMap = {}
@@ -110,16 +109,25 @@ export default function CashFlowPage() {
     [transactions, accountsMap, deductionsMap]
   )
 
-  if (loading) {
-    return (
-      <div className="p-6">
-        <p className="text-muted-foreground">Loading…</p>
-      </div>
-    )
+  const status = (
+    <div className="text-sm">
+      {loading && <p role="status" className="text-muted-foreground">Updating report…</p>}
+      {(loading || error) && loadedPeriod && (
+        <p className="text-muted-foreground">Showing previously loaded data: {loadedPeriod}.</p>
+      )}
+      {error && <p role="alert" className="text-destructive">{error}{" "}
+        <button className="underline" onClick={() => setRetry((value) => value + 1)} disabled={loading}>Retry</button>
+      </p>}
+    </div>
+  )
+
+  if (!loadedPeriod) {
+    return <div className="p-6" aria-busy={loading}>{status}</div>
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 space-y-6" aria-busy={loading}>
+      {status}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="pb-2">
@@ -200,7 +208,7 @@ export default function CashFlowPage() {
             Income and expenses by category for the selected period.
           </p>
           <p className="text-xs text-muted-foreground">
-            Selected period: {formatPeriodLabel(startDate, endDate)}
+            Selected period: {loadedPeriod}
           </p>
           <p className="text-xs text-muted-foreground">
             Cash savings destinations show net deposits after withdrawals and direct spending.

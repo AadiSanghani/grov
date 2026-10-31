@@ -3,6 +3,7 @@
 import { format, subMonths, subYears } from 'date-fns'
 import { getInvestmentAccounts } from '@/lib/investments/accounts'
 import { getBenchmarkSeriesCad } from '@/lib/investments/benchmark'
+import { createFxToCadResolver } from '@/lib/investments/fx-resolver'
 import { getFxRate, getFxRateSeries } from '@/lib/investments/fx'
 import {
   getHistoricalSeriesForSecurity,
@@ -117,31 +118,6 @@ function sortTransactionsAscending(transactions: InvestmentTransaction[]): Inves
 
     return Number(a.id) - Number(b.id)
   })
-}
-
-function buildFxResolver(input: {
-  prefetchedByCurrency: Map<string, Map<string, number>>
-}): (currency: string, date: string) => Promise<number> {
-  const fxCache = new Map<string, number>()
-
-  return async (currency: string, date: string): Promise<number> => {
-    const normalizedCurrency = currency.trim().toUpperCase()
-    if (normalizedCurrency === CAD_CURRENCY) return 1
-
-    const key = `${normalizedCurrency}:CAD:${date}`
-    const existing = fxCache.get(key)
-    if (existing != null) return existing
-
-    const prefetched = input.prefetchedByCurrency.get(normalizedCurrency)?.get(date)
-    if (prefetched != null) {
-      fxCache.set(key, prefetched)
-      return prefetched
-    }
-
-    const fetched = await getFxRate(normalizedCurrency, 'CAD', date)
-    fxCache.set(key, fetched)
-    return fetched
-  }
 }
 
 function buildHistoryLookupByDate(
@@ -395,30 +371,28 @@ export async function getInvestmentDashboardData(input?: {
   }
 
   const prefetchedFxByCurrency = new Map<string, Map<string, number>>()
-  await Promise.all(
-    Array.from(fxCurrencies).map(async (currency) => {
+  const [quoteBySecurityId] = await Promise.all([
+    getQuoteSnapshotsForSecurities(securities, { allowFetch: false, forceRefresh: false }),
+    Promise.all(Array.from(fxCurrencies).map(async (currency) => {
       const series = await getFxRateSeries(currency, 'CAD', startDate, endDate)
       prefetchedFxByCurrency.set(currency, series)
+    })),
+  ])
+
+  const fxToCadResolver = createFxToCadResolver(prefetchedFxByCurrency, getFxRate)
+
+  const [derived, portfolioSeries, benchmarkSeriesRaw] = await Promise.all([
+    deriveHoldingsAndRealized({
+      transactions,
+      securityById,
+      quoteBySecurityId,
+      holdingOverrideByPositionKey: buildHoldingOverrideMap(holdingOverrides),
+      fxToCadResolver,
+      valuationDate: endDate,
     }),
-  )
-
-  const fxToCadResolver = buildFxResolver({
-    prefetchedByCurrency: prefetchedFxByCurrency,
-  })
-
-  const quoteBySecurityId = await getQuoteSnapshotsForSecurities(securities, {
-    allowFetch: false,
-    forceRefresh: false,
-  })
-
-  const derived = await deriveHoldingsAndRealized({
-    transactions,
-    securityById,
-    quoteBySecurityId,
-    holdingOverrideByPositionKey: buildHoldingOverrideMap(holdingOverrides),
-    fxToCadResolver,
-    valuationDate: endDate,
-  })
+    buildPortfolioSeriesCad({ transactions, securityById, startDate, endDate, fxToCadResolver }),
+    getBenchmarkSeriesCad({ startDate, endDate, fxToCadResolver }),
+  ])
 
   const totalValueCad = round2(derived.holdings.reduce((sum, row) => sum + row.market_value_cad, 0))
   const totalCostBasisCad = round2(derived.holdings.reduce((sum, row) => sum + row.cost_basis_cad, 0))
@@ -454,20 +428,6 @@ export async function getInvestmentDashboardData(input?: {
       asOf = holding.quote_as_of
     }
   }
-
-  const portfolioSeries = await buildPortfolioSeriesCad({
-    transactions,
-    securityById,
-    startDate,
-    endDate,
-    fxToCadResolver,
-  })
-
-  const benchmarkSeriesRaw = await getBenchmarkSeriesCad({
-    startDate,
-    endDate,
-    fxToCadResolver,
-  })
 
   const benchmarkSeries = mergeBenchmarkWithPortfolioDates(portfolioSeries, benchmarkSeriesRaw)
 
@@ -551,21 +511,15 @@ export async function getInvestmentAllocationData(input?: {
   }
 
   const prefetchedFxByCurrency = new Map<string, Map<string, number>>()
-  await Promise.all(
-    Array.from(fxCurrencies).map(async (currency) => {
+  const [quoteBySecurityId] = await Promise.all([
+    getQuoteSnapshotsForSecurities(securities, { allowFetch: false, forceRefresh: false }),
+    Promise.all(Array.from(fxCurrencies).map(async (currency) => {
       const series = await getFxRateSeries(currency, 'CAD', startDate, endDate)
       prefetchedFxByCurrency.set(currency, series)
-    }),
-  )
+    })),
+  ])
 
-  const fxToCadResolver = buildFxResolver({
-    prefetchedByCurrency: prefetchedFxByCurrency,
-  })
-
-  const quoteBySecurityId = await getQuoteSnapshotsForSecurities(securities, {
-    allowFetch: false,
-    forceRefresh: false,
-  })
+  const fxToCadResolver = createFxToCadResolver(prefetchedFxByCurrency, getFxRate)
 
   const derived = await deriveHoldingsAndRealized({
     transactions,
@@ -671,9 +625,7 @@ export async function getInvestmentRealizedData(input?: {
     }),
   )
 
-  const fxToCadResolver = buildFxResolver({
-    prefetchedByCurrency: prefetchedFxByCurrency,
-  })
+  const fxToCadResolver = createFxToCadResolver(prefetchedFxByCurrency, getFxRate)
 
   const { realizedRows } = await deriveHoldingsAndRealized({
     transactions,

@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -27,6 +27,7 @@ export function InvestmentsRealizedShell() {
   const [accounts, setAccounts] = useState<InvestmentAccount[]>([])
   const [data, setData] = useState<InvestmentRealizedData | null>(null)
   const [loading, setLoading] = useState(true)
+  const requestId = useRef(0)
   const [error, setError] = useState<string | null>(null)
 
   const [accountTypeId, setAccountTypeId] = useState<string>('all')
@@ -35,6 +36,7 @@ export function InvestmentsRealizedShell() {
   const [endDate, setEndDate] = useState('')
 
   const loadData = useCallback(async () => {
+    const request = ++requestId.current
     try {
       setLoading(true)
       setError(null)
@@ -49,18 +51,23 @@ export function InvestmentsRealizedShell() {
         }),
       ])
 
+      if (request !== requestId.current) return false
       setAccounts(accountsResult)
       setData(realizedResult)
+      return true
     } catch (loadError) {
+      if (request !== requestId.current) return false
       console.error('Failed to load realized data:', loadError)
       setError(loadError instanceof Error ? loadError.message : 'Failed to load realized data')
+      return false
     } finally {
-      setLoading(false)
+      if (request === requestId.current) setLoading(false)
     }
   }, [accountTypeId, ticker, startDate, endDate])
 
   useEffect(() => {
     void loadData()
+    return () => { requestId.current += 1 }
   }, [loadData])
 
   const totals = useMemo(() => data?.totals, [data])
@@ -92,7 +99,11 @@ export function InvestmentsRealizedShell() {
   const realizedClass = data.totals.realized_pnl_cad >= 0 ? 'text-primary' : 'text-destructive'
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" aria-busy={loading}>
+      {loading && <p role="status" className="text-sm text-muted-foreground">Updating investments… Showing previously loaded data.</p>}
+      {error && <p role="alert" className="text-sm text-destructive">{error} Showing previously loaded data.{' '}
+        <button className="underline" disabled={loading} onClick={() => void loadData()}>Retry</button>
+      </p>}
       <Card>
         <CardHeader className="pb-2">
           <CardTitle>Filters</CardTitle>
@@ -175,7 +186,6 @@ export function InvestmentsRealizedShell() {
       </div>
 
       <InvestmentsRealizedTable rows={data.rows} />
-      {error ? <p className="text-sm text-destructive">{error}</p> : null}
     </div>
   )
 }

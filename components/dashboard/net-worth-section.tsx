@@ -1,4 +1,5 @@
 import { Suspense } from "react"
+import { DashboardReadError } from "./read-error"
 import { format, startOfYear, subMonths } from "date-fns"
 
 import { NetWorthCard } from "@/components/dashboard/net-worth-card"
@@ -100,36 +101,23 @@ async function NetWorthSectionInner({
   const rangeKey = getRangeKeyFromSearchParams(resolvedSearchParams)
   const { startDate, endDate, granularity } = getDateRange(rangeKey)
 
-  try {
-    const rows = await getNetWorthHistory(startDate, endDate, granularity)
-
-    const points: NetWorthPoint[] = rows.map((row) => {
-      const dateString = row.date.length === 7 ? `${row.date}-01` : row.date
-      return {
-        date: row.date,
-        label:
-          granularity === "monthly"
-            ? format(new Date(dateString), "MMM yyyy")
-            : format(new Date(dateString), "MMM d"),
-        netWorth: row.net_worth,
-      }
-    })
-
-    const data: NetWorthSeriesResult = { rangeKey, points }
-
-    return <NetWorthCard rangeKey={rangeKey} data={data} />
-  } catch (error) {
+  const rows = await getNetWorthHistory(startDate, endDate, granularity).catch((error) => {
     console.error("Failed to load net worth data for dashboard:", error)
-    return (
-      <NetWorthCard
-        rangeKey={rangeKey}
-        data={{
-          rangeKey,
-          points: [],
-        }}
-      />
-    )
-  }
+    return null
+  })
+  if (!rows) return <DashboardReadError title="Net worth" />
+
+  const points: NetWorthPoint[] = rows.map((row) => {
+    const dateString = row.date.length === 7 ? `${row.date}-01` : row.date
+    return {
+      date: row.date,
+      label: granularity === "monthly"
+        ? format(new Date(dateString), "MMM yyyy")
+        : format(new Date(dateString), "MMM d"),
+      netWorth: row.net_worth,
+    }
+  })
+  return <NetWorthCard rangeKey={rangeKey} data={{ rangeKey, points }} />
 }
 
 interface DashboardNetWorthSectionProps {

@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
 import { useParams, useRouter } from "next/navigation"
 import { format } from "date-fns"
@@ -33,9 +33,7 @@ import { getAccounts, type Account } from "@/lib/accounts"
 import { getCategories } from "@/lib/categories"
 import {
   deleteTrip,
-  getTripById,
-  getTripMetrics,
-  getTripTransactions,
+  getTripDetail,
   getTravelTransactionsForTrip,
   setTripTravelTransactions,
   updateTrip,
@@ -78,6 +76,8 @@ export default function TripDetailPage() {
   const tripId = params?.id
 
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const requestId = useRef(0)
   const [editOpen, setEditOpen] = useState(false)
   const [actionsOpen, setActionsOpen] = useState(false)
   const [associateOpen, setAssociateOpen] = useState(false)
@@ -108,21 +108,20 @@ export default function TripDetailPage() {
 
   const loadData = useCallback(async () => {
     if (!tripId) return
+    const request = ++requestId.current
     setLoading(true)
+    setLoadError(null)
     try {
-      const [tripData, metricsData, transactionData, categoriesData] = await Promise.all([
-        getTripById(tripId),
-        getTripMetrics(tripId),
-        getTripTransactions(tripId),
+      const [detail, categoriesData, accountsData, sharedLedgerData] = await Promise.all([
+        getTripDetail(tripId),
         getCategories(),
-      ])
-      const [accountsData, sharedLedgerData] = await Promise.all([
         getAccounts(),
         getTripSharedLedger(tripId),
       ])
-      setTrip(tripData)
-      setMetrics(metricsData)
-      setTransactions(transactionData)
+      if (request !== requestId.current) return
+      setTrip(detail.trip)
+      setMetrics(detail.metrics)
+      setTransactions(detail.transactions)
       setCategories(categoriesData ?? [])
       setAccounts(accountsData ?? [])
       setSharedEntries(sharedLedgerData.entries)
@@ -130,20 +129,15 @@ export default function TripDetailPage() {
       setSharedSummary(sharedLedgerData.summary)
     } catch (error) {
       console.error("Failed to load trip detail:", error)
-      setTrip(null)
-      setMetrics(null)
-      setTransactions([])
-      setCategories([])
-      setAccounts([])
-      setSharedEntries([])
-      setSharedBatches([])
+      if (request === requestId.current) setLoadError("Unable to load trip details. Please try again.")
     } finally {
-      setLoading(false)
+      if (request === requestId.current) setLoading(false)
     }
   }, [tripId])
 
   useEffect(() => {
-    loadData()
+    void loadData()
+    return () => { requestId.current += 1 }
   }, [loadData])
 
   const dailyChartData = useMemo(() => {
@@ -186,13 +180,13 @@ export default function TripDetailPage() {
 
   if (!tripId) {
     return (
-      <PageLayout title="Trip" description="Trip not found.">
+      <PageLayout title="Trip" description="Unable to load trip.">
         <p className="text-sm text-muted-foreground">Missing trip id.</p>
       </PageLayout>
     )
   }
 
-  if (loading) {
+  if (loading && trip?.id !== tripId) {
     return (
       <PageLayout title="Trip" description="Loading trip details…">
         <p className="text-sm text-muted-foreground">Loading…</p>
@@ -200,13 +194,14 @@ export default function TripDetailPage() {
     )
   }
 
-  if (!trip || !metrics) {
+  if (!trip || trip.id !== tripId || !metrics) {
     return (
-      <PageLayout title="Trip" description="Trip not found.">
+      <PageLayout title="Trip" description="Unable to load trip.">
         <div className="space-y-3">
           <p className="text-sm text-muted-foreground">
-            This trip does not exist or you no longer have access.
+            {loadError ?? "This trip does not exist or you no longer have access."}
           </p>
+          <Button variant="outline" onClick={() => void loadData()}>Retry</Button>
           <Button asChild variant="outline">
             <Link href="/trips">
               <ArrowLeft className="h-4 w-4" />
@@ -274,6 +269,12 @@ export default function TripDetailPage() {
         </div>
       }
     >
+      <div aria-busy={loading} className="text-sm">
+        {loading && <p role="status">Updating trip…</p>}
+        {loadError && <p role="alert" className="text-destructive">{loadError} Showing previously loaded data.{' '}
+          <button className="underline" disabled={loading} onClick={() => void loadData()}>Retry</button>
+        </p>}
+      </div>
       <Button asChild variant="ghost" className="w-fit px-2">
         <Link href="/trips">
           <ArrowLeft className="h-4 w-4" />
