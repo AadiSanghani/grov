@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils"
 interface TransactionSummaryProps {
   transactions: Transaction[]
   collapsedSecondaryByDefault?: boolean
+  strip?: boolean
 }
 
 interface SummaryMetrics {
@@ -53,6 +54,7 @@ function StatRow({
 export const TransactionSummary = React.memo(function TransactionSummary({
   transactions,
   collapsedSecondaryByDefault = true,
+  strip = false,
 }: TransactionSummaryProps) {
   const [showSecondary, setShowSecondary] = React.useState(!collapsedSecondaryByDefault)
 
@@ -113,6 +115,17 @@ export const TransactionSummary = React.memo(function TransactionSummary({
       : summary.net < 0
         ? "text-destructive"
         : "text-foreground"
+
+  if (strip) return <div aria-label="Filtered transaction summary" className="grid grid-cols-3 divide-x rounded-xl border bg-muted/20">
+    {[
+      { label: "Spending", value: `-${formatCurrency(summary.totalSpending)}` },
+      { label: "Income", value: `+${formatCurrency(summary.totalIncome)}` },
+      { label: "Net", value: `${summary.net >= 0 ? "+" : "-"}${formatCurrency(summary.net)}` },
+    ].map(metric => <div key={metric.label} className="min-w-0 px-3 py-3 sm:px-5">
+      <p className="text-xs text-muted-foreground">{metric.label}</p>
+      <p className={cn("mt-1 break-words text-sm font-semibold tabular-nums sm:text-xl", metric.label === "Net" && netClassName)}>{metric.value}</p>
+    </div>)}
+  </div>
 
   return (
     <div className="p-4">

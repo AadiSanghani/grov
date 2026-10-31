@@ -8,11 +8,11 @@ import {
   Dialog,
   DialogContent,
   DialogHeader,
+  DialogDescription,
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Calendar } from "@/components/ui/calendar"
 import {
   Select,
   SelectContent,
@@ -40,12 +40,16 @@ import {
   normalizeCalendarDate,
   toLocalDateString,
 } from "@/lib/utils"
-import { CalendarIcon, Check, ChevronsUpDown, MinusCircle, PlusCircle, ArrowRightLeft, Plus, Trash2, ChevronDown, ChevronUp, Loader2 } from "lucide-react"
+import { Check, ChevronsUpDown, MinusCircle, PlusCircle, ArrowRightLeft, Plus, Trash2, ChevronDown, ChevronUp } from "lucide-react"
+import type { Transaction } from "@/lib/types"
 import { type Account } from "@/lib/accounts"
 import { createTransaction } from "@/lib/transactions"
 import { type Category } from "@/lib/categories"
 import { useDataContext } from "@/app/data-context"
 import { useComboboxSearch } from "@/hooks/use-combobox-search"
+import { TransactionDateField, useTransactionDate } from "@/components/transaction-editor/date-field"
+import { EditorFooter, submitOnShortcut, useEditorFocus } from "@/components/transaction-editor/editor-controls"
+import { reconcileSavedTransaction } from "@/lib/ledger/saved-transaction"
 import { PAYROLL_DEDUCTION_LABELS } from "@/lib/payroll-deductions"
 
 export interface TransactionFormData {
@@ -65,82 +69,11 @@ export interface TransactionFormData {
 interface AddTransactionDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  onTransactionCreated?: (data: TransactionFormData) => void
+  onTransactionCreated?: (data: Transaction) => void
   onAfterSave?: () => void
   accounts: Account[]
   categories: Category[]
   defaultDate?: Date
-}
-
-function addDays(baseDate: Date, days: number): Date {
-  const next = normalizeCalendarDate(baseDate)
-  next.setDate(next.getDate() + days)
-  return normalizeCalendarDate(next)
-}
-
-function formatDateForInput(date: Date): string {
-  const day = String(date.getDate()).padStart(2, "0")
-  const month = String(date.getMonth() + 1).padStart(2, "0")
-  const year = date.getFullYear()
-  return `${day}/${month}/${year}`
-}
-
-function parseShortcutDateInput(rawValue: string, fallbackDate: Date): Date | null {
-  const value = rawValue.trim().toLowerCase()
-  if (!value) return fallbackDate
-
-  if (value === "today" || value === "t") {
-    return normalizeCalendarDate(new Date())
-  }
-  if (value === "yesterday" || value === "y") {
-    return addDays(new Date(), -1)
-  }
-  if (value === "tomorrow") {
-    return addDays(new Date(), 1)
-  }
-
-  if (/^[+-]\d+$/.test(value)) {
-    return addDays(new Date(), Number(value))
-  }
-
-  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-    const [yearStr, monthStr, dayStr] = value.split("-")
-    const year = Number(yearStr)
-    const month = Number(monthStr)
-    const day = Number(dayStr)
-    const candidate = new Date(year, month - 1, day)
-    if (
-      candidate.getFullYear() === year &&
-      candidate.getMonth() === month - 1 &&
-      candidate.getDate() === day
-    ) {
-      return normalizeCalendarDate(candidate)
-    }
-    return null
-  }
-
-  const dayFirstDateMatch = value.match(/^(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?$/)
-  if (dayFirstDateMatch) {
-    const day = Number(dayFirstDateMatch[1])
-    const month = Number(dayFirstDateMatch[2])
-    const yearInput = dayFirstDateMatch[3]
-    let year = yearInput ? Number(yearInput) : fallbackDate.getFullYear()
-
-    if (yearInput && yearInput.length === 2) {
-      year += 2000
-    }
-
-    const candidate = new Date(year, month - 1, day)
-    if (
-      candidate.getFullYear() === year &&
-      candidate.getMonth() === month - 1 &&
-      candidate.getDate() === day
-    ) {
-      return normalizeCalendarDate(candidate)
-    }
-  }
-
-  return null
 }
 
 export function AddTransactionDialog({
@@ -161,9 +94,8 @@ export function AddTransactionDialog({
   const [displayAmount, setDisplayAmount] = useState("$")
   const [merchant, setMerchant] = useState("")
   const merchantCombobox = useComboboxSearch({ search: merchant, onSearchChange: setMerchant })
-  const [date, setDate] = useState<Date>(() => resolvedDefaultDate)
-  const [dateInput, setDateInput] = useState(() => formatDateForInput(resolvedDefaultDate))
-  const [dateOpen, setDateOpen] = useState(false)
+  const dateField = useTransactionDate(resolvedDefaultDate)
+  const applyDate = dateField.apply
   const [accountTypeId, setAccountTypeId] = useState("")
   const accountCombobox = useComboboxSearch()
   const [toAccountTypeId, setToAccountTypeId] = useState("")
@@ -177,6 +109,9 @@ export function AddTransactionDialog({
   const [deductions, setDeductions] = useState<{ label: string; amount: string; displayAmount: string; targetAccountId: string }[]>([])
   const [formErrors, setFormErrors] = useState<Record<string, string>>({})
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const submitting = React.useRef(false)
+  const [saveError, setSaveError] = useState("")
+  const editorFocus = useEditorFocus()
   const amountInputRef = useRef<HTMLInputElement>(null)
   const { merchants, addMerchant } = useDataContext()
   const merchantNames = useMemo(() => merchants.map((m) => m.name), [merchants])
@@ -189,26 +124,6 @@ export function AddTransactionDialog({
     () => accounts.filter((a) => a.account_type === "Investments"),
     [accounts]
   )
-
-  const applyDate = React.useCallback((nextDate: Date) => {
-    const normalized = normalizeCalendarDate(nextDate)
-    setDate(normalized)
-    setDateInput(formatDateForInput(normalized))
-  }, [])
-
-  const commitDateInput = React.useCallback((rawValue: string, silent = false): boolean => {
-    const parsed = parseShortcutDateInput(rawValue, date)
-    if (!parsed) {
-      setDateInput(formatDateForInput(date))
-      if (!silent) {
-        toast.error("Invalid date. Use DD/MM/YYYY, YYYY-MM-DD, today, yesterday, +1, or -7.")
-      }
-      return false
-    }
-
-    applyDate(parsed)
-    return true
-  }, [applyDate, date])
 
   const resetForm = () => {
     setTransactionType("outgoing")
@@ -273,6 +188,10 @@ export function AddTransactionDialog({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (submitting.current) return
+    const submittedDate = dateField.commit()
+    if (!submittedDate) return
+    setSaveError("")
     setFormErrors({})
 
     const numAmount = parseFloat(amount)
@@ -329,7 +248,7 @@ export function AddTransactionDialog({
 
     const merchantValue = (transactionType === "transfer" ? (merchant || "Transfer") : merchant).trim()
 
-    const optimisticData: TransactionFormData = {
+    const savedData: TransactionFormData = {
       transaction_type: transactionType,
       incoming_subtype:
         transactionType === "incoming"
@@ -337,7 +256,7 @@ export function AddTransactionDialog({
           : null,
       amount: numAmount,
       merchant: merchantValue,
-      date,
+      date: submittedDate,
       account_type_id: accountTypeId,
       category: transactionType === "transfer" ? (category || "transfer") : category,
       notes,
@@ -345,7 +264,7 @@ export function AddTransactionDialog({
       deductions: parsedDeductions.length > 0 ? parsedDeductions : undefined,
     }
     if (transactionType === "transfer") {
-      optimisticData.to_account_type_id = toAccountTypeId
+      savedData.to_account_type_id = toAccountTypeId
     }
 
     const shouldPersistMerchant =
@@ -354,27 +273,40 @@ export function AddTransactionDialog({
       !merchantNames.some((m) => m.toLowerCase() === merchantValue.toLowerCase())
 
     const transactionData: Parameters<typeof createTransaction>[0] = {
-      ...optimisticData,
-      date: toLocalDateString(date),
+      ...savedData,
+      date: toLocalDateString(submittedDate),
     }
 
+    submitting.current = true
     setIsSubmitting(true)
     try {
       if (shouldPersistMerchant) {
         await addMerchant(merchantValue)
       }
-      await createTransaction(transactionData)
+      const result = await createTransaction(transactionData)
+      onTransactionCreated?.(reconcileSavedTransaction({ ...savedData, affects_balance: true, source_type: "manual" }, result))
+      toast.success("Transaction saved")
+      const another = (e.nativeEvent as SubmitEvent).submitter?.getAttribute("value") === "another"
       resetForm()
-      onOpenChange(false)
-      onTransactionCreated?.(optimisticData)
+      if (another) {
+        // Carry only context, never amounts, merchant, notes, shares, or deductions.
+        setTransactionType(transactionType)
+        setAccountTypeId(accountTypeId)
+        applyDate(submittedDate)
+        requestAnimationFrame(() => amountInputRef.current?.focus())
+      } else {
+        onOpenChange(false)
+      }
       onAfterSave?.()
     } catch (error) {
+      setSaveError("Could not save. Your draft is intact; please try again.")
       console.error("Failed to create transaction:", error)
       toast.error("Failed to create transaction. Please try again.", {
         duration: 5000,
         position: "top-right",
       })
     } finally {
+      submitting.current = false
       setIsSubmitting(false)
     }
   }
@@ -400,29 +332,26 @@ export function AddTransactionDialog({
   )
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[600px] max-h-[90vh] overflow-y-auto overscroll-contain shadow-2xl">
+    <Dialog open={open} onOpenChange={(next) => { if (!submitting.current) onOpenChange(next) }}>
+      <DialogContent {...editorFocus} className="sm:max-w-[600px] max-h-[90dvh] overflow-y-auto overscroll-contain">
         <DialogHeader>
           <DialogTitle>Add transaction</DialogTitle>
+          <DialogDescription>Keep your ledger up to date. All amounts are in dollars.</DialogDescription>
         </DialogHeader>
 
         <form
           onSubmit={handleSubmit}
           className="space-y-6"
-          onKeyDown={(event) => {
-            if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
-              event.preventDefault()
-              event.currentTarget.requestSubmit()
-            }
-          }}
+          onKeyDown={submitOnShortcut}
         >
+          <fieldset disabled={isSubmitting} className="min-w-0 space-y-5">
           {/* Transaction Type Toggle */}
           <div className="flex gap-2">
             <Button
               type="button"
               variant={transactionType === "outgoing" ? "default" : "outline"}
               className={cn(
-                "flex-1",
+                "min-w-0 flex-1 px-2 text-xs sm:text-sm",
                 transactionType === "outgoing" 
                   ? "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground" 
                   : "hover:bg-muted hover:text-foreground"
@@ -436,7 +365,7 @@ export function AddTransactionDialog({
               type="button"
               variant={transactionType === "incoming" ? "default" : "outline"}
               className={cn(
-                "flex-1",
+                "min-w-0 flex-1 px-2 text-xs sm:text-sm",
                 transactionType === "incoming" 
                   ? "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground" 
                   : "hover:bg-muted hover:text-foreground"
@@ -454,7 +383,7 @@ export function AddTransactionDialog({
               type="button"
               variant={transactionType === "transfer" ? "default" : "outline"}
               className={cn(
-                "flex-1",
+                "min-w-0 flex-1 px-2 text-xs sm:text-sm",
                 transactionType === "transfer" 
                   ? "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground" 
                   : "hover:bg-muted hover:text-foreground"
@@ -709,8 +638,6 @@ export function AddTransactionDialog({
                     {isCustomMerchant && (
                       <CommandItem
                         onSelect={() => {
-                          // Persist the custom merchant to the database
-                          addMerchant(merchant).catch(console.error)
                           merchantCombobox.setOpen(false)
                         }}
                       >
@@ -744,59 +671,7 @@ export function AddTransactionDialog({
             </Popover>
           </div>
 
-          {/* Date */}
-          <div className="space-y-2">
-            <Label htmlFor="transaction-date-input">Date</Label>
-            <div className="flex gap-2">
-              <Input
-                id="transaction-date-input"
-                value={dateInput}
-                onChange={(event) => setDateInput(event.target.value)}
-                onBlur={() => {
-                  commitDateInput(dateInput, true)
-                }}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") {
-                    event.preventDefault()
-                    commitDateInput(dateInput)
-                  }
-                  if (event.key === "ArrowDown") {
-                    event.preventDefault()
-                    setDateOpen(true)
-                  }
-                }}
-                placeholder="DD/MM/YYYY, today, yesterday, +1, -7"
-              />
-              <Popover open={dateOpen} onOpenChange={setDateOpen}>
-                <PopoverTrigger asChild>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    className="shrink-0"
-                    aria-label="Open date picker"
-                  >
-                    <CalendarIcon className="h-4 w-4" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="end">
-                  <Calendar
-                    mode="single"
-                    selected={date}
-                    onSelect={(newDate) => {
-                      if (newDate) {
-                        applyDate(newDate)
-                        setDateOpen(false)
-                      }
-                    }}
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Quick input: today, yesterday, +1, -7.
-            </p>
-          </div>
+          <TransactionDateField value={dateField} />
 
           {/* From account / Account */}
           <div className="space-y-2">
@@ -995,19 +870,8 @@ export function AddTransactionDialog({
             />
           </div>
 
-          {/* Action Buttons */}
-          <div className="flex gap-3 justify-end">
-            <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Adding…
-                </>
-              ) : (
-                "Add transaction"
-              )}
-            </Button>
-          </div>
+          </fieldset>
+          <EditorFooter pending={isSubmitting} error={saveError} create />
         </form>
       </DialogContent>
     </Dialog>

@@ -1,522 +1,301 @@
 "use client"
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react"
-import { CalendarDays, ChevronDown, ChevronUp, Plus, SlidersHorizontal } from "lucide-react"
+import { Plus, RefreshCw } from "lucide-react"
 import { toast } from "sonner"
-
 import { Button } from "@/components/ui/button"
 import { PageLayout } from "@/components/page-layout"
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from "@/components/ui/sheet"
 import { AddTransactionDialog } from "@/components/add-transaction-dialog"
 import { EditTransactionDialog } from "@/components/edit-transaction-dialog"
 import { TransactionList } from "@/components/transaction-list"
-import { TransactionFiltersPanel } from "@/components/transaction-filters"
+import { TransactionToolbar } from "@/components/transaction-filters"
 import { TransactionSummary } from "@/components/transaction-summary"
-import { Transaction, TransactionFilters } from "@/lib/types"
+import type { Transaction } from "@/lib/types"
 import { getAccounts, type Account } from "@/lib/accounts"
-import { deleteTransaction, duplicateTransaction, getTransactions } from "@/lib/transactions"
+import {
+  deleteTransaction,
+  duplicateTransaction,
+  getTransactions,
+} from "@/lib/transactions"
 import { getCategories, type Category } from "@/lib/categories"
-import { type TransactionFormData } from "@/components/add-transaction-dialog"
 import { trackEvent } from "@/lib/telemetry"
-import { categoryNameToValue, toLocalDateString } from "@/lib/utils"
-
-const REDESIGN_ENABLED = process.env.NEXT_PUBLIC_TRANSACTIONS_REDESIGN !== "0"
-
-function isEditableTarget(target: EventTarget | null): boolean {
-  if (!(target instanceof HTMLElement)) return false
-  const tag = target.tagName.toLowerCase()
-  return (
-    target.isContentEditable ||
-    tag === "input" ||
-    tag === "textarea" ||
-    tag === "select" ||
-    Boolean(target.closest('[contenteditable="true"]'))
-  )
-}
+import { toLocalDateString } from "@/lib/utils"
+import { filterTransactions } from "@/lib/ledger/filters"
+import { shouldOpenTransaction } from "@/lib/ledger/keyboard"
+import { useLedgerFilters } from "@/hooks/use-ledger-filters"
 
 export default function Transactions() {
-  const [isAddTransactionOpen, setIsAddTransactionOpen] = useState(false)
-  const [isEditTransactionOpen, setIsEditTransactionOpen] = useState(false)
-  const [isMobileSummaryOpen, setIsMobileSummaryOpen] = useState(false)
-  const [isMobileFiltersOpen, setIsMobileFiltersOpen] = useState(false)
-  const [quickCreateDate, setQuickCreateDate] = useState<Date>(() => new Date())
-  const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null)
+  const [isAddOpen, setIsAddOpen] = useState(false)
+  const [isEditOpen, setIsEditOpen] = useState(false)
+  const [quickCreateDate, setQuickCreateDate] = useState(() => new Date())
+  const [selected, setSelected] = useState<Transaction | null>(null)
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [accounts, setAccounts] = useState<Account[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
-  const [filters, setFilters] = useState<TransactionFilters>({
-    sortBy: "date",
-    sortOrder: "desc",
-    search: "",
-    account_types: [],
-    categories: [],
-    tags: [],
-  })
+  const [loaded, setLoaded] = useState(false)
+  const [error, setError] = useState("")
+  const [density, setDensity] = useState<"compact" | "comfortable">("compact")
+  const [filters, setFilters] = useLedgerFilters()
+  const referenceDataLoaded = useRef(false)
+  const request = useRef(0)
+  const pendingActions = useRef(new Set<string>())
+  const [pendingIds, setPendingIds] = useState<ReadonlySet<string>>(new Set())
 
-  const hasTrackedViewRef = useRef(false)
+  const loadData = useCallback(async () => {
+    const version = ++request.current
+    setLoading(true)
+    setError("")
+    try {
+      const [rows, reference] = await Promise.all([
+        getTransactions(),
+        referenceDataLoaded.current
+          ? Promise.resolve(null)
+          : Promise.all([getAccounts(), getCategories()]),
+      ])
+      if (version !== request.current) return
+      setTransactions(rows ?? [])
+      if (reference) {
+        setAccounts(reference[0] ?? [])
+        setCategories(reference[1] ?? [])
+        referenceDataLoaded.current = true
+      }
+      setLoaded(true)
+    } catch {
+      if (version === request.current)
+        setError("We couldn’t load your transactions. Please try again.")
+    } finally {
+      if (version === request.current) setLoading(false)
+    }
+  }, [])
 
   useEffect(() => {
-    if (!loading && !hasTrackedViewRef.current) {
-      hasTrackedViewRef.current = true
+    void loadData()
+    // Invalidate in-flight responses on unmount, including Strict Mode's cleanup.
+    return () => {
+      invalidateRequests()
+    }
+    function invalidateRequests() {
+      request.current++
+    }
+  }, [loadData])
+  const tracked = useRef(false)
+  useEffect(() => {
+    if (loaded && !tracked.current) {
+      tracked.current = true
       trackEvent("transactions_view_loaded", {
         totalTransactions: transactions.length,
       })
     }
-  }, [loading, transactions.length])
+  }, [loaded, transactions.length])
 
-  const loadData = useCallback(async () => {
-    try {
-      setLoading(true)
-
-      const [transactionsData, accountsData, categoriesData] = await Promise.all([
-        getTransactions(),
-        getAccounts(),
-        getCategories(),
-      ])
-
-      setTransactions(transactionsData || [])
-      setAccounts(accountsData || [])
-      setCategories(categoriesData || [])
-    } catch (error) {
-      console.error("Failed to load data:", error)
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    loadData()
-  }, [loadData])
-
-  const refreshData = useCallback(async () => {
-    try {
-      const [transactionsData, accountsData, categoriesData] = await Promise.all([
-        getTransactions(),
-        getAccounts(),
-        getCategories(),
-      ])
-
-      setTransactions(transactionsData || [])
-      setAccounts(accountsData || [])
-      setCategories(categoriesData || [])
-    } catch (error) {
-      console.error("Failed to refresh data:", error)
-    }
-  }, [])
-
-  const filteredTransactions = useMemo(() => {
-    let filtered = [...transactions]
-
-    if (filters.search) {
-      const searchLower = filters.search.toLowerCase()
-      filtered = filtered.filter(
-        (t) =>
-          t.merchant.toLowerCase().includes(searchLower) ||
-          t.category.toLowerCase().includes(searchLower) ||
-          t.notes?.toLowerCase().includes(searchLower)
-      )
-    }
-
-    if (filters.account_types.length > 0) {
-      const hasUnassigned = filters.account_types.includes("__unassigned__")
-      filtered = filtered.filter((t) =>
-        hasUnassigned
-          ? t.account_type_id == null
-          : t.account_type_id != null && filters.account_types.includes(t.account_type_id)
-      )
-    }
-
-    if (filters.categories.length > 0) {
-      filtered = filtered.filter((t) => {
-        const normalized = categoryNameToValue(t.category)
-        return filters.categories.includes(t.category) || filters.categories.includes(normalized)
-      })
-    }
-
-    if (filters.amountMin !== undefined) {
-      filtered = filtered.filter((t) => t.amount >= filters.amountMin!)
-    }
-    if (filters.amountMax !== undefined) {
-      filtered = filtered.filter((t) => t.amount <= filters.amountMax!)
-    }
-
-    if (filters.dateStart) {
-      const start = toLocalDateString(filters.dateStart)
-      filtered = filtered.filter((t) => toLocalDateString(t.date) >= start)
-    }
-    if (filters.dateEnd) {
-      const end = toLocalDateString(filters.dateEnd)
-      filtered = filtered.filter((t) => toLocalDateString(t.date) <= end)
-    }
-
-    filtered.sort((a, b) => {
-      let comparison = 0
-
-      switch (filters.sortBy) {
-        case "date":
-          comparison = b.date.getTime() - a.date.getTime()
-          break
-        case "amount":
-          comparison = b.amount - a.amount
-          break
-        case "merchant":
-          comparison = a.merchant.localeCompare(b.merchant)
-          break
-      }
-
-      if (comparison !== 0) {
-        return filters.sortOrder === "asc" ? -comparison : comparison
-      }
-
-      const aTime = a.created_at?.getTime() ?? Number.MAX_SAFE_INTEGER
-      const bTime = b.created_at?.getTime() ?? Number.MAX_SAFE_INTEGER
-      return bTime - aTime
+  const rows = useMemo(
+    () => filterTransactions(transactions, filters),
+    [transactions, filters]
+  )
+  const openAdd = useCallback((date?: Date, source = "header") => {
+    const nextDate = date ?? new Date()
+    setQuickCreateDate(nextDate)
+    setIsAddOpen(true)
+    trackEvent("transaction_create_opened", {
+      source,
+      date: toLocalDateString(nextDate),
     })
+  }, [])
+  useEffect(() => {
+    const keydown = (event: KeyboardEvent) => {
+      if (!isAddOpen && !isEditOpen && shouldOpenTransaction(event)) {
+        event.preventDefault()
+        openAdd(undefined, "keyboard")
+      }
+    }
+    window.addEventListener("keydown", keydown)
+    return () => window.removeEventListener("keydown", keydown)
+  }, [openAdd, isAddOpen, isEditOpen])
 
-    return filtered
-  }, [transactions, filters])
-
-  const openAddTransaction = useCallback(
-    (date?: Date, source: "header" | "day_group" | "keyboard" = "header") => {
-      const selectedDate = date ?? new Date()
-      setQuickCreateDate(selectedDate)
-      setIsAddTransactionOpen(true)
-      trackEvent("transaction_create_opened", {
-        source,
-        date: toLocalDateString(selectedDate),
-      })
+  const handleCreated = useCallback((data: Transaction) => {
+    setTransactions((previous) => [data, ...previous])
+  }, [])
+  const handleUpdated = useCallback(
+    (id: string, data: Partial<Transaction>) => {
+      setTransactions((previous) =>
+        previous.map((row) => (row.id === id ? { ...row, ...data } : row))
+      )
     },
     []
   )
-
-  useEffect(() => {
-    const handleGlobalShortcut = (event: KeyboardEvent) => {
-      if (event.defaultPrevented || event.repeat) return
-      if (event.metaKey || event.ctrlKey || event.altKey) return
-      if (isEditableTarget(event.target)) return
-
-      if (event.key.toLowerCase() === "n") {
-        event.preventDefault()
-        openAddTransaction(undefined, "keyboard")
+  const handleClick = useCallback((transaction: Transaction) => {
+    setSelected(transaction)
+    setIsEditOpen(true)
+  }, [])
+  const mutate = useCallback(
+    async (transaction: Transaction, action: "delete" | "duplicate") => {
+      if (!transaction.id || pendingActions.current.has(transaction.id)) return
+      const id = transaction.id
+      pendingActions.current.add(id)
+      setPendingIds(new Set(pendingActions.current))
+      try {
+        if (action === "delete") {
+          await deleteTransaction(id)
+          setTransactions((previous) => previous.filter((row) => row.id !== id))
+        } else {
+          await duplicateTransaction(id, toLocalDateString(new Date()))
+        }
+        toast.success(
+          action === "delete" ? "Transaction deleted" : "Transaction duplicated"
+        )
+        await loadData()
+      } catch {
+        toast.error(`Could not ${action} transaction. Please try again.`)
+      } finally {
+        pendingActions.current.delete(id)
+        setPendingIds(new Set(pendingActions.current))
       }
-    }
-
-    window.addEventListener("keydown", handleGlobalShortcut)
-    return () => window.removeEventListener("keydown", handleGlobalShortcut)
-  }, [openAddTransaction])
-
-  const handleTransactionClick = useCallback((transaction: Transaction) => {
-    setSelectedTransaction(transaction)
-    setIsEditTransactionOpen(true)
-    trackEvent("transaction_row_opened", {
-      transactionType: transaction.transaction_type,
-      hasNotes: Boolean(transaction.notes?.trim()),
-      date: toLocalDateString(transaction.date),
-    })
-  }, [])
-
-  const handleFiltersChange = useCallback((nextFilters: TransactionFilters) => {
-    setFilters(nextFilters)
-    trackEvent("filters_changed", {
-      sortBy: nextFilters.sortBy,
-      searchActive: Boolean(nextFilters.search.trim()),
-      dateRangeActive: Boolean(nextFilters.dateStart || nextFilters.dateEnd),
-      accountFilters: nextFilters.account_types.length,
-      categoryFilters: nextFilters.categories.length,
-    })
-  }, [])
-
-  const handleOptimisticCreate = useCallback((data: TransactionFormData) => {
-    const optimisticTx: Transaction = {
-      id: `temp-${Date.now()}`,
-      transaction_type: data.transaction_type,
-      incoming_subtype: data.incoming_subtype ?? null,
-      amount: data.amount,
-      merchant: data.merchant,
-      date: data.date,
-      account_type_id: data.account_type_id,
-      category: data.category,
-      notes: data.notes || "",
-    }
-    setTransactions((prev) => [optimisticTx, ...prev])
-    trackEvent("transaction_create_submitted", {
-      transactionType: data.transaction_type,
-      hasNotes: Boolean(data.notes?.trim()),
-      date: toLocalDateString(data.date),
-    })
-  }, [])
-
-  const handleOptimisticUpdate = useCallback((id: string, data: Partial<Transaction>) => {
-    setTransactions((prev) => prev.map((t) => (t.id === id ? { ...t, ...data } : t)))
-  }, [])
-
-  const handleOptimisticDelete = useCallback((id: string) => {
-    setTransactions((prev) => prev.filter((t) => t.id !== id))
-  }, [])
-
-  const handleDuplicateTransaction = useCallback(async (transaction: Transaction) => {
-    if (!transaction.id) return
-
-    try {
-      await duplicateTransaction(transaction.id, toLocalDateString(new Date()))
-      await refreshData()
-    } catch (error) {
-      console.error("Failed to duplicate transaction:", error)
-      toast.error("Failed to duplicate transaction. Please try again.")
-    }
-  }, [refreshData])
-
-  const handleDeleteTransaction = useCallback(async (transaction: Transaction) => {
-    if (!transaction.id) return
-
-    const transactionId = transaction.id
-    handleOptimisticDelete(transactionId)
-
-    try {
-      await deleteTransaction(transactionId)
-    } catch (error) {
-      console.error("Failed to delete transaction:", error)
-      toast.error("Failed to delete transaction. Please try again.")
-    } finally {
-      await refreshData()
-    }
-  }, [handleOptimisticDelete, refreshData])
-
-  if (loading) {
-    return (
-      <PageLayout
-        title="Transactions"
-        description="View, filter, and manage all your transactions."
-      >
-        <p className="text-muted-foreground">Loading transactions…</p>
-      </PageLayout>
-    )
-  }
-
-  const pageAction = (
-    <Button onClick={() => openAddTransaction(undefined, "header")}>
-      <Plus className="w-4 h-4" />
-      Add transaction
-      <span className="ml-1 hidden text-[11px] opacity-80 sm:inline">(N)</span>
-    </Button>
+    },
+    [loadData]
   )
-
-  if (!REDESIGN_ENABLED) {
-    return (
-      <PageLayout
-        title="Transactions"
-        description="View, filter, and manage all your transactions."
-        action={pageAction}
-        contentClassName="flex flex-col gap-4"
-      >
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-5">
-          <div className="lg:col-span-4">
-            <div className="overflow-hidden rounded-xl border bg-background">
-              <div className="border-b px-6 py-4">
-                <h2 className="text-xl font-semibold">Transactions</h2>
-              </div>
-              <div className="p-6">
-                <TransactionList
-                  transactions={filteredTransactions}
-                  categories={categories}
-                  accounts={accounts}
-                  onTransactionClick={handleTransactionClick}
-                  onDuplicateTransaction={handleDuplicateTransaction}
-                  onDeleteTransaction={handleDeleteTransaction}
-                />
-              </div>
-            </div>
-          </div>
-
-          <div className="lg:col-span-1">
-            <div className="space-y-4 lg:sticky lg:top-6 lg:h-fit">
-              <div className="overflow-hidden rounded-xl border bg-background">
-                <div className="shrink-0 border-b px-4 py-3">
-                  <h2 className="text-lg font-semibold">Filter & sort</h2>
-                </div>
-                <TransactionFiltersPanel
-                  filters={filters}
-                  onFiltersChange={handleFiltersChange}
-                  accountTypes={accounts}
-                  categories={categories}
-                />
-              </div>
-
-              <div className="overflow-hidden rounded-xl border bg-background">
-                <div className="shrink-0 border-b px-4 py-3">
-                  <h2 className="text-lg font-semibold">Summary</h2>
-                </div>
-                <TransactionSummary transactions={filteredTransactions} />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <AddTransactionDialog
-          open={isAddTransactionOpen}
-          onOpenChange={setIsAddTransactionOpen}
-          onTransactionCreated={handleOptimisticCreate}
-          onAfterSave={refreshData}
-          accounts={accounts}
-          categories={categories}
-          defaultDate={quickCreateDate}
-        />
-
-        <EditTransactionDialog
-          open={isEditTransactionOpen}
-          onOpenChange={setIsEditTransactionOpen}
-          transaction={selectedTransaction}
-          onTransactionUpdated={handleOptimisticUpdate}
-          onAfterSave={refreshData}
-          accounts={accounts}
-          categories={categories}
-        />
-      </PageLayout>
-    )
-  }
+  const handleDelete = useCallback(
+    (transaction: Transaction) => {
+      void mutate(transaction, "delete")
+    },
+    [mutate]
+  )
+  const handleDuplicate = useCallback(
+    (transaction: Transaction) => {
+      void mutate(transaction, "duplicate")
+    },
+    [mutate]
+  )
 
   return (
     <PageLayout
       title="Transactions"
-      description="View, filter, and manage all your transactions."
-      action={pageAction}
-      contentClassName="flex flex-col gap-4 pb-20"
-    >
-      <div className="flex items-center justify-between gap-2 lg:hidden">
-        <Sheet open={isMobileFiltersOpen} onOpenChange={setIsMobileFiltersOpen}>
-          <SheetTrigger asChild>
-            <Button variant="outline" className="flex-1">
-              <SlidersHorizontal className="mr-2 h-4 w-4" />
-              Filter & sort
-            </Button>
-          </SheetTrigger>
-          <SheetContent side="right" className="w-[92vw] p-0 sm:max-w-sm">
-            <SheetHeader className="border-b">
-              <SheetTitle>Filter & sort</SheetTitle>
-            </SheetHeader>
-            <TransactionFiltersPanel
-              filters={filters}
-              onFiltersChange={handleFiltersChange}
-              accountTypes={accounts}
-              categories={categories}
-            />
-          </SheetContent>
-        </Sheet>
-
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() => setIsMobileSummaryOpen((prev) => !prev)}
-          className="flex-1"
-        >
-          <CalendarDays className="mr-2 h-4 w-4" />
-          Summary
-          {isMobileSummaryOpen ? (
-            <ChevronUp className="ml-2 h-4 w-4" />
-          ) : (
-            <ChevronDown className="ml-2 h-4 w-4" />
-          )}
+      description="Your money, in detail."
+      contentClassName="flex flex-col gap-4 pb-8"
+      action={
+        <Button disabled={!loaded} onClick={() => openAdd()}>
+          <Plus className="h-4 w-4" />
+          Add transaction
+          <kbd className="ml-2 hidden rounded border border-current/20 px-1 text-xs sm:inline">
+            N
+          </kbd>
         </Button>
-      </div>
-
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
-        <div className="space-y-4">
-          <div className="overflow-hidden rounded-xl border bg-background">
-            <div className="flex items-center justify-between border-b px-4 py-3 sm:px-5">
-              <h2 className="text-lg font-semibold">Transactions</h2>
-              <span className="text-xs text-muted-foreground">
-                {filteredTransactions.length.toLocaleString("en-US")} shown
-              </span>
+      }
+    >
+      {error && (
+        <div
+          role="alert"
+          className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm"
+        >
+          <span>
+            {error}
+            {loaded ? " Your previous results are still visible." : ""}
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={loading}
+            onClick={() => void loadData()}
+          >
+            Retry
+          </Button>
+        </div>
+      )}
+      {!loaded && loading ? (
+        <div
+          role="status"
+          aria-label="Loading transactions"
+          className="space-y-4 motion-safe:animate-pulse"
+        >
+          <div className="h-12 rounded-lg bg-muted" />
+          <div className="h-24 rounded-lg bg-muted/60" />
+          <div className="rounded-xl border p-4">
+            {Array.from({ length: 7 }, (_, i) => (
+              <div key={i} className="my-4 h-12 rounded bg-muted/60" />
+            ))}
+          </div>
+          <span className="sr-only">Loading transactions…</span>
+        </div>
+      ) : loaded ? (
+        <>
+          <TransactionToolbar
+            filters={filters}
+            onFiltersChange={setFilters}
+            accountTypes={accounts}
+            categories={categories}
+          />
+          <TransactionSummary transactions={rows} strip />
+          <section
+            aria-label="Transaction ledger"
+            aria-busy={loading}
+            className="min-w-0 rounded-xl border bg-background"
+          >
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3">
+              <p className="text-sm text-muted-foreground">
+                <span className="font-medium tabular-nums text-foreground">
+                  {rows.length.toLocaleString()}
+                </span>{" "}
+                transactions{loading ? " · Refreshing…" : ""}
+              </p>
+              <div className="flex items-center gap-2">
+                <label htmlFor="ledger-density" className="sr-only">
+                  Row density
+                </label>
+                <select
+                  id="ledger-density"
+                  className="rounded-md border bg-background px-2 py-1.5 text-xs"
+                  value={density}
+                  onChange={(event) =>
+                    setDensity(event.target.value as typeof density)
+                  }
+                >
+                  <option value="compact">Compact</option>
+                  <option value="comfortable">Comfortable</option>
+                </select>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label="Refresh transactions"
+                  disabled={loading}
+                  onClick={() => void loadData()}
+                >
+                  <RefreshCw
+                    className={`h-4 w-4 ${loading ? "animate-spin" : ""}`}
+                  />
+                </Button>
+              </div>
             </div>
-            <div className="p-3 sm:p-4">
+            <div className="p-2 sm:p-3">
               <TransactionList
-                transactions={filteredTransactions}
+                transactions={rows}
+                pendingIds={pendingIds}
                 categories={categories}
                 accounts={accounts}
-                density="balanced"
-                amountColorMode="semantic-minimal"
-                showNotesPreview
-                onTransactionClick={handleTransactionClick}
-                onDuplicateTransaction={handleDuplicateTransaction}
-                onDeleteTransaction={handleDeleteTransaction}
-                onCreateForDate={(date) => openAddTransaction(date, "day_group")}
+                density={density}
+                onTransactionClick={handleClick}
+                onDuplicateTransaction={handleDuplicate}
+                onDeleteTransaction={handleDelete}
+                onCreateForDate={(date) => openAdd(date, "day_group")}
               />
             </div>
-          </div>
-
-          <div className="overflow-hidden rounded-xl border bg-background lg:hidden">
-            <button
-              type="button"
-              className="flex w-full items-center justify-between border-b px-4 py-3 text-left"
-              onClick={() => setIsMobileSummaryOpen((prev) => !prev)}
-              aria-expanded={isMobileSummaryOpen}
-            >
-              <h2 className="text-base font-semibold">Summary</h2>
-              {isMobileSummaryOpen ? (
-                <ChevronUp className="h-4 w-4 text-muted-foreground" />
-              ) : (
-                <ChevronDown className="h-4 w-4 text-muted-foreground" />
-              )}
-            </button>
-            {isMobileSummaryOpen && (
-              <TransactionSummary
-                transactions={filteredTransactions}
-                collapsedSecondaryByDefault
-              />
-            )}
-          </div>
-        </div>
-
-        <aside className="hidden lg:block">
-          <div className="space-y-4 lg:sticky lg:top-6 lg:h-fit">
-            <div className="overflow-hidden rounded-xl border bg-background">
-              <div className="border-b px-4 py-3">
-                <h2 className="text-base font-semibold">Filter & sort</h2>
-              </div>
-              <TransactionFiltersPanel
-                filters={filters}
-                onFiltersChange={handleFiltersChange}
-                accountTypes={accounts}
-                categories={categories}
-              />
-            </div>
-
-            <div className="overflow-hidden rounded-xl border bg-background">
-              <div className="border-b px-4 py-3">
-                <h2 className="text-base font-semibold">Summary</h2>
-              </div>
-              <TransactionSummary
-                transactions={filteredTransactions}
-                collapsedSecondaryByDefault
-              />
-            </div>
-          </div>
-        </aside>
-      </div>
-
+          </section>
+        </>
+      ) : null}
       <AddTransactionDialog
-        open={isAddTransactionOpen}
-        onOpenChange={setIsAddTransactionOpen}
-        onTransactionCreated={handleOptimisticCreate}
-        onAfterSave={refreshData}
+        open={isAddOpen}
+        onOpenChange={setIsAddOpen}
+        onTransactionCreated={handleCreated}
+        onAfterSave={loadData}
         accounts={accounts}
         categories={categories}
         defaultDate={quickCreateDate}
       />
-
       <EditTransactionDialog
-        open={isEditTransactionOpen}
-        onOpenChange={setIsEditTransactionOpen}
-        transaction={selectedTransaction}
-        onTransactionUpdated={handleOptimisticUpdate}
-        onAfterSave={refreshData}
+        open={isEditOpen}
+        onOpenChange={setIsEditOpen}
+        transaction={selected}
+        onTransactionUpdated={handleUpdated}
+        onAfterSave={loadData}
         accounts={accounts}
         categories={categories}
       />

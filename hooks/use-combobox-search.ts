@@ -32,7 +32,7 @@ export function useComboboxSearch(options: ComboboxSearchOptions = {}) {
 
   function onTriggerKeyDown(event: KeyboardEvent<HTMLButtonElement>) {
     if (
-      event.defaultPrevented ||
+      event.defaultPrevented || event.repeat ||
       event.ctrlKey || event.metaKey || event.altKey ||
       event.nativeEvent.isComposing
     ) return
