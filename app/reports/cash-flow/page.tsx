@@ -6,7 +6,9 @@ import { useReportsContext } from "../context"
 import { getTransactionsInRange } from "@/lib/transactions"
 import { Transaction } from "@/lib/types"
 import { MermaidSankey, buildSankeyData, type AccountMap, type DeductionsMap } from "@/components/mermaid-sankey"
-import { getSpendingAmount, isIncomeForReporting } from "@/lib/utils"
+import { MetricStrip } from "@/components/metric-strip"
+import { ReportStatus } from "@/components/reports/report-status"
+import { summarizeReport, toReportAccountMap } from "@/lib/report-summary"
 import { getAccounts } from "@/lib/accounts"
 import { getDeductionsForTransactions } from "@/lib/deductions"
 
@@ -63,145 +65,38 @@ export default function CashFlowPage() {
     return () => { active = false }
   }, [startDate, endDate, retry])
 
-  const accountsMap: AccountMap = useMemo(() => {
-    const map: AccountMap = {}
-    for (const acc of accounts) {
-      if (acc.id != null) {
-        map[String(acc.id)] = {
-          name: acc.account_name,
-          category: acc.category ?? "asset",
-          accountType: acc.account_type ?? "Cash",
-          accountSubtype: acc.account_subtype ?? "",
-        }
-      }
-    }
-    return map
-  }, [accounts])
+  const accountsMap: AccountMap = useMemo(() => toReportAccountMap(accounts), [accounts])
 
-  const summary = useMemo(() => {
-    let totalNetIncome = 0
-    let totalExpenses = 0
-    let totalInvestmentContributions = 0
-    transactions.forEach((t) => {
-      if (t.transaction_type === "incoming") {
-        if (!isIncomeForReporting(t)) {
-          return
-        }
-        const amount = Number(t.amount) || 0
-        const account = t.account_type_id != null ? accountsMap[t.account_type_id] : undefined
-        if (account?.accountType === "Investments") {
-          totalInvestmentContributions += amount
-        } else {
-          totalNetIncome += amount
-        }
-      } else if (t.transaction_type === "outgoing") {
-        totalExpenses += getSpendingAmount(t)
-      }
-      // transfers excluded from both
-    })
-    const netIncome = totalNetIncome - totalExpenses
-    const savingsRate = totalNetIncome > 0 ? (netIncome / totalNetIncome) * 100 : 0
-    return { totalNetIncome, totalExpenses, netIncome, savingsRate, totalInvestmentContributions }
-  }, [transactions, accountsMap])
+  const summary = useMemo(() => summarizeReport(transactions, accountsMap), [transactions, accountsMap])
 
   const sankeyData = useMemo(
     () => buildSankeyData(transactions, accountsMap, deductionsMap),
     [transactions, accountsMap, deductionsMap]
   )
 
-  const status = (
-    <div className="text-sm">
-      {loading && <p role="status" className="text-muted-foreground">Updating report…</p>}
-      {(loading || error) && loadedPeriod && (
-        <p className="text-muted-foreground">Showing previously loaded data: {loadedPeriod}.</p>
-      )}
-      {error && <p role="alert" className="text-destructive">{error}{" "}
-        <button className="underline" onClick={() => setRetry((value) => value + 1)} disabled={loading}>Retry</button>
-      </p>}
-    </div>
-  )
+  const status = <ReportStatus loading={loading} error={error} loadedPeriod={loadedPeriod} onRetry={() => setRetry((value) => value + 1)} />
 
   if (!loadedPeriod) {
-    return <div className="p-6" aria-busy={loading}>{status}</div>
+    return <div aria-busy={loading}>{status}</div>
   }
 
   return (
-    <div className="p-6 space-y-6" aria-busy={loading}>
+    <div className="min-w-0 space-y-6" aria-busy={loading}>
       {status}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Total Income
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <span className="text-2xl font-semibold text-accent">
-              +{formatCurrency(summary.totalNetIncome)}
-            </span>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Total Expenses
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <span className="text-2xl font-semibold">
-              {formatCurrency(summary.totalExpenses)}
-            </span>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Net Income
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <span
-              className={`text-2xl font-semibold ${
-                summary.netIncome >= 0 ? "text-accent" : "text-destructive"
-              }`}
-            >
-              {summary.netIncome >= 0 ? "+" : ""}
-              {formatCurrency(summary.netIncome)}
-            </span>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Savings Rate
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <span className="text-2xl font-semibold">
-              {summary.savingsRate.toFixed(1)}%
-            </span>
-          </CardContent>
-        </Card>
+      <div>
+        <h2 className="text-xl font-semibold tracking-tight">Follow your money</h2>
+        <p className="mt-1 text-sm text-muted-foreground">How income moves through deductions, accounts, and spending.</p>
       </div>
+      <MetricStrip metrics={[
+        { label: "Income", value: formatCurrency(summary.income) },
+        { label: "Spending", value: formatCurrency(summary.spending) },
+        { label: "Remaining", value: formatCurrency(summary.remaining), tone: summary.remaining < 0 ? "negative" : "positive" },
+        { label: "Savings rate", value: summary.savingsRate === null ? "—" : `${summary.savingsRate.toFixed(1)}%`, detail: summary.savingsRate === null ? "No reportable income" : "Remaining as a share of income" },
+      ]} />
 
-      {summary.totalInvestmentContributions > 0 && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Investment Contributions
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <span className="text-2xl font-semibold text-accent">
-                {formatCurrency(summary.totalInvestmentContributions)}
-              </span>
-            </CardContent>
-          </Card>
-        </div>
-      )}
+      {summary.investmentInflows > 0 && <MetricStrip metrics={[{ label: "Investment account inflows", value: formatCurrency(summary.investmentInflows), detail: "Incoming transactions to investment accounts, shown separately from reportable income" }]} />}
 
-      <Card className="overflow-auto">
+      <Card className="min-w-0 overflow-hidden shadow-none">
         <CardHeader>
           <CardTitle>Cash Flow</CardTitle>
           <p className="text-sm text-muted-foreground">
@@ -239,7 +134,7 @@ export default function CashFlowPage() {
             </p>
           )}
         </CardHeader>
-        <CardContent className="min-h-[70vh] w-full p-4">
+        <CardContent className="min-h-[70vh] w-full overflow-x-auto p-4">
           <MermaidSankey
             transactions={transactions}
             accountsMap={accountsMap}

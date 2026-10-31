@@ -10,7 +10,7 @@ Personal finance web app: accounts, transactions, reports, trips, and investment
 - **Accounts** — Asset and liability accounts with balances  
 - **Transactions** — Income, expenses, transfers (optional UI flag via env)  
 - **Investments** — Portfolio views and related tooling  
-- **Reports** — Cash flow, income, spending  
+- **Reports** — Period overview, cash flow, spending, and income with category drill-downs
 - **Trips** — Trip tracking linked to transactions  
 
 Sign-in and sign-up are public; all other routes require an authenticated Clerk user.
@@ -77,6 +77,8 @@ Filters and sorting run in Postgres. Search is debounced by 250 ms; changing a f
 Supabase is accessed from the server using a client that passes the Clerk session token (`ssr/client.ts`), so RLS policies should key off the same user identity your migrations expect (e.g. JWT `sub`).
 
 ## Project layout (high level)
+
+Workspace pages use `components/page-layout.tsx` for a consistent header and content width. Reports and Investments share `components/section-tabs.tsx`; reports and portfolio summaries share `components/metric-strip.tsx`. Report totals and trends are calculated in `lib/report-summary.ts` so the overview and detail pages use the same definitions.
 
 | Path | Role |
 |------|------|

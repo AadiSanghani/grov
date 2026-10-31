@@ -2,7 +2,6 @@ import * as React from "react"
 
 import {
   Card,
-  CardAction,
   CardContent,
   CardDescription,
   CardHeader,
@@ -25,8 +24,8 @@ export function DashboardCard({
   ...props
 }: DashboardCardProps) {
   return (
-    <Card className={cn("gap-0 py-0", className)} {...props}>
-      <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2 border-b px-4 py-2.5 pb-2.5!">
+    <Card className={cn("gap-0 py-0 shadow-none", className)} {...props}>
+      <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2 border-b px-5 py-4 pb-4! sm:px-6">
         <CardTitle className="text-lg font-semibold tracking-tight">
           {title}
         </CardTitle>
@@ -35,8 +34,7 @@ export function DashboardCard({
         ) : null}
         {actions ? <div className="flex shrink-0">{actions}</div> : null}
       </CardHeader>
-      <CardContent className="px-4 pt-2 pb-3">{children}</CardContent>
+      <CardContent className="px-5 py-5 sm:px-6 sm:py-6">{children}</CardContent>
     </Card>
   )
 }
-

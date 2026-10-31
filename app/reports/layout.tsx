@@ -1,16 +1,17 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import dynamic from "next/dynamic"
-import Link from "next/link"
-import { usePathname } from "next/navigation"
-import { format } from "date-fns"
+import { format, parseISO } from "date-fns"
 import { CalendarIcon } from "lucide-react"
 import type { DateRange } from "react-day-picker"
 import { ReportsProvider, TIMELINE_OPTIONS, useReportsContext } from "./context"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Calendar } from "@/components/ui/calendar"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { PageLayout } from "@/components/page-layout"
+import { SectionTabs } from "@/components/section-tabs"
 import {
   Popover,
   PopoverContent,
@@ -18,37 +19,26 @@ import {
 } from "@/components/ui/popover"
 
 function ReportsDateSelect() {
-  const { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } =
-    require("@/components/ui/select")
   const {
     timeline,
     setTimeline,
     customStartDate,
     customEndDate,
     setCustomDateRange,
+    startDate,
+    endDate,
   } = useReportsContext()
 
   const [date, setDate] = useState<DateRange | undefined>(() =>
     customStartDate && customEndDate
       ? {
-          from: new Date(customStartDate),
-          to: new Date(customEndDate),
+          from: parseISO(customStartDate),
+          to: parseISO(customEndDate),
         }
       : customStartDate
-        ? { from: new Date(customStartDate), to: undefined }
+        ? { from: parseISO(customStartDate), to: undefined }
         : undefined
   )
-
-  useEffect(() => {
-    if (!customStartDate) {
-      setDate(undefined)
-      return
-    }
-    setDate({
-      from: new Date(customStartDate),
-      to: customEndDate ? new Date(customEndDate) : undefined,
-    })
-  }, [customStartDate, customEndDate])
 
   const applyRange = (range: DateRange) => {
     if (!range.from || !range.to) return
@@ -89,9 +79,9 @@ function ReportsDateSelect() {
   }
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex flex-wrap items-center gap-2">
       <Select value={timeline} onValueChange={setTimeline}>
-        <SelectTrigger className="h-9 min-w-[200px] text-sm font-normal">
+        <SelectTrigger aria-label="Report period" className="h-9 min-w-[180px] text-sm font-normal">
           <SelectValue placeholder="Select range" />
         </SelectTrigger>
         <SelectContent>
@@ -145,6 +135,9 @@ function ReportsDateSelect() {
           </PopoverContent>
         </Popover>
       )}
+      <span className="text-xs text-muted-foreground tabular-nums">
+        {format(parseISO(startDate), "MMM d, yyyy")} – {format(parseISO(endDate), "MMM d, yyyy")}
+      </span>
     </div>
   )
 }
@@ -155,40 +148,11 @@ const ReportsDateSelectClient = dynamic(
 )
 
 const TABS = [
+  { label: "Overview", href: "/reports" },
   { label: "Cash Flow", href: "/reports/cash-flow" },
   { label: "Spending", href: "/reports/spending" },
   { label: "Income", href: "/reports/income" },
 ] as const
-
-function ReportsTopBar() {
-  const pathname = usePathname()
-  return (
-    <div className="border-b bg-background">
-      <div className="flex items-center justify-between px-6 py-4">
-        <nav className="flex items-center gap-1">
-          {TABS.map((tab) => (
-            <Link
-              key={tab.href}
-              href={tab.href}
-              className={cn(
-                "px-4 py-2 text-sm font-medium rounded-md transition-colors",
-                pathname === tab.href
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:text-primary-foreground hover:bg-accent"
-              )}
-            >
-              {tab.label}
-            </Link>
-          ))}
-        </nav>
-        <ReportsDateSelectClient />
-      </div>
-      <p className="px-6 pb-3 text-sm text-muted-foreground">
-        View cash flow, spending, and income for the selected period.
-      </p>
-    </div>
-  )
-}
 
 export default function ReportsLayout({
   children,
@@ -197,10 +161,10 @@ export default function ReportsLayout({
 }) {
   return (
     <ReportsProvider>
-      <div className="flex flex-col min-h-0 flex-1">
-        <ReportsTopBar />
-        <div className="flex-1 overflow-auto">{children}</div>
-      </div>
+      <PageLayout title="Reports" description="Understand what came in, what went out, and what changed." action={<ReportsDateSelectClient />}>
+        <SectionTabs tabs={TABS} label="Reports sections" />
+        {children}
+      </PageLayout>
     </ReportsProvider>
   )
 }
