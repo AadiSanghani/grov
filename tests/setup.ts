@@ -8,7 +8,9 @@ global.ResizeObserver = class {
   unobserve() {}
   disconnect() {}
 }
-Element.prototype.scrollIntoView = vi.fn()
-HTMLElement.prototype.hasPointerCapture = () => false
-HTMLElement.prototype.setPointerCapture = () => {}
-HTMLElement.prototype.releasePointerCapture = () => {}
+if (typeof Element !== "undefined") {
+  Element.prototype.scrollIntoView = vi.fn()
+  HTMLElement.prototype.hasPointerCapture = () => false
+  HTMLElement.prototype.setPointerCapture = () => {}
+  HTMLElement.prototype.releasePointerCapture = () => {}
+}

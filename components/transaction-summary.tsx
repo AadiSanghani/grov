@@ -6,11 +6,13 @@ import { useMemo } from "react"
 import { getSpendingAmount, isIncomeForReporting } from "@/lib/utils"
 import { ChevronDown, ChevronUp } from "lucide-react"
 import { cn } from "@/lib/utils"
+import type { LedgerSummary } from "@/lib/ledger/pagination"
 
 interface TransactionSummaryProps {
   transactions: Transaction[]
   collapsedSecondaryByDefault?: boolean
   strip?: boolean
+  metrics?: LedgerSummary
 }
 
 interface SummaryMetrics {
@@ -55,6 +57,7 @@ export const TransactionSummary = React.memo(function TransactionSummary({
   transactions,
   collapsedSecondaryByDefault = true,
   strip = false,
+  metrics,
 }: TransactionSummaryProps) {
   const [showSecondary, setShowSecondary] = React.useState(!collapsedSecondaryByDefault)
 
@@ -63,6 +66,7 @@ export const TransactionSummary = React.memo(function TransactionSummary({
   }, [collapsedSecondaryByDefault])
 
   const summary = useMemo<SummaryMetrics>(() => {
+    if (metrics) return metrics
     if (transactions.length === 0) {
       return {
         totalTransactions: 0,
@@ -107,7 +111,7 @@ export const TransactionSummary = React.memo(function TransactionSummary({
       totalSpending,
       net: totalIncome - totalSpending,
     }
-  }, [transactions])
+  }, [transactions, metrics])
 
   const netClassName =
     summary.net > 0

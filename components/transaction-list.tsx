@@ -37,6 +37,7 @@ interface TransactionListProps {
   density?: Density
   amountColorMode?: AmountColorMode
   showNotesPreview?: boolean
+  pageSubtotals?: boolean
   onTransactionClick: (transaction: Transaction) => void
   onDuplicateTransaction: (transaction: Transaction) => void
   onDeleteTransaction?: (transaction: Transaction) => void
@@ -125,6 +126,7 @@ export const TransactionList = React.memo(function TransactionList({
   density = "balanced",
   amountColorMode = "semantic-minimal",
   showNotesPreview = true,
+  pageSubtotals = false,
   onTransactionClick,
   onDuplicateTransaction,
   onDeleteTransaction,
@@ -211,6 +213,7 @@ export const TransactionList = React.memo(function TransactionList({
                   getDayNetClass(total)
                 )}
               >
+                {pageSubtotals && <span className="block text-[10px] font-normal text-muted-foreground">Page subtotal</span>}
                 {total >= 0 ? "+" : "-"}${formatMoney(Math.abs(total))}
               </span>
               <span
@@ -220,6 +223,7 @@ export const TransactionList = React.memo(function TransactionList({
                   getDayNetClass(total)
                 )}
               >
+                {pageSubtotals && <span className="block text-[10px] font-normal text-muted-foreground">Page subtotal</span>}
                 {total >= 0 ? "+" : "-"}${formatMoney(Math.abs(total))}
               </span>
               <span className={cn("hidden md:block", ACTION_COLUMN_WIDTH)} />
