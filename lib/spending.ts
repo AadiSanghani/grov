@@ -1,6 +1,6 @@
 'use server'
 
-import { startOfMonth, endOfMonth, subMonths, format } from "date-fns"
+import { startOfMonth, endOfMonth, subMonths, format, parseISO, isValid } from "date-fns"
 
 import { getTransactionsInRange } from "@/lib/transactions"
 import { getSpendingAmount, toLocalDateString } from "@/lib/utils"
@@ -75,7 +75,7 @@ async function getMonthlySpending(range: DateRange): Promise<{
 
   const points: SpendingPoint[] = sortedKeys.map((date) => ({
     date,
-    label: format(new Date(date), "MMM d"),
+    label: format(parseISO(date), "MMM d"),
     amount: byDate.get(date) ?? 0,
   }))
 
@@ -86,8 +86,16 @@ async function getMonthlySpending(range: DateRange): Promise<{
 
 export async function getSpendingSeries(
   rangeKey: SpendingRangeKey,
+  localDate: string,
 ): Promise<SpendingSeriesResult> {
-  const today = new Date()
+  const today = parseISO(localDate)
+  if (
+    !/^\d{4}-\d{2}-\d{2}$/.test(localDate) ||
+    !isValid(today) ||
+    format(today, "yyyy-MM-dd") !== localDate
+  ) {
+    throw new Error("Invalid local date")
+  }
   const thisMonthRange = getMonthDateRange(today)
   const lastMonthAnchor = subMonths(today, 1)
   const lastMonthRange = getMonthDateRange(lastMonthAnchor)
@@ -163,6 +171,5 @@ export async function getSpendingSeries(
     }
   }
 
-  return getSpendingSeries("this_month_vs_last_month")
+  return getSpendingSeries("this_month_vs_last_month", localDate)
 }
-

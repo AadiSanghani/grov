@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
-export function DashboardReadError({ title }: { title: string }) {
+export function DashboardReadError({ title, onRetry }: { title: string; onRetry?: () => void }) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
   return (
@@ -13,7 +13,14 @@ export function DashboardReadError({ title }: { title: string }) {
       <CardHeader><CardTitle>{title}</CardTitle></CardHeader>
       <CardContent className="space-y-3">
         <p role="alert" className="text-sm text-muted-foreground">Unable to load this data. Please try again.</p>
-        <Button variant="outline" disabled={pending} onClick={() => startTransition(() => router.refresh())}>
+        <Button
+          variant="outline"
+          disabled={pending}
+          onClick={() => startTransition(() => {
+            if (onRetry) onRetry()
+            else router.refresh()
+          })}
+        >
           {pending ? 'Retrying…' : 'Retry'}
         </Button>
       </CardContent>

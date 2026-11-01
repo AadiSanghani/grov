@@ -1,13 +1,21 @@
-import { Suspense } from "react"
+"use client"
 
-import { getSpendingSeries, type SpendingRangeKey } from "@/lib/spending"
+import { useEffect, useState } from "react"
+import { format } from "date-fns"
+
+import { getSpendingSeries, type SpendingRangeKey, type SpendingSeriesResult } from "@/lib/spending"
 import { SpendingCard } from "@/components/dashboard/spending-card"
 import { DashboardReadError } from "./read-error"
 
 type ResolvedSearchParams = Record<string, string | string[] | undefined>
 
 interface DashboardSpendingSectionProps {
-  searchParams?: ResolvedSearchParams | Promise<ResolvedSearchParams>
+  searchParams?: ResolvedSearchParams
+}
+
+const EMPTY_DATA: SpendingSeriesResult = {
+  rangeKey: "this_month_vs_last_month",
+  current: { label: "", total: 0, points: [] },
 }
 
 function getRangeKeyFromSearchParams(
@@ -31,39 +39,80 @@ function getRangeKeyFromSearchParams(
   return "this_month_vs_last_month"
 }
 
-async function SpendingSectionInner({
-  searchParams,
-}: DashboardSpendingSectionProps) {
-  const resolvedSearchParams = searchParams
-    ? await searchParams
-    : undefined
-  const rangeKey = getRangeKeyFromSearchParams(resolvedSearchParams)
+export function DashboardSpendingSection({ searchParams }: DashboardSpendingSectionProps) {
+  const rangeKey = getRangeKeyFromSearchParams(searchParams)
+  const [localDate, setLocalDate] = useState<string | null>(null)
+  const [retry, setRetry] = useState(0)
+  const [result, setResult] = useState<{
+    rangeKey: SpendingRangeKey
+    localDate: string
+    data: SpendingSeriesResult | null
+  } | null>(null)
 
-  const data = await getSpendingSeries(rangeKey).catch((error) => {
-    console.error("Failed to load spending data for dashboard:", error)
-    return null
-  })
-  if (!data) return <DashboardReadError title="Spending" />
-  return <SpendingCard rangeKey={rangeKey} data={data} />
-}
+  useEffect(() => {
+    let midnightTimer: ReturnType<typeof setTimeout>
 
-export function DashboardSpendingSection(
-  props: DashboardSpendingSectionProps,
-) {
-  return (
-    <Suspense
-      fallback={
-        <SpendingCard
-          rangeKey="this_month_vs_last_month"
-          loading
-          data={{
-            rangeKey: "this_month_vs_last_month",
-            current: { label: "", total: 0, points: [] },
-          }}
-        />
+    const updateLocalDate = () => {
+      const now = new Date()
+      setLocalDate(format(now, "yyyy-MM-dd"))
+      const nextMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1)
+      midnightTimer = setTimeout(updateLocalDate, nextMidnight.getTime() - now.getTime() + 100)
+    }
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        clearTimeout(midnightTimer)
+        updateLocalDate()
       }
-    >
-      <SpendingSectionInner {...props} />
-    </Suspense>
+    }
+
+    updateLocalDate()
+    document.addEventListener("visibilitychange", onVisibilityChange)
+    return () => {
+      clearTimeout(midnightTimer)
+      document.removeEventListener("visibilitychange", onVisibilityChange)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!localDate) return
+    let cancelled = false
+
+    getSpendingSeries(rangeKey, localDate)
+      .then((data) => {
+        if (!cancelled) setResult({ rangeKey, localDate, data })
+      })
+      .catch((error) => {
+        console.error("Failed to load spending data for dashboard:", error)
+        if (!cancelled) setResult({ rangeKey, localDate, data: null })
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [rangeKey, localDate, retry])
+
+  const currentResult = result?.rangeKey === rangeKey && result.localDate === localDate
+    ? result
+    : null
+
+  if (currentResult && !currentResult.data) {
+    return (
+      <DashboardReadError
+        title="Spending"
+        onRetry={() => {
+          setResult(null)
+          setRetry((value) => value + 1)
+        }}
+      />
+    )
+  }
+
+  return (
+    <SpendingCard
+      rangeKey={rangeKey}
+      data={currentResult?.data ?? EMPTY_DATA}
+      loading={!currentResult}
+    />
   )
 }
