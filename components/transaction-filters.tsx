@@ -6,6 +6,13 @@ import type { TransactionFilters } from "@/lib/types"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import type { Account } from "@/lib/accounts"
 import type { Category } from "@/lib/categories"
 import { categoryNameToValue, toLocalDateString } from "@/lib/utils"
@@ -18,8 +25,7 @@ interface TransactionFiltersProps {
   accountTypes: Account[]
   categories: Category[]
 }
-const selectClass =
-  "h-9 w-full min-w-0 rounded-md border bg-background px-3 text-sm focus-visible:outline-2 focus-visible:outline-ring"
+const selectTriggerClass = "h-9 min-w-0 rounded-md px-3 py-2 text-sm"
 
 export const TransactionFiltersPanel = React.memo(
   function TransactionFiltersPanel({
@@ -34,46 +40,51 @@ export const TransactionFiltersPanel = React.memo(
       <div className="grid grid-cols-1 gap-4 border-t bg-muted/20 p-4 sm:grid-cols-2 lg:grid-cols-4">
         <div className="space-y-1.5">
           <Label htmlFor="filter-account">Account</Label>
-          <select
-            id="filter-account"
-            className={selectClass}
+          <Select
             value={filters.account_types[0] ?? "all"}
-            onChange={(e) =>
-              update({
-                account_types: e.target.value === "all" ? [] : [e.target.value],
-              })
+            onValueChange={(value) =>
+              update({ account_types: value === "all" ? [] : [value] })
             }
           >
-            <option value="all">All accounts</option>
-            <option value="__unassigned__">Unassigned</option>
-            {accountTypes
-              .filter((a) => a.id != null)
-              .map((a) => (
-                <option key={a.id} value={String(a.id)}>
-                  {a.account_name}
-                </option>
-              ))}
-          </select>
+            <SelectTrigger id="filter-account" className={selectTriggerClass}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All accounts</SelectItem>
+              <SelectItem value="__unassigned__">Unassigned</SelectItem>
+              {accountTypes
+                .filter((a) => a.id != null)
+                .map((a) => (
+                  <SelectItem key={a.id} value={String(a.id)}>
+                    {a.account_name}
+                  </SelectItem>
+                ))}
+            </SelectContent>
+          </Select>
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="filter-category">Category</Label>
-          <select
-            id="filter-category"
-            className={selectClass}
+          <Select
             value={filters.categories[0] ?? "all"}
-            onChange={(e) =>
-              update({
-                categories: e.target.value === "all" ? [] : [e.target.value],
-              })
+            onValueChange={(value) =>
+              update({ categories: value === "all" ? [] : [value] })
             }
           >
-            <option value="all">All categories</option>
-            {categories.map((c) => (
-              <option key={c.id ?? c.name} value={categoryNameToValue(c.name)}>
-                {c.name}
-              </option>
-            ))}
-          </select>
+            <SelectTrigger id="filter-category" className={selectTriggerClass}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All categories</SelectItem>
+              {categories.map((c) => (
+                <SelectItem
+                  key={c.id ?? c.name}
+                  value={categoryNameToValue(c.name)}
+                >
+                  {c.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="filter-from">From date</Label>
@@ -242,25 +253,31 @@ export function TransactionToolbar(props: TransactionFiltersProps) {
           />
         </div>
         <div className="flex items-center gap-2">
-          <select
-            aria-label="Sort transactions"
-            className={`${selectClass} w-auto`}
+          <Select
             value={`${filters.sortBy}-${filters.sortOrder}`}
-            onChange={(e) => {
-              const [sortBy, sortOrder] = e.target.value.split("-") as [
+            onValueChange={(value) => {
+              const [sortBy, sortOrder] = value.split("-") as [
                 TransactionFilters["sortBy"],
                 TransactionFilters["sortOrder"],
               ]
               update({ sortBy, sortOrder })
             }}
           >
-            <option value="date-desc">Newest first</option>
-            <option value="date-asc">Oldest first</option>
-            <option value="amount-desc">Highest amount</option>
-            <option value="amount-asc">Lowest amount</option>
-            <option value="merchant-asc">Merchant A–Z</option>
-            <option value="merchant-desc">Merchant Z–A</option>
-          </select>
+            <SelectTrigger
+              aria-label="Sort transactions"
+              className={`${selectTriggerClass} w-auto`}
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="date-desc">Newest first</SelectItem>
+              <SelectItem value="date-asc">Oldest first</SelectItem>
+              <SelectItem value="amount-desc">Highest amount</SelectItem>
+              <SelectItem value="amount-asc">Lowest amount</SelectItem>
+              <SelectItem value="merchant-asc">Merchant A–Z</SelectItem>
+              <SelectItem value="merchant-desc">Merchant Z–A</SelectItem>
+            </SelectContent>
+          </Select>
           <Button
             variant={expanded ? "secondary" : "outline"}
             size="sm"
