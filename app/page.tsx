@@ -21,9 +21,9 @@ export default async function Home({ searchParams }: HomePageProps) {
       title="Dashboard"
       description="High-level view of your spending, accounts, and recent activity."
     >
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <DashboardSpendingSection searchParams={resolvedSearchParams} />
+      <div className="grid grid-cols-1 items-stretch gap-6 lg:grid-cols-2">
         <DashboardNetWorthSection searchParams={resolvedSearchParams} />
+        <DashboardSpendingSection searchParams={resolvedSearchParams} />
       </div>
       <DashboardRecentTransactionsSection />
     </PageLayout>

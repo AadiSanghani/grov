@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import { format } from "date-fns"
 
 import { getSpendingSeries, type SpendingRangeKey, type SpendingSeriesResult } from "@/lib/spending"
-import { SpendingCard } from "@/components/dashboard/spending-card"
+import { SpendingCard, SpendingChangesCard } from "@/components/dashboard/spending-card"
 import { DashboardReadError } from "./read-error"
 
 type ResolvedSearchParams = Record<string, string | string[] | undefined>
@@ -15,6 +15,7 @@ interface DashboardSpendingSectionProps {
 
 const EMPTY_DATA: SpendingSeriesResult = {
   rangeKey: "this_month_vs_last_month",
+  categoryChanges: [],
   current: { label: "", total: 0, points: [] },
 }
 
@@ -97,22 +98,30 @@ export function DashboardSpendingSection({ searchParams }: DashboardSpendingSect
     : null
 
   if (currentResult && !currentResult.data) {
+    const onRetry = () => {
+      setResult(null)
+      setRetry((value) => value + 1)
+    }
     return (
-      <DashboardReadError
-        title="Spending"
-        onRetry={() => {
-          setResult(null)
-          setRetry((value) => value + 1)
-        }}
-      />
+      <>
+        <DashboardReadError title="What changed?" onRetry={onRetry} />
+        <div className="min-w-0 lg:col-span-2">
+          <DashboardReadError title="Spending pace" onRetry={onRetry} />
+        </div>
+      </>
     )
   }
 
   return (
-    <SpendingCard
-      rangeKey={rangeKey}
-      data={currentResult?.data ?? EMPTY_DATA}
-      loading={!currentResult}
-    />
+    <>
+      <SpendingChangesCard data={currentResult?.data ?? EMPTY_DATA} loading={!currentResult} />
+      <div className="min-w-0 lg:col-span-2">
+        <SpendingCard
+          rangeKey={rangeKey}
+          data={currentResult?.data ?? EMPTY_DATA}
+          loading={!currentResult}
+        />
+      </div>
+    </>
   )
 }
