@@ -15,6 +15,7 @@ import {
 } from "recharts"
 
 import { DashboardCard } from "@/components/dashboard-card"
+import { Button } from "@/components/ui/button"
 import {
   Select,
   SelectContent,
@@ -90,7 +91,7 @@ export function SpendingCard({ rangeKey, data, loading }: SpendingCardProps) {
 
   return (
     <DashboardCard
-      title="Spending pace"
+      title={<h2>Spending pace</h2>}
       className="min-w-0"
       aria-busy={isLoading}
       actions={
@@ -118,7 +119,7 @@ export function SpendingCard({ rangeKey, data, loading }: SpendingCardProps) {
       }
     >
       <div className="mb-4 space-y-1" aria-live="polite">
-        <p className="text-3xl font-semibold tracking-tight tabular-nums">
+        <p className="text-4xl font-medium tracking-tight tabular-nums">
           {isLoading ? "—" : formatCurrency(data.current.total)}
         </p>
         <p className="text-xs text-muted-foreground">
@@ -138,15 +139,15 @@ export function SpendingCard({ rangeKey, data, loading }: SpendingCardProps) {
           </p>
         ) : null}
       </div>
-      <div className="h-[240px]">
+      <div className="h-64">
         {isLoading ? (
           <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
             Loading spending data…
           </div>
         ) : !hasSpending ? (
-          <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
-            No spending data yet. Add some transactions to see your spending
-            pace and category changes.
+          <div className="flex h-full flex-col items-center justify-center gap-4 text-center">
+            <p className="max-w-80 text-sm leading-6 text-muted-foreground">No spending data yet. Add some transactions to see your spending pace and category changes.</p>
+            <Button asChild variant="outline"><Link href="/transactions">Add a transaction</Link></Button>
           </div>
         ) : (
           <ResponsiveContainer width="100%" height="100%">
@@ -155,9 +156,11 @@ export function SpendingCard({ rangeKey, data, loading }: SpendingCardProps) {
               margin={{ top: 8, right: 16, left: 0, bottom: 4 }}
             >
               <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" vertical={false} />
-              <XAxis dataKey="day" tickFormatter={(value) => `Day ${value}`} tick={{ fontSize: 12, fill: "var(--muted-foreground)" }} minTickGap={24} />
+              <XAxis dataKey="day" tickFormatter={(value) => `Day ${value}`} axisLine={false} tickLine={false} tickMargin={12} tick={{ fontSize: 12, fill: "var(--muted-foreground)" }} minTickGap={24} />
               <YAxis
                 domain={[0, "auto"]}
+                axisLine={false}
+                tickLine={false}
                 tickFormatter={(value) =>
                   `$${Number(value).toLocaleString("en-US", {
                     maximumFractionDigits: 0,
@@ -172,7 +175,7 @@ export function SpendingCard({ rangeKey, data, loading }: SpendingCardProps) {
                 contentStyle={{ backgroundColor: "var(--popover)", borderColor: "var(--border)", borderRadius: 8 }}
                 labelStyle={{ color: "var(--foreground)" }}
               />
-              {data.comparison && <Legend />}
+              {data.comparison && <Legend iconType="plainline" wrapperStyle={{ paddingTop: 16, fontSize: 12 }} />}
               <Line
                 type="linear"
                 dataKey="current"
@@ -237,7 +240,7 @@ export function SpendingChangesCard({ data, loading }: Pick<SpendingCardProps, "
                     href={`/transactions?${params.toString()}`}
                     prefetch={false}
                     aria-label={`${category.label}: ${formatCurrency(Math.abs(category.difference))} ${increased ? "more" : "less"}. View current-period transactions.`}
-                    className="block rounded-md px-2 py-2.5 -mx-2 transition-colors hover:bg-muted/50 focus-visible:outline-2 focus-visible:outline-ring"
+                    className="block rounded-lg px-2 py-3 -mx-2 transition-colors hover:bg-muted/50 focus-visible:outline-2 focus-visible:outline-ring"
                   >
                     <div className="flex items-baseline justify-between gap-3 text-sm">
                       <span className="min-w-0 break-words font-medium">{category.label}</span>
@@ -246,7 +249,7 @@ export function SpendingChangesCard({ data, loading }: Pick<SpendingCardProps, "
                     <div className="relative mt-2 h-2 rounded-full bg-muted" aria-hidden="true">
                       <span className="absolute inset-y-0 left-1/2 w-px bg-muted-foreground/50" />
                       <span
-                        className={`absolute inset-y-0 rounded-full ${increased ? "bg-chart-1" : "bg-chart-2"}`}
+                        className={`absolute inset-y-0 rounded-full ${increased ? "bg-chart-1" : "bg-muted-foreground"}`}
                         style={{ left: `${increased ? 50 : 50 - barWidth}%`, width: `${barWidth}%` }}
                       />
                     </div>

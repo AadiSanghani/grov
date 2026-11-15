@@ -6,6 +6,7 @@ import { format } from "date-fns"
 import { Plus } from "lucide-react"
 
 import { PageLayout } from "@/components/page-layout"
+import { MetricStrip } from "@/components/metric-strip"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { getTripsWithMetrics, createTrip } from "@/lib/trips"
@@ -32,24 +33,28 @@ function formatDateRange(startDate?: Date | null, endDate?: Date | null): string
 }
 
 function statusBadgeClass(status: TripWithMetrics["status"]) {
-  if (status === "planned") return "bg-blue-50 text-blue-700 border-blue-200"
-  if (status === "completed") return "bg-emerald-50 text-emerald-700 border-emerald-200"
-  return "bg-amber-50 text-amber-700 border-amber-200"
+  if (status === "planned") return "bg-card text-muted-foreground border-border"
+  if (status === "completed") return "bg-muted text-foreground border-transparent"
+  return "bg-sidebar-accent text-sidebar-accent-foreground border-transparent"
 }
 
 export default function TripsPage() {
   const [loading, setLoading] = useState(true)
   const [createOpen, setCreateOpen] = useState(false)
   const [trips, setTrips] = useState<TripWithMetrics[]>([])
+  const [error, setError] = useState(false)
+  const [loaded, setLoaded] = useState(false)
 
   const loadTrips = useCallback(async () => {
     setLoading(true)
+    setError(false)
     try {
       const rows = await getTripsWithMetrics()
       setTrips(rows ?? [])
+      setLoaded(true)
     } catch (error) {
       console.error("Failed to load trips:", error)
-      setTrips([])
+      setError(true)
     } finally {
       setLoading(false)
     }
@@ -73,7 +78,7 @@ export default function TripsPage() {
   return (
     <PageLayout
       title="Trips"
-      description="Group related travel spending and track end-to-end trip cost."
+      description="Every trip, from the first booking to the final expense"
       action={
         <Button onClick={() => setCreateOpen(true)}>
           <Plus className="h-4 w-4" />
@@ -81,48 +86,44 @@ export default function TripsPage() {
         </Button>
       }
     >
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Total trips</CardTitle>
-          </CardHeader>
-          <CardContent className="text-2xl font-semibold">{trips.length}</CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Tracked spend</CardTitle>
-          </CardHeader>
-          <CardContent className="text-2xl font-semibold">{formatCurrency(totals.totalSpend)}</CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Linked transactions</CardTitle>
-          </CardHeader>
-          <CardContent className="text-2xl font-semibold">{totals.totalTransactions}</CardContent>
-        </Card>
+      <div aria-busy={loading}>
+        <MetricStrip metrics={[
+          { label: "Total trips", value: loaded ? trips.length : "—" },
+          { label: "Tracked spend", value: loaded ? formatCurrency(totals.totalSpend) : "—" },
+          { label: "Linked transactions", value: loaded ? totals.totalTransactions : "—" },
+        ]} />
       </div>
 
-      {loading ? (
-        <p className="text-sm text-muted-foreground">Loading trips…</p>
-      ) : trips.length === 0 ? (
+      {error && (
+        <div role="alert" className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-destructive/30 bg-card p-5">
+          <div>
+            <p className="text-sm font-medium">Couldn’t load your trips</p>
+            <p className="mt-1 text-sm text-muted-foreground">{loaded ? "Your previous trips are still shown below" : "Try again to load your trips and totals"}</p>
+          </div>
+          <Button variant="outline" disabled={loading} onClick={() => void loadTrips()}>Try again</Button>
+        </div>
+      )}
+
+      {loading && <p role="status" className="text-sm text-muted-foreground">{loaded ? "Updating trips…" : "Loading trips…"}</p>}
+      {loaded && !loading && !error && trips.length === 0 ? (
         <Card>
           <CardContent className="py-12 text-center">
-            <p className="text-sm text-muted-foreground">
-              No trips yet. Create one and start assigning outgoing transactions.
-            </p>
+            <h2 className="text-lg font-medium">A place for every travel expense</h2>
+            <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-muted-foreground">Create your first trip, then link expenses to see its total cost and daily spending</p>
+            <Button className="mt-6" variant="outline" onClick={() => setCreateOpen(true)}><Plus className="size-4" />Create your first trip</Button>
           </CardContent>
         </Card>
-      ) : (
+      ) : trips.length > 0 ? (
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           {trips.map((trip) => (
-            <Link key={trip.id} href={`/trips/${trip.id}`} className="block">
-              <Card className="h-full transition-colors hover:border-primary/40 hover:bg-muted/20">
+            <Link key={trip.id} href={`/trips/${trip.id}`} className="group block min-w-0 rounded-xl">
+              <Card className="h-full transition-colors hover:border-primary/40">
                 <CardHeader className="space-y-3">
                   <div className="flex items-center justify-between gap-2">
-                    <CardTitle className="truncate">{trip.name}</CardTitle>
+                    <CardTitle className="truncate text-lg font-medium group-hover:text-primary">{trip.name}</CardTitle>
                     <span
                       className={cn(
-                        "rounded-full border px-2 py-0.5 text-xs font-medium capitalize",
+                        "shrink-0 rounded-md border px-2 py-1 text-xs font-medium capitalize",
                         statusBadgeClass(trip.status)
                       )}
                     >
@@ -136,19 +137,19 @@ export default function TripsPage() {
                 <CardContent>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <p className="text-xs uppercase tracking-wide text-muted-foreground">Total spend</p>
+                      <p className="text-xs text-muted-foreground">Total spend</p>
                       <p className="text-lg font-semibold">{formatCurrency(trip.metrics.totalSpend)}</p>
                     </div>
                     <div>
-                      <p className="text-xs uppercase tracking-wide text-muted-foreground">Transactions</p>
+                      <p className="text-xs text-muted-foreground">Transactions</p>
                       <p className="text-lg font-semibold">{trip.metrics.transactionCount}</p>
                     </div>
                     <div>
-                      <p className="text-xs uppercase tracking-wide text-muted-foreground">Avg/day</p>
+                      <p className="text-xs text-muted-foreground">Per day</p>
                       <p className="text-lg font-semibold">{formatCurrency(trip.metrics.avgPerDay)}</p>
                     </div>
                     <div>
-                      <p className="text-xs uppercase tracking-wide text-muted-foreground">Largest expense</p>
+                      <p className="text-xs text-muted-foreground">Largest expense</p>
                       <p className="text-lg font-semibold">{formatCurrency(trip.metrics.largestExpense)}</p>
                     </div>
                   </div>
@@ -157,7 +158,7 @@ export default function TripsPage() {
             </Link>
           ))}
         </div>
-      )}
+      ) : null}
 
       <TripDialog
         open={createOpen}

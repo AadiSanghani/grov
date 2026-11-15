@@ -206,14 +206,14 @@ export function InvestmentsEquityShell() {
         <table className="w-full min-w-[860px] border-collapse">
           <thead>
             <tr className="border-b bg-muted/40">
-              <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Company</th>
-              <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Grant</th>
-              <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Symbol</th>
-              <th className="px-3 py-2 text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground">Total</th>
-              <th className="px-3 py-2 text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground">Vested</th>
-              <th className="px-3 py-2 text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground">Unvested</th>
-              <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Grant date</th>
-              <th className="px-3 py-2 text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground">Actions</th>
+              <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">Company</th>
+              <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">Grant</th>
+              <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">Symbol</th>
+              <th className="px-3 py-2 text-right text-xs font-medium text-muted-foreground">Total</th>
+              <th className="px-3 py-2 text-right text-xs font-medium text-muted-foreground">Vested</th>
+              <th className="px-3 py-2 text-right text-xs font-medium text-muted-foreground">Unvested</th>
+              <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">Grant date</th>
+              <th className="px-3 py-2 text-right text-xs font-medium text-muted-foreground">Actions</th>
             </tr>
           </thead>
           <tbody>

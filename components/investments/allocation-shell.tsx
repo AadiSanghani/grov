@@ -318,12 +318,12 @@ export function InvestmentsAllocationShell() {
               <table className="w-full min-w-[820px] border-collapse">
                 <thead>
                   <tr className="border-b bg-muted/40">
-                    <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Ticker</th>
-                    <th className="px-3 py-2 text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground">Shares</th>
-                    <th className="px-3 py-2 text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground">Current Price</th>
-                    <th className="px-3 py-2 text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground">Market Value (CAD)</th>
-                    <th className="px-3 py-2 text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground">Allocation %</th>
-                    <th className="px-3 py-2 text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground">Share Mix %</th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">Ticker</th>
+                    <th className="px-3 py-2 text-right text-xs font-medium text-muted-foreground">Shares</th>
+                    <th className="px-3 py-2 text-right text-xs font-medium text-muted-foreground">Current Price</th>
+                    <th className="px-3 py-2 text-right text-xs font-medium text-muted-foreground">Market Value (CAD)</th>
+                    <th className="px-3 py-2 text-right text-xs font-medium text-muted-foreground">Allocation %</th>
+                    <th className="px-3 py-2 text-right text-xs font-medium text-muted-foreground">Share Mix %</th>
                   </tr>
                 </thead>
                 <tbody>

@@ -163,7 +163,7 @@ export default function ReportsLayout({
 }) {
   return (
     <ReportsProvider>
-      <PageLayout title="Reports" description="Understand what came in, what went out, and what changed." action={<ReportsDateSelectClient />}>
+      <PageLayout title="Reports" description="What came in, what went out, and what changed" action={<ReportsDateSelectClient />}>
         <SectionTabs tabs={TABS} label="Reports sections" />
         {children}
       </PageLayout>

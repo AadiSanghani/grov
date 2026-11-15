@@ -392,7 +392,7 @@ function SharedLedgerTable({
     <div className="overflow-x-auto">
       <table className="w-full min-w-[760px] text-sm">
         <thead>
-          <tr className="border-b text-left text-xs uppercase tracking-wide text-muted-foreground">
+          <tr className="border-b text-left text-xs text-muted-foreground">
             <th className="py-2 pr-4 font-medium">Date</th>
             <th className="py-2 pr-4 font-medium">Description</th>
             <th className="py-2 pr-4 font-medium">Payer</th>
@@ -420,7 +420,7 @@ function SharedLedgerTable({
                   <span className="truncate">{entry.payer_names.join(", ") || "Unknown"}</span>
                 </td>
                 <td className="py-3 pr-4 text-muted-foreground">
-                  {category ? `${category.emoji} ${category.label}` : entry.grov_category}
+                  {category?.label ?? entry.grov_category}
                 </td>
                 <td className="py-3 pr-4 text-right tabular-nums">
                   {formatCurrency(entry.total_cost, entry.currency || currency)}
@@ -1027,7 +1027,7 @@ function DraftReview({
                 <div className="hidden overflow-x-auto lg:block">
                   <table className="w-full min-w-[1280px] text-sm">
                     <thead>
-                      <tr className="border-b text-left text-xs uppercase tracking-wide text-muted-foreground">
+                      <tr className="border-b text-left text-xs text-muted-foreground">
                         <th className="px-3 py-2 font-medium">Date</th>
                         <th className="px-3 py-2 font-medium">Merchant</th>
                         <th className="px-3 py-2 font-medium">Category</th>

@@ -354,7 +354,7 @@ export default function TripDetailPage() {
                   <div key={entry.category} className="flex items-center justify-between gap-3">
                     <div className="min-w-0">
                       <p className="truncate text-sm font-medium">
-                        {categoryInfo ? `${categoryInfo.emoji} ${categoryInfo.label}` : entry.category}
+                        {categoryInfo?.label ?? entry.category}
                       </p>
                     </div>
                     <p className="shrink-0 text-sm font-semibold">{formatCurrency(entry.amount)}</p>
@@ -412,7 +412,6 @@ export default function TripDetailPage() {
                         <div className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
                           {categoryInfo && (
                             <>
-                              <span>{categoryInfo.emoji}</span>
                               <span>{categoryInfo.label}</span>
                               <span>·</span>
                             </>

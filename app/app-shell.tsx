@@ -40,7 +40,9 @@ export function AppShell({
             <header className="sticky top-0 z-20 flex h-14 items-center gap-3 border-b bg-background px-4 md:hidden">
               <SidebarTrigger id="mobile-navigation-trigger" className="size-10" />
               <span className="grov-wordmark text-xl text-primary">Grov</span>
-              <span className="ml-auto text-xs text-muted-foreground">Workspace</span>
+              <span className="ml-auto text-xs capitalize text-muted-foreground">
+                {pathname === "/" ? "Dashboard" : pathname.split("/")[1].replaceAll("-", " ")}
+              </span>
             </header>
             <main id="main-content" tabIndex={-1} className="min-w-0 scroll-mt-16 md:scroll-mt-4">
               {children}

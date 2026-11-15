@@ -14,7 +14,7 @@ export function MetricStrip({ metrics, className }: { metrics: Metric[]; classNa
       {metrics.map((metric) => (
         <div key={metric.label} className="min-w-0 bg-card px-5 py-4 sm:px-6 sm:py-5">
           <dt className="text-sm font-medium text-muted-foreground">{metric.label}</dt>
-          <dd className={cn("mt-2 break-words text-2xl font-semibold tracking-tight tabular-nums", metric.tone === "positive" && "text-positive", metric.tone === "negative" && "text-negative")}>
+          <dd className={cn("mt-3 break-words text-3xl font-medium tracking-tight tabular-nums", metric.tone === "positive" && "text-positive", metric.tone === "negative" && "text-negative")}>
             {metric.value}
           </dd>
           {metric.detail && <dd className="mt-1 text-xs leading-relaxed text-muted-foreground">{metric.detail}</dd>}

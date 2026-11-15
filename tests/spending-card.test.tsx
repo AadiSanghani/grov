@@ -136,7 +136,7 @@ it("places net worth and category changes above a full-width pace card while sha
 
   const netWorth = screen.getByTestId("net-worth")
   const grid = netWorth.parentElement!
-  expect(grid).toHaveClass("grid-cols-1", "lg:grid-cols-2", "items-stretch")
+  expect(grid).toHaveClass("grid-cols-1", "lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]", "items-stretch")
   expect(grid.children).toHaveLength(3)
   expect(grid.children[0]).toBe(netWorth)
   expect(grid.children[1]).toContainElement(screen.getByRole("heading", { name: "What changed?" }))

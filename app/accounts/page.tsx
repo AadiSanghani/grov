@@ -1,6 +1,6 @@
 "use client"
 import { useState, useEffect, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Button } from '@/components/ui/button';
@@ -95,7 +95,6 @@ const transformAccountsFromApi = (accountsData: Awaited<ReturnType<typeof getAcc
   }));
 
 export default function Accounts() {
-  const router = useRouter();
   const [isAddAccountOpen, setIsAddAccountOpen] = useState(false);
   const [editingAccount, setEditingAccount] = useState<Account | null>(null);
   const [accountToDelete, setAccountToDelete] = useState<Account | null>(null);
@@ -252,11 +251,11 @@ export default function Accounts() {
     }).format(amount);
   };
 
-  const netWorthChartColor = currentNetWorth < 0 ? 'var(--destructive)' : 'var(--accent)';
+  const netWorthChartColor = currentNetWorth < 0 ? 'var(--destructive)' : 'var(--chart-1)';
 
   if (!accountsLoaded) {
     return (
-      <PageLayout title="Accounts" description="Manage accounts and track net worth over time.">
+      <PageLayout title="Accounts" description="Your assets, liabilities, and the balance between them">
         {accountsError ? <p role="alert">{accountsError}{' '}
           <Button variant="outline" onClick={() => setAccountsRetry((value) => value + 1)}>Retry</Button>
         </p> : <p role="status" aria-busy="true" className="text-muted-foreground">Loading accounts…</p>}
@@ -267,22 +266,22 @@ export default function Accounts() {
   return (
     <PageLayout
       title="Accounts"
-      description="Manage accounts and track net worth over time."
+      description="Your assets, liabilities, and the balance between them"
       action={
         <Button onClick={() => setIsAddAccountOpen(true)}>
           <Plus className="w-4 h-4" />
-          Add Account
+          Add account
         </Button>
       }
     >
     {/* Net Worth Chart */}
-    <Card className="w-full mb-6">
+    <Card className="w-full">
         <CardHeader>
             <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <div>
-                    <CardTitle>Net Worth Over Time</CardTitle>
-                    <CardDescription>
-                      Current: {formatCurrency(currentNetWorth)}
+                    <CardTitle className="text-base font-medium">Net worth over time</CardTitle>
+                    <CardDescription className="mt-3 text-3xl font-medium tracking-tight text-foreground">
+                      {formatCurrency(currentNetWorth)}
                     </CardDescription>
                 </div>
                 <Select value={netWorthTimeline} onValueChange={setNetWorthTimeline}>
@@ -299,7 +298,7 @@ export default function Accounts() {
                 </Select>
             </div>
         </CardHeader>
-        <CardContent className="pt-6" aria-busy={loadingNetWorth}>
+        <CardContent aria-busy={loadingNetWorth}>
             {loadingNetWorth && historyLoaded && <p role="status" className="text-sm text-muted-foreground">Updating history… Showing the previous timeline.</p>}
             {historyError && <p role="alert" className="text-sm text-destructive">{historyError}{' '}
               {historyLoaded && 'Showing the previous timeline. '}
@@ -319,24 +318,27 @@ export default function Accounts() {
                 <AreaChart
                 data={chartData}
                 margin={{
-                    top: 24,
-                    right: 24,
-                    left: 24,
+                    top: 16,
+                    right: 8,
+                    left: 0,
                     bottom: 8,
                 }}
                 >
-                <CartesianGrid strokeDasharray="2 2" horizontal={true} vertical={false} />
-                <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+                <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="name" axisLine={false} tickLine={false} minTickGap={32} tick={{ fontSize: 12, fill: 'var(--muted-foreground)' }} />
                 <YAxis
                   domain={yDomain}
                   tickFormatter={(value) => {
-                    if (value < 0) return `($${Math.abs(value).toLocaleString('en-US', { maximumFractionDigits: 0 })})`;
-                    return `$${value.toLocaleString('en-US', { maximumFractionDigits: 0 })}`;
+                    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', notation: 'compact', maximumFractionDigits: 1 }).format(value);
                   }}
-                  tick={{ fontSize: 12 }}
+                  width={64}
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fontSize: 12, fill: 'var(--muted-foreground)' }}
                 />
                 <Tooltip
                   formatter={(value: number) => formatCurrency(value)}
+                  contentStyle={{ backgroundColor: 'var(--popover)', borderColor: 'var(--border)', borderRadius: 8 }}
                   labelStyle={{ color: 'var(--foreground)' }}
                 />
                 <Area
@@ -344,14 +346,10 @@ export default function Accounts() {
                   dataKey="Net Worth"
                   stroke={netWorthChartColor}
                   fill={netWorthChartColor}
-                  fillOpacity={0.3}
+                  fillOpacity={0.08}
                   strokeWidth={2}
-                  dot={{
-                    r: 3,
-                    stroke: netWorthChartColor,
-                    strokeWidth: 2,
-                    fill: 'var(--background)',
-                  }}
+                  dot={chartData.length === 1 ? { r: 3, fill: netWorthChartColor } : false}
+                  isAnimationActive={false}
                   activeDot={{
                     r: 5,
                     stroke: netWorthChartColor,
@@ -414,9 +412,12 @@ export default function Accounts() {
                         const total = group.accounts.reduce((sum, acc) => sum + acc.balance, 0);
                         
                         return (
-                            <Card key={group.key} className="w-full">
-                                <div
-                                    className="flex items-center justify-between p-4 cursor-pointer hover:bg-accent/50 transition-colors"
+                            <Card key={group.key} className="w-full gap-0 overflow-hidden py-0">
+                                <button
+                                    type="button"
+                                    aria-expanded={!isCollapsed}
+                                    aria-label={`${group.label}, ${formatCurrency(total)}`}
+                                    className="flex w-full items-center justify-between gap-4 p-4 text-left transition-colors hover:bg-muted/50 focus-visible:outline-offset-[-3px]"
                                     onClick={() => toggleGroup(group.key)}
                                 >
                                     <div className="flex items-center gap-3">
@@ -428,7 +429,7 @@ export default function Accounts() {
                                         <span className="font-semibold">{group.label}</span>
                                     </div>
                                     <span className="font-semibold">{formatCurrency(total)}</span>
-                                </div>
+                                </button>
 
                                 {!isCollapsed && (
                                     <div className="border-t">
@@ -437,37 +438,25 @@ export default function Accounts() {
                                             return (
                                             <div
                                                 key={account.id}
-                                                className="flex cursor-pointer items-center justify-between border-b p-4 transition-colors hover:bg-accent/50 last:border-b-0"
-                                                role="button"
-                                                tabIndex={0}
-                                                onClick={() => router.push(`/accounts/${account.id}`)}
-                                                onKeyDown={(event) => {
-                                                  if (event.key === 'Enter' || event.key === ' ') {
-                                                    event.preventDefault();
-                                                    router.push(`/accounts/${account.id}`);
-                                                  }
-                                                }}
+                                                className="flex items-center gap-3 border-b px-4 py-3 last:border-b-0"
                                             >
-                                                <div className="flex items-center gap-4 flex-1 min-w-0">
-                                                    <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center shrink-0">
-                                                        <IconComponent className="h-5 w-5" />
+                                                <Link href={`/accounts/${account.id}`} className="flex min-w-0 flex-1 items-center gap-3 rounded-lg py-2 transition-colors hover:text-primary">
+                                                    <div className="hidden size-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground sm:flex">
+                                                        <IconComponent aria-hidden="true" className="size-4" />
                                                     </div>
                                                     <div className="flex-1 min-w-0">
-                                                        <div className="font-medium">{account.name}</div>
-                                                        <div className="text-sm text-muted-foreground">{account.subtype}</div>
+                                                        <div className="truncate text-sm font-medium">{account.name}</div>
+                                                        <div className="truncate text-xs text-muted-foreground">{account.subtype}</div>
                                                     </div>
-                                                </div>
-                                                <div className="flex items-center gap-2 shrink-0">
-                                                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); setEditingAccount(account); }} aria-label="Edit account">
+                                                    <span className="shrink-0 text-right text-sm font-medium tabular-nums">{formatCurrency(account.balance)}</span>
+                                                </Link>
+                                                <div className="flex items-center gap-1 shrink-0">
+                                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={() => setEditingAccount(account)} aria-label={`Edit ${account.name}`}>
                                                         <Pencil className="h-4 w-4" />
                                                     </Button>
-                                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={(e) => { e.stopPropagation(); setAccountToDelete(account); }} aria-label="Archive account">
+                                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" onClick={() => setAccountToDelete(account)} aria-label={`Archive ${account.name}`}>
                                                         <Archive className="h-4 w-4" />
                                                     </Button>
-                                                </div>
-                                                <div className="text-right w-24 shrink-0">
-                                                    <div className="font-semibold">{formatCurrency(account.balance)}</div>
-                                                    <div className="text-sm text-muted-foreground">{account.lastUpdated}</div>
                                                 </div>
                                             </div>
                                             );
@@ -479,8 +468,10 @@ export default function Accounts() {
                     })
                 ) : (
                     <Card className="w-full">
-                        <CardContent className="p-8 text-center text-muted-foreground">
-                            No accounts yet. Click &quot;Add Account&quot; to get started.
+                        <CardContent className="py-8 text-center">
+                            <h2 className="text-base font-medium">Start with an account</h2>
+                            <p className="mx-auto mt-2 max-w-72 text-sm leading-6 text-muted-foreground">Add your cash, investments, or credit card to see where you stand</p>
+                            <Button className="mt-4" variant="outline" onClick={() => setIsAddAccountOpen(true)}><Plus className="size-4" />Add account</Button>
                         </CardContent>
                     </Card>
                 )}

@@ -45,15 +45,15 @@ export function InvestmentsRecentTransactions({
           <table className="w-full min-w-[900px] border-collapse">
             <thead>
               <tr className="border-b bg-muted/30">
-                <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Date</th>
-                <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Type</th>
-                <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Ticker</th>
-                <th className="px-3 py-2 text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground">Qty</th>
-                <th className="px-3 py-2 text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground">Unit Price</th>
-                <th className="px-3 py-2 text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground">Fees</th>
-                <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Currency</th>
-                <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Account</th>
-                <th className="px-3 py-2 text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground">Actions</th>
+                <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">Date</th>
+                <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">Type</th>
+                <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">Ticker</th>
+                <th className="px-3 py-2 text-right text-xs font-medium text-muted-foreground">Qty</th>
+                <th className="px-3 py-2 text-right text-xs font-medium text-muted-foreground">Unit Price</th>
+                <th className="px-3 py-2 text-right text-xs font-medium text-muted-foreground">Fees</th>
+                <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">Currency</th>
+                <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">Account</th>
+                <th className="px-3 py-2 text-right text-xs font-medium text-muted-foreground">Actions</th>
               </tr>
             </thead>
             <tbody>

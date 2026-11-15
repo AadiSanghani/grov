@@ -22,16 +22,16 @@ export function PageLayout({
 }: PageLayoutProps) {
   return (
     <div className="min-h-[calc(100svh-3.5rem)] bg-background md:min-h-svh">
-      <div className="mx-auto flex min-h-[calc(100svh-3.5rem)] min-w-0 max-w-[1600px] md:min-h-svh flex-col gap-6 px-4 py-6 sm:px-6 md:py-8 lg:gap-8 lg:px-10">
+      <div className="mx-auto flex min-h-[calc(100svh-3.5rem)] min-w-0 max-w-[1440px] md:min-h-svh flex-col gap-6 px-4 py-6 sm:px-6 md:py-8 lg:gap-8 lg:px-8">
         {(title || description || action) && (
-          <header className="flex shrink-0 flex-col items-start justify-between gap-4 border-b pb-5 sm:flex-row sm:items-center">
+          <header className="flex shrink-0 flex-col items-start justify-between gap-4 border-b pb-6 sm:flex-row sm:items-center">
             {(title || description) && (
               <div className="min-w-0">
                 {title && (
-                  <h1 className="text-2xl font-semibold tracking-tight text-balance sm:text-3xl">{title}</h1>
+                  <h1 className="text-2xl font-medium tracking-tight text-balance sm:text-3xl">{title}</h1>
                 )}
                 {description && (
-                  <p className="mt-1.5 max-w-2xl text-sm leading-relaxed text-muted-foreground">
+                  <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
                     {description}
                   </p>
                 )}

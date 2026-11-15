@@ -235,7 +235,7 @@ export function TransactionToolbar(props: TransactionFiltersProps) {
   return (
     <section
       aria-label="Filter transactions"
-      className="min-w-0 rounded-xl border bg-background"
+      className="min-w-0 rounded-xl border bg-card"
     >
       <div className="flex flex-wrap items-center gap-2 p-3">
         <div className="relative min-w-48 flex-1">

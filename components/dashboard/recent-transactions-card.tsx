@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { format } from "date-fns"
-import { ChevronRight } from "lucide-react"
+import { ArrowDownLeft, ArrowLeftRight, ArrowUpRight, ChevronRight } from "lucide-react"
 
 import { DashboardCard } from "@/components/dashboard-card"
 import { cn, findCategoryByValue, getSpendingAmount, isReimbursementTransaction } from "@/lib/utils"
@@ -32,7 +32,7 @@ export function RecentTransactionsCard({
   if (loading) {
     return (
       <DashboardCard
-        title="Recent Transactions"
+        title={<h2>Recent transactions</h2>}
         actions={
           <Link
             href="/transactions"
@@ -51,7 +51,7 @@ export function RecentTransactionsCard({
 
   return (
     <DashboardCard
-      title="Recent Transactions"
+      title={<h2>Recent transactions</h2>}
       actions={
         <Link
           href="/transactions"
@@ -63,19 +63,21 @@ export function RecentTransactionsCard({
     >
       {transactions.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-8 text-center">
-          <p className="text-xs text-muted-foreground">No transactions yet.</p>
+          <p className="text-sm font-medium">Your activity starts here</p>
+          <p className="mt-2 text-sm text-muted-foreground">Record an expense, income, or transfer to see it here</p>
           <Link
             href="/transactions"
-            className="mt-1 text-xs font-medium text-primary hover:underline"
+            className="mt-4 text-sm font-medium text-primary underline-offset-4 hover:underline"
           >
             Add your first transaction
           </Link>
         </div>
       ) : (
-        <ul className="space-y-1">
+        <ul className="-my-2 divide-y divide-border/60">
           {transactions.map((transaction) => {
             const isTransfer = transaction.transaction_type === "transfer"
             const isReimbursement = isReimbursementTransaction(transaction)
+            const TransactionIcon = isTransfer ? ArrowLeftRight : transaction.transaction_type === "incoming" ? ArrowDownLeft : ArrowUpRight
             const categoryInfo = findCategoryByValue(categories, transaction.category)
             const transferLabel =
               isTransfer && transaction.to_account_type_id
@@ -90,8 +92,11 @@ export function RecentTransactionsCard({
               <li key={transaction.id}>
                 <Link
                   href="/transactions"
-                  className="flex items-center justify-between gap-2 rounded-lg px-2 py-2 text-left transition-colors hover:bg-muted/50"
+                  className="group flex items-center justify-between gap-3 rounded-lg px-2 py-4 text-left transition-colors hover:bg-muted/50"
                 >
+                  <span className="hidden size-9 shrink-0 items-center justify-center rounded-lg border text-muted-foreground sm:flex">
+                    <TransactionIcon aria-hidden="true" className="size-4" />
+                  </span>
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium">
                       {isTransfer
@@ -103,10 +108,9 @@ export function RecentTransactionsCard({
                         Reimbursement
                       </span>
                     )}
-                    <div className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
+                    <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
                       {!isTransfer && categoryInfo && (
                         <>
-                          <span>{categoryInfo.emoji}</span>
                           <span>{categoryInfo.label}</span>
                           <span>·</span>
                         </>
@@ -119,11 +123,11 @@ export function RecentTransactionsCard({
                       className={cn(
                         "text-sm font-semibold",
                         transaction.transaction_type === "incoming"
-                          ? "text-accent"
+                          ? "text-positive"
                           : "text-foreground",
                       )}
                     >
-                      {transaction.transaction_type === "incoming" ? "+" : ""}$
+                      {transaction.transaction_type === "incoming" ? "+" : transaction.transaction_type === "outgoing" ? "−" : ""}$
                       {(transaction.transaction_type === "outgoing"
                         ? getSpendingAmount(transaction)
                         : transaction.amount

@@ -826,7 +826,6 @@ export function AddTransactionDialog({
                 >
                   {selectedCategory ? (
                     <div className="flex items-center">
-                      <span className="mr-2">{selectedCategory.emoji}</span>
                       <span>{selectedCategory.label}</span>
                     </div>
                   ) : (
@@ -862,7 +861,6 @@ export function AddTransactionDialog({
                                 category === item.value ? "opacity-100" : "opacity-0"
                               )}
                             />
-                            <span className="mr-2">{item.emoji}</span>
                             {item.label}
                           </CommandItem>
                         ))}

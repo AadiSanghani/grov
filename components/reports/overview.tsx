@@ -131,7 +131,7 @@ export function ReportsOverview() {
     <div className="flex min-w-0 flex-col gap-6" aria-busy={loading}>
       <ReportStatus loading={loading} error={error} loadedPeriod={loadedPeriod} onRetry={() => setRetry((value) => value + 1)} />
       <div className="rounded-xl border border-primary/20 bg-secondary/50 px-5 py-5 sm:px-7 sm:py-6">
-        <p className="text-xs font-semibold uppercase tracking-[0.12em] text-secondary-foreground">Your period at a glance</p>
+        <p className="text-xs font-medium text-secondary-foreground">Your period at a glance</p>
         <h2 className="mt-2 max-w-3xl text-2xl font-semibold leading-tight tracking-tight text-foreground sm:text-3xl">{takeaway}</h2>
         <p className="mt-2 text-sm text-muted-foreground">{format(parseISO(data.period.startDate), "MMMM d, yyyy")} – {format(parseISO(data.period.endDate), "MMMM d, yyyy")}</p>
       </div>

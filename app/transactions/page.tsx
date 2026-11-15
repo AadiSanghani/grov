@@ -193,7 +193,7 @@ export default function Transactions() {
   return (
     <PageLayout
       title="Transactions"
-      description="Your money, in detail."
+      description="Every expense, income, and transfer, accounted for"
       contentClassName="flex flex-col gap-4 pb-8"
       action={
         <Button disabled={!loaded} onClick={() => openAdd()}>
@@ -255,7 +255,7 @@ export default function Transactions() {
           <section
             aria-label="Transaction ledger"
             aria-busy={updating}
-            className="min-w-0 rounded-xl border bg-background"
+            className="min-w-0 rounded-xl border bg-card"
           >
             <div className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3">
               <p className="text-sm text-muted-foreground">

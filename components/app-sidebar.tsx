@@ -37,9 +37,9 @@ export function AppSidebar() {
       <SidebarHeader className="h-20 justify-center px-3">
         <div className="flex items-center justify-between gap-2 group-data-[collapsible=icon]:justify-center">
           {expanded && (
-            <span className="grov-wordmark px-2 text-[1.75rem] text-sidebar-primary">
-              Grov
-            </span>
+            <Link href="/" aria-label="Grov dashboard" onNavigate={() => setOpenMobile(false)} className="px-2 py-2">
+              <span className="grov-wordmark text-[1.75rem] text-sidebar-primary">Grov</span>
+            </Link>
           )}
           <SidebarTrigger className="size-10 shrink-0" />
         </div>
@@ -58,7 +58,7 @@ export function AppSidebar() {
                         asChild
                         isActive={isActive}
                         tooltip={item.title}
-                        className="h-11 gap-3 rounded-lg px-3 text-sm font-medium group-data-[collapsible=icon]:size-10! group-data-[collapsible=icon]:p-3! md:h-10 data-[active=true]:shadow-[inset_3px_0_0_var(--sidebar-primary)]"
+                        className="h-11 gap-3 rounded-lg px-3 text-sm font-medium group-data-[collapsible=icon]:size-10! group-data-[collapsible=icon]:p-3! md:h-9"
                       >
                         <Link
                           href={item.url}
@@ -80,8 +80,8 @@ export function AppSidebar() {
       </SidebarContent>
       <SidebarFooter className="gap-3 border-t border-sidebar-border p-3">
         {expanded && (
-          <p className="px-2 text-[11px] font-medium tracking-wide text-muted-foreground">
-            YOUR WORKSPACE
+          <p className="px-2 text-xs text-muted-foreground">
+            Personal workspace
           </p>
         )}
         <UserButton

@@ -154,10 +154,10 @@ export function AddAccountDialog({ open, onOpenChange, setAccounts }: AddAccount
                   {accountTypes.asset.map((type) => (
                     <button
                       key={type.name}
-                      className="group w-full flex items-center gap-3 p-3 rounded-lg hover:bg-accent hover:text-white transition-colors text-left"
+                      className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-muted transition-colors text-left"
                       onClick={() => handleAccountTypeSelect(type.name)}
                     >
-                      <type.icon className="h-5 w-5 text-foreground group-hover:text-white" />
+                      <type.icon className="size-4 text-muted-foreground" />
                       <span className="text-base">{type.name}</span>
                     </button>
                   ))}
@@ -171,10 +171,10 @@ export function AddAccountDialog({ open, onOpenChange, setAccounts }: AddAccount
                   {accountTypes.liability.map((type) => (
                     <button
                       key={type.name}
-                      className="group w-full flex items-center gap-3 p-3 rounded-lg hover:bg-accent hover:text-white transition-colors text-left"
+                      className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-muted transition-colors text-left"
                       onClick={() => handleAccountTypeSelect(type.name)}
                     >
-                      <type.icon className="h-5 w-5 text-foreground group-hover:text-white" />
+                      <type.icon className="size-4 text-muted-foreground" />
                       <span className="text-base">{type.name}</span>
                     </button>
                   ))}
@@ -308,4 +308,3 @@ export function AddAccountDialog({ open, onOpenChange, setAccounts }: AddAccount
     </Dialog>
   );
 }
-

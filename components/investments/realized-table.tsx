@@ -25,13 +25,13 @@ export function InvestmentsRealizedTable({ rows, emptyMessage }: RealizedTablePr
       <table className="w-full min-w-[860px] border-collapse">
         <thead>
           <tr className="border-b bg-muted/40">
-            <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Date</th>
-            <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Ticker</th>
-            <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Account</th>
-            <th className="px-3 py-2 text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground">Qty Sold</th>
-            <th className="px-3 py-2 text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground">Proceeds (CAD)</th>
-            <th className="px-3 py-2 text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground">Cost Basis (CAD)</th>
-            <th className="px-3 py-2 text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground">Realized P/L</th>
+            <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">Date</th>
+            <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">Ticker</th>
+            <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">Account</th>
+            <th className="px-3 py-2 text-right text-xs font-medium text-muted-foreground">Qty Sold</th>
+            <th className="px-3 py-2 text-right text-xs font-medium text-muted-foreground">Proceeds (CAD)</th>
+            <th className="px-3 py-2 text-right text-xs font-medium text-muted-foreground">Cost Basis (CAD)</th>
+            <th className="px-3 py-2 text-right text-xs font-medium text-muted-foreground">Realized P/L</th>
           </tr>
         </thead>
         <tbody>

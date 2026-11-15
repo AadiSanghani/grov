@@ -25,14 +25,12 @@ export function DashboardCard({
 }: DashboardCardProps) {
   return (
     <Card className={cn("gap-0 py-0 shadow-none", className)} {...props}>
-      <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2 border-b px-5 py-4 pb-4! sm:px-6">
-        <CardTitle className="text-lg font-semibold tracking-tight">
-          {title}
-        </CardTitle>
-        {description ? (
-          <CardDescription className="w-full">{description}</CardDescription>
-        ) : null}
-        {actions ? <div className="flex shrink-0">{actions}</div> : null}
+      <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-4 border-b px-5 py-4 pb-4! sm:px-6">
+        <div className="min-w-0">
+          <CardTitle className="text-base font-medium leading-6">{title}</CardTitle>
+          {description ? <CardDescription className="mt-1 leading-5">{description}</CardDescription> : null}
+        </div>
+        {actions ? <div className="flex max-w-full shrink-0">{actions}</div> : null}
       </CardHeader>
       <CardContent className="px-5 py-5 sm:px-6 sm:py-6">{children}</CardContent>
     </Card>

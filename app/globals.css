@@ -45,79 +45,74 @@
 }
 
 :root {
-  --radius: 0.625rem;
-  --background: #f7f7f2;
-  --foreground: #243331;
+  --radius: 0.5rem;
+  --background: #f6f7f8;
+  --foreground: #24313a;
   --card: #ffffff;
-  --card-foreground: #243331;
+  --card-foreground: #24313a;
   --popover: #ffffff;
-  --popover-foreground: #243331;
+  --popover-foreground: #24313a;
   --primary: #22577a;
   --primary-foreground: #ffffff;
-  --secondary: #e5eee8;
-  --secondary-foreground: #264b3d;
-  --muted: #eeefe9;
-  --muted-foreground: #626e68;
-  --accent: #28786f;
-  --accent-foreground: #ffffff;
+  --secondary: #edf0f2;
+  --secondary-foreground: #344650;
+  --muted: #edf0f2;
+  --muted-foreground: #606c76;
+  --accent: #edf0f2;
+  --accent-foreground: #24313a;
   --destructive: #bc3e3e;
   --destructive-foreground: #ffffff;
-  --border: #dfe3da;
-  --input: #cbd2c8;
-  --ring: #28736f;
+  --border: #dfe4e8;
+  --input: #cbd3d9;
+  --ring: #22577a;
   --chart-1: #22577a;
-  --chart-2: #38a3a5;
-  --chart-3: #57cc99;
-  --chart-4: #80ed99;
-  --chart-5: #22577a;
-  --sidebar: #f0f2eb;
-  --sidebar-foreground: #45574e;
+  --chart-2: #608497;
+  --chart-3: #819aa8;
+  --chart-4: #a6b9c4;
+  --chart-5: #75808c;
+  --sidebar: #f0f2f4;
+  --sidebar-foreground: #56636d;
   --sidebar-primary: #22577a;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #dfeae4;
-  --sidebar-accent-foreground: #214c42;
-  --sidebar-border: #dce2d7;
-  --sidebar-ring: #28736f;
+  --sidebar-accent: #e2e9ef;
+  --sidebar-accent-foreground: #22577a;
+  --sidebar-border: #dfe4e8;
+  --sidebar-ring: #22577a;
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  /* Primary: Lighter Baltic Blue for dark mode */
-  --primary: #38A3A5;
-  --primary-foreground: oklch(0.985 0 0);
-  /* Secondary: Emerald for dark mode */
-  --secondary: #57CC99;
-  --secondary-foreground: oklch(0.145 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  /* Accent: Tropical Teal */
-  --accent: #38a3a5;
-  --accent-foreground: #ffffff;
-  --destructive: oklch(0.704 0.191 22.216);
-  --destructive-foreground: oklch(0.985 0 0);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: #38A3A5;
-  /* Chart colors using the palette for dark mode */
-  --chart-1: #38A3A5; /* Tropical Teal */
-  --chart-2: #57CC99; /* Emerald */
-  --chart-3: #80ED99; /* Light Green */
-  --chart-4: #22577A; /* Baltic Blue */
-  --chart-5: #38A3A5; /* Tropical Teal */
-  /* Sidebar: Dark theme with palette */
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: #38A3A5;
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: #233b38;
-  --sidebar-accent-foreground: #c1e6da;
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: #38A3A5;
+  --background: #15191d;
+  --foreground: #e6ebef;
+  --card: #1b2025;
+  --card-foreground: #e6ebef;
+  --popover: #1b2025;
+  --popover-foreground: #e6ebef;
+  --primary: #9cc4df;
+  --primary-foreground: #142b3a;
+  --secondary: #272e35;
+  --secondary-foreground: #d4dce2;
+  --muted: #272e35;
+  --muted-foreground: #a0adb8;
+  --accent: #2a333c;
+  --accent-foreground: #e6ebef;
+  --destructive: #f18b8b;
+  --destructive-foreground: #321818;
+  --border: #323b44;
+  --input: #46515c;
+  --ring: #9cc4df;
+  --chart-1: #9cc4df;
+  --chart-2: #82a8bd;
+  --chart-3: #718f9f;
+  --chart-4: #567182;
+  --chart-5: #b4c1cb;
+  --sidebar: #181d21;
+  --sidebar-foreground: #a0adb8;
+  --sidebar-primary: #9cc4df;
+  --sidebar-primary-foreground: #142b3a;
+  --sidebar-accent: #273644;
+  --sidebar-accent-foreground: #c5deee;
+  --sidebar-border: #323b44;
+  --sidebar-ring: #9cc4df;
 }
 
 @layer base {
@@ -127,6 +122,9 @@
   body {
     @apply bg-background text-foreground font-sans antialiased;
     font-variant-numeric: tabular-nums;
+  }
+  button, a, input, select, textarea {
+    -webkit-tap-highlight-color: transparent;
   }
   :where(a, button, input, select, textarea, [tabindex]):focus-visible {
     outline: 2px solid var(--ring);
@@ -144,8 +142,8 @@
 /* A serif wordmark keeps Grov's character without a second font download. */
 .grov-wordmark {
   font-family: Georgia, "Times New Roman", serif;
-  font-weight: 700;
-  letter-spacing: -0.065em;
+  font-weight: 600;
+  letter-spacing: -0.04em;
   line-height: 1;
 }
 
@@ -172,7 +170,7 @@
 }
 
 .dark .text-positive {
-  color: #80ed99;
+  color: #8ac8a9;
 }
 
 .text-negative {

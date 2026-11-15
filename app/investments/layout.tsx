@@ -16,7 +16,7 @@ export default function InvestmentsLayout({
   children: React.ReactNode
 }) {
   return (
-    <PageLayout title="Investments" description="Track your portfolio, allocation, and realized performance.">
+    <PageLayout title="Investments" description="Your portfolio, from individual holdings to the bigger picture">
       <SectionTabs tabs={TABS} label="Investments sections" />
       {children}
     </PageLayout>

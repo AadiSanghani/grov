@@ -178,7 +178,7 @@ export const TransactionList = React.memo(function TransactionList({
     <>
     <div className="space-y-5">
       <div className="hidden items-center px-3 md:flex">
-        <div className={cn("grid flex-1 gap-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground", ROW_GRID_TEMPLATE)}>
+        <div className={cn("grid flex-1 gap-2 text-xs font-medium text-muted-foreground", ROW_GRID_TEMPLATE)}>
           <span>Merchant</span>
           <span>Category</span>
           <span>Notes</span>
@@ -296,7 +296,6 @@ export const TransactionList = React.memo(function TransactionList({
                         <span className="truncate">Reimbursement</span>
                       ) : categoryInfo ? (
                         <>
-                          <span className="shrink-0">{categoryInfo.emoji}</span>
                           <span className="truncate">{categoryInfo.label}</span>
                         </>
                       ) : (

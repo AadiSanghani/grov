@@ -89,12 +89,12 @@ function HeaderCell({
   align?: 'left' | 'right'
 }) {
   return (
-    <th className={`px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground ${align === 'right' ? 'text-right' : 'text-left'}`}>
+    <th className={`px-3 py-2 text-xs font-medium text-muted-foreground ${align === 'right' ? 'text-right' : 'text-left'}`}>
       <Button
         type="button"
         variant="ghost"
         size="sm"
-        className={`h-7 p-0 text-xs font-semibold uppercase tracking-wide ${align === 'right' ? 'ml-auto flex justify-end' : ''}`}
+        className={`h-7 p-0 text-xs font-medium ${align === 'right' ? 'ml-auto flex justify-end' : ''}`}
         onClick={() => onSort(sortKey)}
       >
         {title}
@@ -146,7 +146,7 @@ export function InvestmentsHoldingsTable({ holdings, onEditHolding }: HoldingsTa
               <HeaderCell title="Allocation" sortKey="allocation_pct" currentSort={sortKey} direction={direction} onSort={onSort} align="right" />
               <HeaderCell title="Account" sortKey="account_name" currentSort={sortKey} direction={direction} onSort={onSort} />
               {onEditHolding ? (
-                <th className="px-3 py-2 text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground">Actions</th>
+                <th className="px-3 py-2 text-right text-xs font-medium text-muted-foreground">Actions</th>
               ) : null}
             </tr>
           </thead>
