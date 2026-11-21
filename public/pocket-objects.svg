@@ -1,0 +1,332 @@
+<svg xmlns="http://www.w3.org/2000/svg">
+<defs>
+<linearGradient id="leather" x2=".85" y2="1" gradientUnits="objectBoundingBox">
+<stop offset="0" stop-color="#ffb58a"/>
+<stop offset="0.11" stop-color="#ff845e"/>
+<stop offset="0.51" stop-color="#f24b37"/>
+<stop offset="0.83" stop-color="#e63b2e"/>
+<stop offset="1" stop-color="#b72c22"/>
+</linearGradient>
+<linearGradient id="bronze" x2=".85" y2="1" gradientUnits="objectBoundingBox">
+<stop offset="0" stop-color="#fff9ba"/>
+<stop offset="0.27" stop-color="#ffde68"/>
+<stop offset="0.57" stop-color="#e7a92b"/>
+<stop offset="0.81" stop-color="#ffe584"/>
+<stop offset="1" stop-color="#b5771b"/>
+</linearGradient>
+<linearGradient id="indigo" x2=".85" y2="1" gradientUnits="objectBoundingBox">
+<stop offset="0" stop-color="#99b2ff"/>
+<stop offset="0.3" stop-color="#5372e5"/>
+<stop offset="0.85" stop-color="#2647bd"/>
+<stop offset="1" stop-color="#153185"/>
+</linearGradient>
+<linearGradient id="paper" x2=".85" y2="1" gradientUnits="objectBoundingBox">
+<stop offset="0" stop-color="#fffaeb"/>
+<stop offset="0.6" stop-color="#f8f0d9"/>
+<stop offset="1" stop-color="#dfcfaa"/>
+</linearGradient>
+<linearGradient id="green" x2=".85" y2="1" gradientUnits="objectBoundingBox">
+<stop offset="0" stop-color="#a9e5ae"/>
+<stop offset="0.3" stop-color="#5baa79"/>
+<stop offset="1" stop-color="#23694d"/>
+</linearGradient>
+<filter id="blur" x="-50%" y="-100%" width="200%" height="300%">
+<feGaussianBlur stdDeviation="8"/>
+</filter>
+<pattern id="grain" width="6" height="5" patternUnits="userSpaceOnUse">
+<path d="M1 2q1 -1 2 0m1 2h1" fill="none" stroke="#692019" stroke-opacity=".17" stroke-width=".65"/>
+</pattern>
+</defs>
+<g id="receipt" font-family="Arial,sans-serif">
+<path d="M0 0H152V181l-9.5 -6 -9.5 6l-9.5 -6 -9.5 6l-9.5 -6 -9.5 6l-9.5 -6 -9.5 6l-9.5 -6 -9.5 6l-9.5 -6 -9.5 6l-9.5 -6 -9.5 6l-9.5 -6 -9.5 6V0Z" fill="url(#paper)" />
+<text x="15" y="33" font-size="27" fill="#293a35" font-family="Georgia,serif">Grov</text>
+<text x="15" y="55" font-size="10" fill="#39443c" font-family="monospace">DAILY RECEIPT</text>
+<path d="M15 68h122M15 116h122" fill="none" stroke="#978d7c" stroke-dasharray="3 3"/>
+<text x="15" y="90" font-size="13" fill="#183733" >Coffee</text>
+<text x="136" y="90" font-size="13" fill="#183733" text-anchor="end">4.50</text>
+<text x="15" y="109" font-size="13" fill="#183733" >Train</text>
+<text x="136" y="109" font-size="13" fill="#183733" text-anchor="end">3.25</text>
+<rect x="18" y="135" width="1" height="19" rx="0" fill="#344039"/>
+<rect x="21.2" y="135" width="3" height="19" rx="0" fill="#344039"/>
+<rect x="24.4" y="135" width="2" height="19" rx="0" fill="#344039"/>
+<rect x="27.6" y="135" width="1" height="19" rx="0" fill="#344039"/>
+<rect x="30.8" y="135" width="3" height="19" rx="0" fill="#344039"/>
+<rect x="34" y="135" width="2" height="19" rx="0" fill="#344039"/>
+<rect x="37.2" y="135" width="1" height="19" rx="0" fill="#344039"/>
+<rect x="40.400000000000006" y="135" width="3" height="19" rx="0" fill="#344039"/>
+<rect x="43.6" y="135" width="2" height="19" rx="0" fill="#344039"/>
+<rect x="46.8" y="135" width="1" height="19" rx="0" fill="#344039"/>
+<rect x="50" y="135" width="3" height="19" rx="0" fill="#344039"/>
+<rect x="53.2" y="135" width="2" height="19" rx="0" fill="#344039"/>
+<rect x="56.400000000000006" y="135" width="1" height="19" rx="0" fill="#344039"/>
+<rect x="59.6" y="135" width="3" height="19" rx="0" fill="#344039"/>
+<rect x="62.800000000000004" y="135" width="2" height="19" rx="0" fill="#344039"/>
+<rect x="66" y="135" width="1" height="19" rx="0" fill="#344039"/>
+<rect x="69.2" y="135" width="3" height="19" rx="0" fill="#344039"/>
+<rect x="72.4" y="135" width="2" height="19" rx="0" fill="#344039"/>
+<rect x="75.6" y="135" width="1" height="19" rx="0" fill="#344039"/>
+<rect x="78.80000000000001" y="135" width="3" height="19" rx="0" fill="#344039"/>
+<rect x="82" y="135" width="2" height="19" rx="0" fill="#344039"/>
+<rect x="85.2" y="135" width="1" height="19" rx="0" fill="#344039"/>
+<rect x="88.4" y="135" width="3" height="19" rx="0" fill="#344039"/>
+<rect x="91.60000000000001" y="135" width="2" height="19" rx="0" fill="#344039"/>
+<rect x="94.80000000000001" y="135" width="1" height="19" rx="0" fill="#344039"/>
+<rect x="98" y="135" width="3" height="19" rx="0" fill="#344039"/>
+<rect x="101.2" y="135" width="2" height="19" rx="0" fill="#344039"/>
+<rect x="104.4" y="135" width="1" height="19" rx="0" fill="#344039"/>
+<rect x="107.60000000000001" y="135" width="3" height="19" rx="0" fill="#344039"/>
+<rect x="110.80000000000001" y="135" width="2" height="19" rx="0" fill="#344039"/>
+<rect x="114" y="135" width="1" height="19" rx="0" fill="#344039"/>
+<rect x="117.2" y="135" width="3" height="19" rx="0" fill="#344039"/>
+<rect x="120.4" y="135" width="2" height="19" rx="0" fill="#344039"/>
+<rect x="123.60000000000001" y="135" width="1" height="19" rx="0" fill="#344039"/>
+</g>
+<g id="token" font-family="Arial,sans-serif">
+<circle cy="6" r="46" fill="#926015"/>
+<circle cy="3" r="46" fill="#c28b20"/>
+<circle r="46" fill="url(#bronze)" stroke="#ffed96" stroke-width="2"/>
+<g transform="rotate(0)">
+<path d="M0 -41v4" fill="none" stroke="#ac7419" stroke-width="1.6"/>
+</g>
+<g transform="rotate(8)">
+<path d="M0 -41v4" fill="none" stroke="#ac7419" stroke-width="1.6"/>
+</g>
+<g transform="rotate(16)">
+<path d="M0 -41v4" fill="none" stroke="#ac7419" stroke-width="1.6"/>
+</g>
+<g transform="rotate(24)">
+<path d="M0 -41v4" fill="none" stroke="#ac7419" stroke-width="1.6"/>
+</g>
+<g transform="rotate(32)">
+<path d="M0 -41v4" fill="none" stroke="#ac7419" stroke-width="1.6"/>
+</g>
+<g transform="rotate(40)">
+<path d="M0 -41v4" fill="none" stroke="#ac7419" stroke-width="1.6"/>
+</g>
+<g transform="rotate(48)">
+<path d="M0 -41v4" fill="none" stroke="#ac7419" stroke-width="1.6"/>
+</g>
+<g transform="rotate(56)">
+<path d="M0 -41v4" fill="none" stroke="#ac7419" stroke-width="1.6"/>
+</g>
+<g transform="rotate(64)">
+<path d="M0 -41v4" fill="none" stroke="#ac7419" stroke-width="1.6"/>
+</g>
+<g transform="rotate(72)">
+<path d="M0 -41v4" fill="none" stroke="#ac7419" stroke-width="1.6"/>
+</g>
+<g transform="rotate(80)">
+<path d="M0 -41v4" fill="none" stroke="#ac7419" stroke-width="1.6"/>
+</g>
+<g transform="rotate(88)">
+<path d="M0 -41v4" fill="none" stroke="#ac7419" stroke-width="1.6"/>
+</g>
+<g transform="rotate(96)">
+<path d="M0 -41v4" fill="none" stroke="#ac7419" stroke-width="1.6"/>
+</g>
+<g transform="rotate(104)">
+<path d="M0 -41v4" fill="none" stroke="#ac7419" stroke-width="1.6"/>
+</g>
+<g transform="rotate(112)">
+<path d="M0 -41v4" fill="none" stroke="#ac7419" stroke-width="1.6"/>
+</g>
+<g transform="rotate(120)">
+<path d="M0 -41v4" fill="none" stroke="#ac7419" stroke-width="1.6"/>
+</g>
+<g transform="rotate(128)">
+<path d="M0 -41v4" fill="none" stroke="#ac7419" stroke-width="1.6"/>
+</g>
+<g transform="rotate(136)">
+<path d="M0 -41v4" fill="none" stroke="#ac7419" stroke-width="1.6"/>
+</g>
+<g transform="rotate(144)">
+<path d="M0 -41v4" fill="none" stroke="#ac7419" stroke-width="1.6"/>
+</g>
+<g transform="rotate(152)">
+<path d="M0 -41v4" fill="none" stroke="#ac7419" stroke-width="1.6"/>
+</g>
+<g transform="rotate(160)">
+<path d="M0 -41v4" fill="none" stroke="#ac7419" stroke-width="1.6"/>
+</g>
+<g transform="rotate(168)">
+<path d="M0 -41v4" fill="none" stroke="#ac7419" stroke-width="1.6"/>
+</g>
+<g transform="rotate(176)">
+<path d="M0 -41v4" fill="none" stroke="#ac7419" stroke-width="1.6"/>
+</g>
+<g transform="rotate(184)">
+<path d="M0 -41v4" fill="none" stroke="#ac7419" stroke-width="1.6"/>
+</g>
+<g transform="rotate(192)">
+<path d="M0 -41v4" fill="none" stroke="#ac7419" stroke-width="1.6"/>
+</g>
+<g transform="rotate(200)">
+<path d="M0 -41v4" fill="none" stroke="#ac7419" stroke-width="1.6"/>
+</g>
+<g transform="rotate(208)">
+<path d="M0 -41v4" fill="none" stroke="#ac7419" stroke-width="1.6"/>
+</g>
+<g transform="rotate(216)">
+<path d="M0 -41v4" fill="none" stroke="#ac7419" stroke-width="1.6"/>
+</g>
+<g transform="rotate(224)">
+<path d="M0 -41v4" fill="none" stroke="#ac7419" stroke-width="1.6"/>
+</g>
+<g transform="rotate(232)">
+<path d="M0 -41v4" fill="none" stroke="#ac7419" stroke-width="1.6"/>
+</g>
+<g transform="rotate(240)">
+<path d="M0 -41v4" fill="none" stroke="#ac7419" stroke-width="1.6"/>
+</g>
+<g transform="rotate(248)">
+<path d="M0 -41v4" fill="none" stroke="#ac7419" stroke-width="1.6"/>
+</g>
+<g transform="rotate(256)">
+<path d="M0 -41v4" fill="none" stroke="#ac7419" stroke-width="1.6"/>
+</g>
+<g transform="rotate(264)">
+<path d="M0 -41v4" fill="none" stroke="#ac7419" stroke-width="1.6"/>
+</g>
+<g transform="rotate(272)">
+<path d="M0 -41v4" fill="none" stroke="#ac7419" stroke-width="1.6"/>
+</g>
+<g transform="rotate(280)">
+<path d="M0 -41v4" fill="none" stroke="#ac7419" stroke-width="1.6"/>
+</g>
+<g transform="rotate(288)">
+<path d="M0 -41v4" fill="none" stroke="#ac7419" stroke-width="1.6"/>
+</g>
+<g transform="rotate(296)">
+<path d="M0 -41v4" fill="none" stroke="#ac7419" stroke-width="1.6"/>
+</g>
+<g transform="rotate(304)">
+<path d="M0 -41v4" fill="none" stroke="#ac7419" stroke-width="1.6"/>
+</g>
+<g transform="rotate(312)">
+<path d="M0 -41v4" fill="none" stroke="#ac7419" stroke-width="1.6"/>
+</g>
+<g transform="rotate(320)">
+<path d="M0 -41v4" fill="none" stroke="#ac7419" stroke-width="1.6"/>
+</g>
+<g transform="rotate(328)">
+<path d="M0 -41v4" fill="none" stroke="#ac7419" stroke-width="1.6"/>
+</g>
+<g transform="rotate(336)">
+<path d="M0 -41v4" fill="none" stroke="#ac7419" stroke-width="1.6"/>
+</g>
+<g transform="rotate(344)">
+<path d="M0 -41v4" fill="none" stroke="#ac7419" stroke-width="1.6"/>
+</g>
+<g transform="rotate(352)">
+<path d="M0 -41v4" fill="none" stroke="#ac7419" stroke-width="1.6"/>
+</g>
+<circle r="32" fill="none" stroke="#b78925" stroke-width="2"/>
+<text x="0" y="15" font-size="58" fill="#af761b" font-family="Georgia,serif" text-anchor="middle">g</text>
+<text x="-1" y="13" font-size="58" fill="#ffe69a" font-family="Georgia,serif" text-anchor="middle">g</text>
+</g>
+<g id="green-card" font-family="Arial,sans-serif">
+<rect x="3" y="5" width="240" height="146" rx="17" fill="#233852"/>
+<rect x="0" y="0" width="240" height="146" rx="17" fill="url(#green)"/>
+<text x="18" y="34" font-size="19" fill="#fff3d9" font-weight="600">Everyday account</text>
+<rect x="19" y="55" width="34" height="24" rx="5" fill="url(#bronze)"/>
+<path d="M20 67h32m-16 -11v23" fill="none" stroke="#ad8d49"/>
+<text x="18" y="119" font-size="17" fill="#fff3d9" font-family="monospace">••••   0142</text>
+</g>
+<g id="blue-card" font-family="Arial,sans-serif">
+<rect x="3" y="5" width="240" height="146" rx="17" fill="#233852"/>
+<rect x="0" y="0" width="240" height="146" rx="17" fill="url(#indigo)"/>
+<text x="18" y="34" font-size="19" fill="#fff3d9" font-weight="600">Grov</text>
+<rect x="19" y="55" width="34" height="24" rx="5" fill="url(#bronze)"/>
+<path d="M20 67h32m-16 -11v23" fill="none" stroke="#ad8d49"/>
+<text x="18" y="119" font-size="17" fill="#fff3d9" font-family="monospace">••••   0142</text>
+</g>
+<g id="wallet-back" font-family="Arial,sans-serif">
+<rect x="4" y="0" width="303" height="174" rx="29" fill="#993927"/>
+<rect x="0" y="-4" width="299" height="170" rx="26" fill="#f17b55"/>
+</g>
+<g id="wallet-front" font-family="Arial,sans-serif">
+<rect x="5" y="23" width="301" height="155" rx="28" fill="#a73828"/>
+<rect x="0" y="17" width="300" height="155" rx="26" fill="url(#leather)"/>
+<rect x="0" y="17" width="300" height="155" rx="26" fill="url(#grain)"/>
+<rect x="8" y="24" width="284" height="140" rx="21" fill="none" stroke="#ffd0a0" stroke-width="2" stroke-dasharray="4 4" opacity=".86"/>
+<text x="24" y="138" font-size="39" fill="#a7352a" font-family="Georgia,serif">Grov</text>
+<text x="24" y="136" font-size="39" fill="#ffe4bc" font-family="Georgia,serif">Grov</text>
+<rect x="228" y="66" width="79" height="49" rx="15" fill="#a53125"/>
+<rect x="226" y="61" width="78" height="47" rx="15" fill="url(#leather)"/>
+<circle cx="248" cy="84" r="12" fill="#b5452e"/>
+<circle cx="247" cy="82" r="11" fill="url(#bronze)"/>
+<circle cx="247" cy="82" r="7.5" fill="none" stroke="#c39431"/>
+</g>
+<g id="tag-back" font-family="Arial,sans-serif">
+<path d="M30 0H184Q199 0 199 15V110Q199 124 184 124H30L0 92V31Z" fill="#304848" transform="translate(3 5)"/>
+<path d="M30 0H184Q199 0 199 15V110Q199 124 184 124H30L0 92V31Z" fill="url(#green)" />
+<circle cx="23" cy="62" r="7" fill="#293b40"/>
+<circle cx="23" cy="62" r="4" fill="#ffa9a1"/>
+<text x="46" y="29" font-size="10" fill="#fff3d8" font-family="monospace">GROV / TRIP 02</text>
+<text x="46" y="75" font-size="44" fill="#fff3d8" font-family="Georgia,serif">TRIP</text>
+<text x="47" y="103" font-size="14" fill="#fff3d8" >Shared expenses</text>
+</g>
+<g id="tag-front" font-family="Arial,sans-serif">
+<path d="M30 0H184Q199 0 199 15V110Q199 124 184 124H30L0 92V31Z" fill="#304848" transform="translate(3 5)"/>
+<path d="M30 0H184Q199 0 199 15V110Q199 124 184 124H30L0 92V31Z" fill="url(#indigo)" />
+<circle cx="23" cy="62" r="7" fill="#293b40"/>
+<circle cx="23" cy="62" r="4" fill="#ffa9a1"/>
+<text x="46" y="29" font-size="10" fill="#fff3d8" font-family="monospace">GROV / TRIP 01</text>
+<text x="46" y="75" font-size="44" fill="#fff3d8" font-family="Georgia,serif">YUL</text>
+<text x="47" y="103" font-size="14" fill="#fff3d8" >Montréal</text>
+</g>
+<g id="stack-green" font-family="Arial,sans-serif">
+<g transform="translate(0 0)">
+<ellipse cy="0" rx="46" ry="22" fill="#35704d"/>
+<path d="M-46 0v-8h92v8" fill="#35704d"/>
+<ellipse cy="-8" rx="46" ry="22" fill="url(#green)" stroke="#fff6c5" stroke-opacity=".5"/>
+<ellipse cy="-13" rx="46" ry="22" fill="#35704d"/>
+<path d="M-46 -13v-8h92v8" fill="#35704d"/>
+<ellipse cy="-21" rx="46" ry="22" fill="url(#green)" stroke="#fff6c5" stroke-opacity=".5"/>
+<ellipse cy="-26" rx="46" ry="22" fill="#35704d"/>
+<path d="M-46 -26v-8h92v8" fill="#35704d"/>
+<ellipse cy="-34" rx="46" ry="22" fill="url(#green)" stroke="#fff6c5" stroke-opacity=".5"/>
+<ellipse cy="-39" rx="46" ry="22" fill="#35704d"/>
+<path d="M-46 -39v-8h92v8" fill="#35704d"/>
+<ellipse cy="-47" rx="46" ry="22" fill="url(#green)" stroke="#fff6c5" stroke-opacity=".5"/>
+<ellipse cy="-52" rx="46" ry="22" fill="#35704d"/>
+<path d="M-46 -52v-8h92v8" fill="#35704d"/>
+<ellipse cy="-60" rx="46" ry="22" fill="url(#green)" stroke="#fff6c5" stroke-opacity=".5"/>
+<ellipse cy="-65" rx="46" ry="22" fill="#35704d"/>
+<path d="M-46 -65v-8h92v8" fill="#35704d"/>
+<ellipse cy="-73" rx="46" ry="22" fill="url(#green)" stroke="#fff6c5" stroke-opacity=".5"/>
+<ellipse cy="-78" rx="46" ry="22" fill="#35704d"/>
+<path d="M-46 -78v-8h92v8" fill="#35704d"/>
+<ellipse cy="-86" rx="46" ry="22" fill="url(#green)" stroke="#fff6c5" stroke-opacity=".5"/>
+</g>
+</g>
+<g id="stack-blue" font-family="Arial,sans-serif">
+<g transform="translate(0 0)">
+<ellipse cy="0" rx="46" ry="22" fill="#323b8e"/>
+<path d="M-46 0v-8h92v8" fill="#323b8e"/>
+<ellipse cy="-8" rx="46" ry="22" fill="url(#indigo)" stroke="#fff6c5" stroke-opacity=".5"/>
+<ellipse cy="-13" rx="46" ry="22" fill="#323b8e"/>
+<path d="M-46 -13v-8h92v8" fill="#323b8e"/>
+<ellipse cy="-21" rx="46" ry="22" fill="url(#indigo)" stroke="#fff6c5" stroke-opacity=".5"/>
+<ellipse cy="-26" rx="46" ry="22" fill="#323b8e"/>
+<path d="M-46 -26v-8h92v8" fill="#323b8e"/>
+<ellipse cy="-34" rx="46" ry="22" fill="url(#indigo)" stroke="#fff6c5" stroke-opacity=".5"/>
+<ellipse cy="-39" rx="46" ry="22" fill="#323b8e"/>
+<path d="M-46 -39v-8h92v8" fill="#323b8e"/>
+<ellipse cy="-47" rx="46" ry="22" fill="url(#indigo)" stroke="#fff6c5" stroke-opacity=".5"/>
+</g>
+</g>
+<g id="stack-gold" font-family="Arial,sans-serif">
+<g transform="translate(0 0)">
+<ellipse cy="0" rx="46" ry="22" fill="#ad7920"/>
+<path d="M-46 0v-8h92v8" fill="#ad7920"/>
+<ellipse cy="-8" rx="46" ry="22" fill="url(#bronze)" stroke="#fff6c5" stroke-opacity=".5"/>
+<ellipse cy="-13" rx="46" ry="22" fill="#ad7920"/>
+<path d="M-46 -13v-8h92v8" fill="#ad7920"/>
+<ellipse cy="-21" rx="46" ry="22" fill="url(#bronze)" stroke="#fff6c5" stroke-opacity=".5"/>
+<ellipse cy="-26" rx="46" ry="22" fill="#ad7920"/>
+<path d="M-46 -26v-8h92v8" fill="#ad7920"/>
+<ellipse cy="-34" rx="46" ry="22" fill="url(#bronze)" stroke="#fff6c5" stroke-opacity=".5"/>
+</g>
+</g>
+</svg>

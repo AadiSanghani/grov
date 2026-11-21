@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/sidebar"
 
 const items = [
-  { title: "Dashboard", url: "/", match: "/dashboard", icon: Home },
+  { title: "Dashboard", url: "/dashboard", match: "/dashboard", icon: Home },
   { title: "Accounts", url: "/accounts", match: "/accounts", icon: LayoutDashboard },
   { title: "Transactions", url: "/transactions", match: "/transactions", icon: CreditCard },
   { title: "Investments", url: "/investments", match: "/investments", icon: TrendingUp },
@@ -37,7 +37,7 @@ export function AppSidebar() {
       <SidebarHeader className="h-20 justify-center px-3">
         <div className="flex items-center justify-between gap-2 group-data-[collapsible=icon]:justify-center">
           {expanded && (
-            <Link href="/" aria-label="Grov dashboard" onNavigate={() => setOpenMobile(false)} className="px-2 py-2">
+            <Link href="/dashboard" aria-label="Grov dashboard" onNavigate={() => setOpenMobile(false)} className="px-2 py-2">
               <span className="grov-wordmark text-[1.75rem] text-sidebar-primary">Grov</span>
             </Link>
           )}

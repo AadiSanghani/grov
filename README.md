@@ -13,7 +13,7 @@ Personal finance web app: accounts, transactions, reports, trips, and investment
 - **Reports** — Period overview, cash flow, spending, and income with category drill-downs
 - **Trips** — Trip tracking linked to transactions  
 
-Sign-in and sign-up are public; all other routes require an authenticated Clerk user.
+Signed-out visitors see the Pocket Objects landing page at `/`. Signed-in visitors to `/` go to `/dashboard`, preserving dashboard filters. Sign-in and sign-up remain public; workspace pages and API routes require authentication.
 
 ## Tech stack
 

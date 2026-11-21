@@ -1,7 +1,7 @@
 import { cloneElement, type ReactElement, type ReactNode } from "react"
 import { fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { beforeEach, expect, it, vi } from "vitest"
-import Home from "@/app/page"
+import Home from "@/app/dashboard/page"
 import { SpendingCard, SpendingChangesCard } from "@/components/dashboard/spending-card"
 import type { SpendingSeriesResult } from "@/lib/spending"
 
