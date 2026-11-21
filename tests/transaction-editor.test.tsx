@@ -35,7 +35,7 @@ const accounts: Account[] = [1, 2].map((id) => ({
   category: "asset",
 }))
 const categories = [
-  { id: 1, name: "Dining Out", emoji: "", group_name: "Food" },
+  { id: 1, name: "Dining Out", emoji: "🍽️", group_name: "Food" },
 ]
 const transaction: Transaction = {
   id: "10",
@@ -69,6 +69,23 @@ function deferred() {
 }
 
 describe("transaction editor", () => {
+  it.each(["add", "edit"])("shows category emojis in the %s picker and selected category", async (editor) => {
+    const user = userEvent.setup()
+    render(editor === "add"
+      ? <AddTransactionDialog {...props} />
+      : <EditTransactionDialog {...props} transaction={transaction} onTransactionUpdated={vi.fn()} />)
+
+    const category = screen.getByRole("combobox", { name: "Category" })
+    if (editor === "edit") expect(category).toHaveTextContent("🍽️")
+    await user.click(category)
+    const option = screen.getByRole("option", { name: "Dining Out" })
+    expect(option).toHaveTextContent("🍽️")
+    await user.click(option)
+    expect(category).toHaveTextContent("🍽️")
+    expect(category).toHaveTextContent("Dining Out")
+    expect(category.querySelector('[aria-hidden="true"]')).toHaveTextContent("🍽️")
+  })
+
   it("keeps edits local until success, rejects repeated shortcuts, and retains the draft after failure", async () => {
     const pending = deferred()
     actions.update

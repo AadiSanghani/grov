@@ -420,7 +420,9 @@ function SharedLedgerTable({
                   <span className="truncate">{entry.payer_names.join(", ") || "Unknown"}</span>
                 </td>
                 <td className="py-3 pr-4 text-muted-foreground">
-                  {category?.label ?? entry.grov_category}
+                  {category ? (
+                    <><span aria-hidden="true" className="mr-2">{category.emoji}</span>{category.label}</>
+                  ) : entry.grov_category}
                 </td>
                 <td className="py-3 pr-4 text-right tabular-nums">
                   {formatCurrency(entry.total_cost, entry.currency || currency)}

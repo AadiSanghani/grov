@@ -296,6 +296,7 @@ export const TransactionList = React.memo(function TransactionList({
                         <span className="truncate">Reimbursement</span>
                       ) : categoryInfo ? (
                         <>
+                          <span aria-hidden="true" className="shrink-0">{categoryInfo.emoji}</span>
                           <span className="truncate">{categoryInfo.label}</span>
                         </>
                       ) : (

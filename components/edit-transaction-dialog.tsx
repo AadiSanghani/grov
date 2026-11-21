@@ -810,6 +810,7 @@ export function EditTransactionDialog({
                   >
                     {selectedCategory ? (
                       <div className="flex items-center">
+                        <span aria-hidden="true" className="mr-2">{selectedCategory.emoji}</span>
                         <span>{selectedCategory.label}</span>
                       </div>
                     ) : (
@@ -845,6 +846,7 @@ export function EditTransactionDialog({
                                   category === item.value ? "opacity-100" : "opacity-0"
                                 )}
                               />
+                              <span aria-hidden="true" className="mr-2">{item.emoji}</span>
                               {item.label}
                             </CommandItem>
                           ))}

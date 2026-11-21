@@ -14,7 +14,7 @@ Keep Grov’s serif wordmark, bundled Geist font, blue brand accent, features, a
 
 1. Spacing: unify page gutters, card spacing, control heights, and compact desktop navigation. Remove duplicated spacing above the account chart and inside grouped accounts.
 2. Color: replace competing green surfaces and teal hover fills with an ink-tinted neutral ramp. Keep blue for primary actions and chart series, with semantic colors for signed changes. Provide equivalent dark tokens.
-3. Icons: retain Lucide navigation icons and remove decorative category emoji from transaction pickers, ledger rows, and trip details. Category data remains unchanged.
+3. Icons: retain Lucide navigation icons and category emoji in transaction pickers, ledger rows, dashboard activity, and trip details. Category emoji were restored at the user's request; hide them from assistive technology where the adjacent category name provides the label. Category data remains unchanged.
 4. Copy: replace generic page descriptions, label financial comparisons, and remove the unsupported “Just now” account timestamp.
 5. Type: use lighter page headings and larger balance figures. Replace uppercase, tracked table headings with readable sentence-style labels.
 6. Layout: give net worth more width than the category-change list while preserving the full-width spending chart. Reuse the shared metric strip for trips.
