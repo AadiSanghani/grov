@@ -51,7 +51,10 @@ export function PocketLanding() {
       <svg className="pocket-flight" aria-hidden="true" focusable="false"><g><use href="/pocket-objects.svg#receipt" /></g></svg>
     </div>
     {chapters.slice(1).map((chapter, index) => <Chapter key={chapter.id} index={index + 1} />)}
-    <footer className="pocket-close"><div><div className="pocket-kicker">Back in your pocket</div><h2>Your money awaits.</h2></div><Login /></footer>
+    <footer className="pocket-close">
+      <div><div className="pocket-kicker">Back in your pocket</div><h2>Your money awaits.</h2></div>
+      <div className="flex flex-wrap items-center gap-6"><Link href="/privacy" className="underline underline-offset-4">Privacy</Link><Login /></div>
+    </footer>
     <PocketMotion />
   </div>
 }

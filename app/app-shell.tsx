@@ -7,7 +7,7 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar"
 import { AppSidebar } from "@/components/app-sidebar"
 
 function isPublicPath(pathname: string) {
-  return pathname === "/" || ["/sign-in", "/sign-up"].some(
+  return pathname === "/" || pathname === "/privacy" || ["/sign-in", "/sign-up"].some(
     (route) => pathname === route || pathname.startsWith(`${route}/`)
   )
 }

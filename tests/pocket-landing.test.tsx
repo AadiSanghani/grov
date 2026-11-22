@@ -12,6 +12,7 @@ it("serves the illustrated guide and local login links without a session or clie
   expect(document.querySelector("h1")?.textContent).toContain("Big picture.")
   for (const link of document.querySelectorAll('a[href^="#"]')) expect(document.querySelector(link.getAttribute("href")!)).not.toBeNull()
   expect(document.querySelectorAll('a[href="/sign-in"]')).toHaveLength(3)
+  expect(document.querySelector('footer a[href="/privacy"]')?.textContent).toBe("Privacy")
   expect(document.querySelectorAll("dl")).toHaveLength(4)
   expect(document.body.textContent).not.toMatch(/pricing|sign up/i)
   expect(redirect).not.toHaveBeenCalled()

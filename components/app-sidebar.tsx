@@ -81,7 +81,7 @@ export function AppSidebar() {
       <SidebarFooter className="gap-3 border-t border-sidebar-border p-3">
         {expanded && (
           <p className="px-2 text-xs text-muted-foreground">
-            Personal workspace
+            Personal workspace · <Link href="/privacy" onNavigate={() => setOpenMobile(false)} className="underline underline-offset-4">Privacy</Link>
           </p>
         )}
         <UserButton
